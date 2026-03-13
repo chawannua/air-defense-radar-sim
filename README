@@ -1,0 +1,53 @@
+# Air Defense Radar Simulator 📡🚀
+
+### 🎓 Final Project - Object-Oriented Programming (OOP)
+**Education Purpose Only**
+
+A real-time Air Defense Radar Simulation developed to demonstrate core **Object-Oriented Programming** principles. This project simulates a radar system capable of detecting, tracking, and identifying various aerial objects within a defined airspace.
+
+---
+
+## 🎯 Project Objectives
+* Implement **Inheritance** through various aerial object types (Drone, Commercial Plane, Fighter Jet).
+* Utilize **Polymorphism** for different movement behaviors and radar cross-section (RCS) calculations.
+* Apply **Encapsulation** to secure internal system states and hardware-mocking logic.
+* Demonstrate **Abstraction** by separating the Radar UI from the underlying detection algorithms.
+
+---
+
+## 🛠️ Tech Stack
+* **Language:** Python
+* **GUI Framework:** Pygame / Tkinter (เลือกอันที่ใช้)
+* **Core Logic:** Math (Coordinate Geometry), OOP Principles
+
+---
+
+## 🏗️ System Architecture (OOP Structure)
+
+* **`RadarSystem` (Class):** The core engine managing the sweep, detection radius, and object tracking.
+* **`AerialObject` (Abstract Base Class):** * Properties: `speed`, `altitude`, `heading`, `RCS`
+    * Methods: `move()`, `get_coordinates()`
+* **Subclasses:**
+    * `FighterJet`: High speed, low RCS, unpredictable paths.
+    * `CommercialPlane`: Constant speed, high RCS, follows flight paths.
+    * `UAV / Drone`: Low speed, very small RCS, hovering capabilities.
+* **`SignalProcessor` (Utility Class):** Handles noise filtering and detection probability.
+
+---
+
+## 🚀 Key Features
+- **Real-time Radar Sweep:** Visual representation of the radar pulse.
+- **Object Identification:** Categorizing targets based on behavior and signal strength.
+- **Coordinate Tracking:** Live Latitude/Longitude and Altitude updates.
+- **Simulation Controls:** Ability to spawn new threats and adjust radar sensitivity.
+
+---
+
+## ⚠️ Disclaimer
+This project is developed strictly for **educational purposes** as a final assignment for the Object-Oriented Programming course. It is a simplified simulation and does not represent actual military-grade radar technology or algorithms.
+
+---
+
+## 👤 Author
+* **Chawan (Nuea)** - *Computer Engineering Student*
+* GitHub: [@chawannua](https://github.com/chawannua)
