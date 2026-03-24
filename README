@@ -17,7 +17,7 @@ A real-time Air Defense Radar Simulation developed to demonstrate core **Object-
 
 ## 🛠️ Tech Stack
 * **Language:** Python
-* **GUI Framework:** Pygame / Tkinter (เลือกอันที่ใช้)
+* **GUI Framework:** Pygame
 * **Core Logic:** Math (Coordinate Geometry), OOP Principles
 
 ---
