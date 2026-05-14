@@ -162,10 +162,10 @@ def start_radar():
     
     def km_to_px(km): return km * zoom_level
 
-    font_xs = pygame.font.SysFont('consolas', 12)
-    font_sm = pygame.font.SysFont('consolas', 14)
-    font_md = pygame.font.SysFont('consolas', 18, bold=True)
-    font_lg = pygame.font.SysFont('consolas', 24, bold=True)
+    font_xs = pygame.font.SysFont('consolas', 10)
+    font_sm = pygame.font.SysFont('consolas', 12)
+    font_md = pygame.font.SysFont('consolas', 16, bold=True)
+    font_lg = pygame.font.SysFont('consolas', 22, bold=True)
 
     cmd = CommandCenter()
     sweep_angle = 0.0
@@ -351,8 +351,7 @@ def start_radar():
                 px_y = CY - km_to_px(y_km) # Minus because Pygame Y is flipped relative to North
                 pixel_points.append((px_x, px_y))
             if len(pixel_points) > 2:
-                # Beautiful Anti-Aliased Map Rendering with CRT Glow
-                pygame.draw.lines(screen, (0, 30, 10), True, pixel_points, 3) # Faint outer glow
+                # Beautiful Anti-Aliased Map Rendering
                 pygame.draw.aalines(screen, (0, 140, 40), True, pixel_points) # Sharp inner anti-aliased line
 
         # Draw Topographical Contours
@@ -691,7 +690,7 @@ def start_radar():
         
         sorted_contacts = sorted(cmd.contacts, key=lambda c: c.calculate_threat_score(), reverse=True)
         for i, c in enumerate(sorted_contacts[:20]):
-            row_y = list_y + 30 + (i * 22)
+            row_y = list_y + 30 + (i * 18)
             r_color = (150, 150, 150)
             if c.status in ["HOSTILE", "ENGAGING"]: r_color = (255, 80, 80)
             elif c.status == "SUSPECT": r_color = (255, 220, 50)
@@ -708,11 +707,7 @@ def start_radar():
         recent_logs = cmd.tactical_log[-20:]
         for i, log in enumerate(recent_logs):
             clean_str = clean_ansi(log)[:70]
-            # Draw semi-transparent background for logs to increase readability
-            text_surf = font_xs.render(clean_str, True, get_log_color(log))
-            bg_rect = pygame.Rect(log_x - 5, log_y + (i * 20) - 2, text_surf.get_width() + 10, 20)
-            pygame.draw.rect(screen, (5, 8, 5, 180), bg_rect)
-            screen.blit(text_surf, (log_x, log_y + (i * 20)))
+            screen.blit(font_xs.render(clean_str, True, get_log_color(log)), (log_x, log_y + (i * 16)))
 
         if cmd.base_hp <= 0:
             pygame.draw.rect(screen, (100, 0, 0), (CX - 220, CY - 40, 440, 80))
