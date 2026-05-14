@@ -292,27 +292,12 @@ def start_radar():
                 px_y = CY - km_to_px(y_km) # Minus because Pygame Y is flipped relative to North
                 pixel_points.append((px_x, px_y))
             if len(pixel_points) > 2:
-                pygame.draw.polygon(screen, (0, 30, 10), pixel_points, 1)
+                # Make map terrain brighter
+                pygame.draw.polygon(screen, (0, 80, 20), pixel_points, 1)
 
         r_max = km_to_px(RADAR_MAX_KM)
         pygame.draw.line(screen, GRID_COLOR, (CX, CY - r_max), (CX, CY + r_max), 1)
         pygame.draw.line(screen, GRID_COLOR, (CX - r_max, CY), (CX + r_max, CY), 1)
-
-        for angle in range(0, 360, 10):
-            rad = math.radians(angle)
-            outer_x = CX + (r_max + 5) * math.sin(rad)
-            outer_y = CY - (r_max + 5) * math.cos(rad)
-            inner_x = CX + r_max * math.sin(rad)
-            inner_y = CY - r_max * math.cos(rad)
-            
-            if angle % 30 == 0:
-                pygame.draw.line(screen, (0, 120, 0), (inner_x, inner_y), (outer_x, outer_y), 2)
-                text = font_xs.render(f"{angle:03d}", True, (0, 150, 0))
-                tx = CX + (r_max + 15) * math.sin(rad) - text.get_width()//2
-                ty = CY - (r_max + 15) * math.cos(rad) - text.get_height()//2
-                screen.blit(text, (tx, ty))
-            else:
-                pygame.draw.line(screen, GRID_COLOR, (inner_x, inner_y), (outer_x, outer_y), 1)
 
         # ===================================================
         # 2. จำลองการกวาดแบบ Rotary AESA (Mechanical + Electronic Steering)
