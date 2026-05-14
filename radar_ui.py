@@ -105,13 +105,13 @@ def start_radar():
     MISSILE_COLOR = (255, 120, 0)
     
     RADAR_AREA = WIDTH 
-    RADAR_RADIUS_PX = (HEIGHT // 2) - 20 
     RADAR_MAX_KM = 800.0 
     
     camera_x = 0.0
     camera_y = 0.0
+    zoom_level = 1.5
     
-    def km_to_px(km): return (km / RADAR_MAX_KM) * RADAR_RADIUS_PX
+    def km_to_px(km): return km * zoom_level
 
     font_xs = pygame.font.SysFont('consolas', 10)
     font_sm = pygame.font.SysFont('consolas', 12)
@@ -203,7 +203,6 @@ def start_radar():
                         screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
                     
                     RADAR_AREA = WIDTH
-                    RADAR_RADIUS_PX = (HEIGHT // 2) - 20
 
                 # 🟢 [RESTART] เริ่มเกมใหม่เมื่อฐานถูกทำลาย
                 if event.key == pygame.K_r and cmd.base_hp <= 0:
@@ -211,6 +210,10 @@ def start_radar():
                     selected_contact = None
                     sweep_angle = 0.0
                     LAST_TICK_TIME = pygame.time.get_ticks()
+
+            if event.type == pygame.MOUSEWHEEL:
+                zoom_level += event.y * 0.15
+                zoom_level = max(0.2, min(10.0, zoom_level))
 
             # 🟢 [CLICK] คลิกเมาส์เพื่อล็อคเป้าหมาย
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -271,7 +274,7 @@ def start_radar():
         # ===================================================
         # 1. วาดกริดและ Weapon Engagement Zones (WEZ)
         # ===================================================
-        for ring_km in [200, 400, 600, 800]:
+        for ring_km in [50, 100, 200, 400, 600, 800]:
             r_px = km_to_px(ring_km)
             pygame.draw.circle(screen, GRID_COLOR, (CX, CY), int(r_px), 1)
             screen.blit(font_xs.render(f"{ring_km}", True, GRID_COLOR), (CX + 2, CY - r_px - 12))
@@ -291,21 +294,22 @@ def start_radar():
             if len(pixel_points) > 2:
                 pygame.draw.polygon(screen, (0, 30, 10), pixel_points, 1)
 
-        pygame.draw.line(screen, GRID_COLOR, (CX, CY - RADAR_RADIUS_PX), (CX, CY + RADAR_RADIUS_PX), 1)
-        pygame.draw.line(screen, GRID_COLOR, (CX - RADAR_RADIUS_PX, CY), (CX + RADAR_RADIUS_PX, CY), 1)
+        r_max = km_to_px(RADAR_MAX_KM)
+        pygame.draw.line(screen, GRID_COLOR, (CX, CY - r_max), (CX, CY + r_max), 1)
+        pygame.draw.line(screen, GRID_COLOR, (CX - r_max, CY), (CX + r_max, CY), 1)
 
         for angle in range(0, 360, 10):
             rad = math.radians(angle)
-            outer_x = CX + (RADAR_RADIUS_PX + 5) * math.sin(rad)
-            outer_y = CY - (RADAR_RADIUS_PX + 5) * math.cos(rad)
-            inner_x = CX + RADAR_RADIUS_PX * math.sin(rad)
-            inner_y = CY - RADAR_RADIUS_PX * math.cos(rad)
+            outer_x = CX + (r_max + 5) * math.sin(rad)
+            outer_y = CY - (r_max + 5) * math.cos(rad)
+            inner_x = CX + r_max * math.sin(rad)
+            inner_y = CY - r_max * math.cos(rad)
             
             if angle % 30 == 0:
                 pygame.draw.line(screen, (0, 120, 0), (inner_x, inner_y), (outer_x, outer_y), 2)
                 text = font_xs.render(f"{angle:03d}", True, (0, 150, 0))
-                tx = CX + (RADAR_RADIUS_PX + 15) * math.sin(rad) - text.get_width()//2
-                ty = CY - (RADAR_RADIUS_PX + 15) * math.cos(rad) - text.get_height()//2
+                tx = CX + (r_max + 15) * math.sin(rad) - text.get_width()//2
+                ty = CY - (r_max + 15) * math.cos(rad) - text.get_height()//2
                 screen.blit(text, (tx, ty))
             else:
                 pygame.draw.line(screen, GRID_COLOR, (inner_x, inner_y), (outer_x, outer_y), 1)
@@ -366,7 +370,7 @@ def start_radar():
         for _ in range(12): 
             e_angle = random.uniform(-AESA_FOV, AESA_FOV)
             r_angle = (sweep_angle + e_angle) % 360
-            r_len = RADAR_RADIUS_PX * random.uniform(0.3, 0.95)
+            r_len = km_to_px(RADAR_MAX_KM) * random.uniform(0.3, 0.95)
             bx = CX + r_len * math.sin(math.radians(r_angle))
             by = CY - r_len * math.cos(math.radians(r_angle))
             pygame.draw.line(screen, (0, 80, 40), (CX, CY), (bx, by), 1)
@@ -378,7 +382,7 @@ def start_radar():
                 
                 # Only track if the mechanical dish is pointing roughly towards it
                 if angle_diff(target_bearing, sweep_angle) <= AESA_FOV:
-                    dist_px = (c.distance_km / RADAR_MAX_KM) * RADAR_RADIUS_PX
+                    dist_px = km_to_px(c.distance_km)
                     
                     b_color = (0, 180, 80) if c.status != "HOSTILE" else (200, 100, 0)
                     track_probability = 1.0 if selected_contact == c else 0.40
@@ -395,17 +399,18 @@ def start_radar():
         # Draw AESA FOV Boundaries Faintly
         fov_left = (sweep_angle - AESA_FOV) % 360
         fov_right = (sweep_angle + AESA_FOV) % 360
-        lx = CX + RADAR_RADIUS_PX * math.sin(math.radians(fov_left))
-        ly = CY - RADAR_RADIUS_PX * math.cos(math.radians(fov_left))
-        rx = CX + RADAR_RADIUS_PX * math.sin(math.radians(fov_right))
-        ry = CY - RADAR_RADIUS_PX * math.cos(math.radians(fov_right))
+        r_max = km_to_px(RADAR_MAX_KM)
+        lx = CX + r_max * math.sin(math.radians(fov_left))
+        ly = CY - r_max * math.cos(math.radians(fov_left))
+        rx = CX + r_max * math.sin(math.radians(fov_right))
+        ry = CY - r_max * math.cos(math.radians(fov_right))
         pygame.draw.line(screen, (0, 60, 20), (CX, CY), (lx, ly), 1)
         pygame.draw.line(screen, (0, 60, 20), (CX, CY), (rx, ry), 1)
 
         # --- Main Sweep Line (Mechanical Boresight) ---
         # ยังคงเส้นหลักไว้เพื่อให้เห็นทิศทางการหมุนของจานเรดาร์
-        end_x = CX + RADAR_RADIUS_PX * math.sin(math.radians(sweep_angle))
-        end_y = CY - RADAR_RADIUS_PX * math.cos(math.radians(sweep_angle))
+        end_x = CX + r_max * math.sin(math.radians(sweep_angle))
+        end_y = CY - r_max * math.cos(math.radians(sweep_angle))
         pygame.draw.line(screen, (150, 255, 180), (CX, CY), (end_x, end_y), 3)
 
         # วาด Tail (เงาของเส้นกวาด) ให้ดูนวลขึ้น
@@ -413,8 +418,8 @@ def start_radar():
             t_angle = (sweep_angle - (i * 3)) % 360
             t_alpha = 1.0 - (i / 10.0)
             t_color = (int(0 * t_alpha), int(200 * t_alpha), int(50 * t_alpha))
-            tx = CX + RADAR_RADIUS_PX * math.sin(math.radians(t_angle))
-            ty = CY - RADAR_RADIUS_PX * math.cos(math.radians(t_angle))
+            tx = CX + r_max * math.sin(math.radians(t_angle))
+            ty = CY - r_max * math.cos(math.radians(t_angle))
             pygame.draw.line(screen, t_color, (CX, CY), (tx, ty), 2)
 
         # ===================================================
@@ -429,7 +434,7 @@ def start_radar():
             
             # Draw noise particles representing RF interference in this sector
             for _ in range(80):
-                r_dist = random.uniform(20, RADAR_RADIUS_PX)
+                r_dist = random.uniform(20, r_max)
                 j_angle = ew_bearing + random.uniform(-jam_width, jam_width)
                 jx = CX + r_dist * math.sin(math.radians(j_angle))
                 jy = CY - r_dist * math.cos(math.radians(j_angle))
@@ -438,8 +443,8 @@ def start_radar():
                 
             # Draw faint boundaries of the strobe
             for angle_offset in [-jam_width, jam_width]:
-                sx = CX + RADAR_RADIUS_PX * math.sin(math.radians(ew_bearing + angle_offset))
-                sy = CY - RADAR_RADIUS_PX * math.cos(math.radians(ew_bearing + angle_offset))
+                sx = CX + r_max * math.sin(math.radians(ew_bearing + angle_offset))
+                sy = CY - r_max * math.cos(math.radians(ew_bearing + angle_offset))
                 pygame.draw.line(screen, (0, 80, 40), (CX, CY), (sx, sy), 1)
 
         for c in cmd.contacts:
