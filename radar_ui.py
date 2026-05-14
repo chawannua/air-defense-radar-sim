@@ -158,7 +158,7 @@ def start_radar():
     
     camera_x = 0.0
     camera_y = 0.0
-    zoom_level = 1.5
+    zoom_level = 0.8
     
     def km_to_px(km): return km * zoom_level
 
@@ -512,7 +512,7 @@ def start_radar():
             if c.brightness <= 0: continue 
             
             bearing = getattr(c, 'bearing', getattr(c, 'heading', 0)) 
-            px_dist = km_to_px(min(c.visible_dist, RADAR_MAX_KM))
+            px_dist = km_to_px(c.visible_dist)
             x = CX + px_dist * math.sin(math.radians(bearing))
             y = CY - px_dist * math.cos(math.radians(bearing))
 
@@ -528,7 +528,7 @@ def start_radar():
 
             if hasattr(c, 'trail'):
                 for i, (tr_dist, tr_bear) in enumerate(c.trail):
-                    tr_px = km_to_px(min(tr_dist, RADAR_MAX_KM))
+                    tr_px = km_to_px(tr_dist)
                     tx = CX + tr_px * math.sin(math.radians(tr_bear))
                     ty = CY - tr_px * math.cos(math.radians(tr_bear))
                     alpha = (i + 1) / len(c.trail) * c.brightness

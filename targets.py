@@ -49,7 +49,7 @@ class AirContact(ABC):
         # 2. RCS Detection Check with Jamming (Simplified Radar Range Equation & Burn-through)
         # Baseline: Can detect 1.0 m^2 target at 400 km
         # Max Range = Baseline_Range * (RCS / Baseline_RCS)^(1/4) * Jamming_Factor
-        max_detection_range = 400.0 * (max(0.001, self.rcs) ** 0.25) * jamming_factor
+        max_detection_range = 800.0 * (max(0.001, self.rcs) ** 0.25) * jamming_factor
         if self.distance_km > max_detection_range:
             return False
             
@@ -80,7 +80,7 @@ class AirContact(ABC):
 
 class Aircraft(AirContact):
     def __init__(self, track_number):
-        super().__init__(track_number, random.randint(300, 800))
+        super().__init__(track_number, random.randint(600, 1200))
         self.speed_mach = random.uniform(0.7, 2.5)
         self.altitude_ft = random.randint(15000, 45000)
         self.rcs = random.uniform(0.1, 10.0)
@@ -134,7 +134,7 @@ class Aircraft(AirContact):
 
 class Helicopter(AirContact):
     def __init__(self, track_number):
-        super().__init__(track_number, random.randint(50, 150))
+        super().__init__(track_number, random.randint(150, 400))
         self.speed_mach = random.uniform(0.1, 0.3); self.altitude_ft = random.randint(500, 5000)
         self.rcs = random.uniform(2.0, 5.0); self.is_friendly = False; self.has_transponder = False
         
@@ -150,7 +150,7 @@ class Helicopter(AirContact):
 
 class Drone(AirContact):
     def __init__(self, track_number):
-        super().__init__(track_number, random.randint(100, 300))
+        super().__init__(track_number, random.randint(300, 700))
         self.speed_mach = random.uniform(0.1, 0.6); self.altitude_ft = random.randint(2000, 20000)
         self.rcs = random.uniform(0.01, 0.5); self.is_friendly = False; self.has_transponder = False
         
@@ -169,7 +169,7 @@ class Drone(AirContact):
 
 class TacticalBM(AirContact):
     def __init__(self, track_number):
-        super().__init__(track_number, random.randint(800, 1500)) 
+        super().__init__(track_number, random.randint(1200, 2000)) 
         self.speed_mach = random.uniform(6.0, 10.0); self.altitude_ft = random.randint(80000, 150000)
         self.rcs = random.uniform(0.5, 1.0); self.is_friendly = False; self.has_transponder = False
         
@@ -211,7 +211,7 @@ class ICBM(AirContact):
 
 class Airliner(AirContact):
     def __init__(self, track_number):
-        super().__init__(track_number, random.randint(300, 800))
+        super().__init__(track_number, random.randint(600, 1200))
         self.speed_mach = random.uniform(0.7, 0.85)
         self.altitude_ft = random.randint(30000, 42000)
         self.rcs = random.uniform(50.0, 200.0)
