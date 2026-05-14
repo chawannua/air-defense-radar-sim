@@ -250,7 +250,9 @@ def start_radar():
             bearing = getattr(target, 'bearing', getattr(target, 'heading', 0))
             
             if angle_diff(bearing, sweep_angle) <= AESA_FOV:
-                eng.visible_dist = target.distance_km * progress
+                # Calculate expected impact distance to ensure linear missile trajectory
+                impact_dist = max(0, target.distance_km - (target.speed_mach * getattr(eng, 'time_to_impact', 0)))
+                eng.visible_dist = impact_dist * progress
                 eng.brightness = 1.0
                 if not hasattr(eng, 'trail'): eng.trail = []
                 if random.random() < 0.1:

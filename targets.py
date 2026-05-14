@@ -15,7 +15,8 @@ class AirContact(ABC):
         self.bearing = random.randint(0, 359)
         self.speed_mach = 0.0
         self.altitude_ft = 0
-        self.heading = random.randint(0, 359)
+        # Target flies directly towards the radar (the base)
+        self.heading = (self.bearing + 180) % 360
         self.rcs = 0.0
         self.size = "UNKNOWN"
         self.type_name = "UNKNOWN"
