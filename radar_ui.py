@@ -142,7 +142,7 @@ def start_radar():
     info = pygame.display.Info()
     MONITOR_W, MONITOR_H = info.current_w, info.current_h
     
-    # เปิดมาตอนแรกให้เป็นโหมด Window 90% และดึงขอบหน้าต่างได้ (RESIZABLE)
+    # start windowed at 90% of screen
     WIDTH, HEIGHT = int(MONITOR_W * 0.9), int(MONITOR_H * 0.9)
     is_fullscreen = False
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE) 
@@ -169,7 +169,7 @@ def start_radar():
 
     cmd = CommandCenter()
     sweep_angle = 0.0
-    sweep_speed = 2.8  # เพิ่มความเร็วการกวาดเพื่อให้ตรวจสอบเป้าหมายบ่อยขึ้น
+    sweep_speed = 2.8
     clock = pygame.time.Clock()
     LAST_TICK_TIME = pygame.time.get_ticks()
 
@@ -226,11 +226,11 @@ def start_radar():
                     if wpn:
                         cmd.manual_override_fire(selected_contact, wpn)
 
-                # 🔴 [ABORT] ระบบยกเลิกการยิงเป้าหมายที่เลือก
+                # abort engagement
                 if event.key == pygame.K_BACKSPACE and selected_contact:
                     cmd.manual_override_abort(selected_contact)
 
-                # 🛠️ [DEV] Manual Spawn
+                # dev: manual threat spawn
                 if not selected_contact:
                     if event.key == pygame.K_5: cmd.manual_spawn("ICBM")
                     elif event.key == pygame.K_6: cmd.manual_spawn("FIGHTER")
@@ -243,7 +243,7 @@ def start_radar():
                 if event.key == pygame.K_F11:
                     is_fullscreen = not is_fullscreen
                     if is_fullscreen:
-                        # ใช้ (0, 0) เพื่อให้ Pygame วาดทับหน้าจอพอดี โดยไม่เปลี่ยนความละเอียด OS
+                        # (0,0) tells pygame to fill the display natively
                         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                         info_fs = pygame.display.Info()
                         WIDTH, HEIGHT = info_fs.current_w, info_fs.current_h 
@@ -495,30 +495,49 @@ def start_radar():
             ty = CY - r_max * math.cos(math.radians(t_angle))
             pygame.draw.line(screen, t_color, (CX, CY), (tx, ty), 2)
 
-        # --- 3. Contacts & Electronic Warfare Jamming ---
+        # --- 3. Contacts & EW Jamming ---
         ew_aircrafts = [c for c in cmd.contacts if c.active and getattr(c, 'status', '') == 'HOSTILE' and "EW" in getattr(c, 'type_name', '')]
 
-        # --- Draw Realistic Jamming Strobes (Sector Jamming) ---
+        # full-screen green particle noise when any EW is active (like movie radar jamming)
+        if ew_active:
+            # scatter green dots everywhere across the entire radar area
+            for _ in range(600):
+                nx = random.randint(int(CX - r_max), int(CX + r_max))
+                ny = random.randint(int(CY - r_max), int(CY + r_max))
+                # only draw inside the radar circle
+                if math.hypot(nx - CX, ny - CY) < r_max:
+                    g = random.choice([(0, 255, 0), (0, 200, 0), (100, 255, 50),
+                                       (0, 180, 0), (50, 255, 30), (200, 255, 0)])
+                    sz = random.choice([1, 1, 1, 2])
+                    pygame.draw.circle(screen, g, (nx, ny), sz)
+
+            # bright horizontal scan lines for that CRT glitch look
+            for _ in range(random.randint(3, 8)):
+                sy = random.randint(int(CY - r_max), int(CY + r_max))
+                line_alpha = random.randint(20, 80)
+                pygame.draw.line(screen, (0, line_alpha, 0),
+                                 (int(CX - r_max), sy), (int(CX + r_max), sy), 1)
+
+        # per-jammer strobe cone (bright interference wedge from the EW source)
         for ew in ew_aircrafts:
             ew_bearing = getattr(ew, 'bearing', getattr(ew, 'heading', 0))
-            # Heavy EW gets a wider jamming cone
-            jam_width = 15.0 if getattr(ew, 'is_heavy_ew', False) else 8.0 
-            
-            # Draw noise particles representing RF interference in this sector
-            noise_density = 250 if getattr(ew, 'is_heavy_ew', False) else 80
-            for _ in range(noise_density):
-                r_dist = random.uniform(10, r_max * 1.5)
+            jam_width = 20.0 if getattr(ew, 'is_heavy_ew', False) else 10.0
+
+            # dense noise particles in the jammer's sector
+            particle_count = 400 if getattr(ew, 'is_heavy_ew', False) else 120
+            for _ in range(particle_count):
+                r_dist = random.uniform(10, r_max * 1.3)
                 j_angle = ew_bearing + random.uniform(-jam_width, jam_width)
                 jx = CX + r_dist * math.sin(math.radians(j_angle))
                 jy = CY - r_dist * math.cos(math.radians(j_angle))
-                noise_color = random.choice([(0, 255, 0), (200, 255, 0), (50, 150, 50)])
-                pygame.draw.circle(screen, noise_color, (int(jx), int(jy)), 1)
-                
-            # Draw faint boundaries of the strobe
-            for angle_offset in [-jam_width, jam_width]:
-                sx = CX + r_max * math.sin(math.radians(ew_bearing + angle_offset))
-                sy = CY - r_max * math.cos(math.radians(ew_bearing + angle_offset))
-                pygame.draw.line(screen, (0, 100, 50), (CX, CY), (sx, sy), 1)
+                g = random.choice([(0, 255, 0), (150, 255, 0), (0, 200, 50), (80, 255, 80)])
+                pygame.draw.circle(screen, g, (int(jx), int(jy)), random.choice([1, 1, 2, 2, 3]))
+
+            # strobe boundary lines
+            for offset in [-jam_width, jam_width]:
+                sx = CX + r_max * math.sin(math.radians(ew_bearing + offset))
+                sy = CY - r_max * math.cos(math.radians(ew_bearing + offset))
+                pygame.draw.line(screen, (0, 120, 40), (CX, CY), (sx, sy), 1)
 
         for c in cmd.contacts:
             if not c.active or not hasattr(c, 'visible_dist'): continue
@@ -602,7 +621,7 @@ def start_radar():
             pygame.draw.line(screen, MISSILE_COLOR, (mx-4, my+4), (mx+4, my-4), 2)
             screen.blit(font_sm.render(wpn_name, True, MISSILE_COLOR), (mx + 8, my - 5))
 
-        # (Removed Heavy EW Quadrant Logic for realism)
+
 
         # --- Flight Info Panel ---
         if selected_contact:

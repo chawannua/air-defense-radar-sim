@@ -1,155 +1,98 @@
 # AEGIS Radar — RTAF Tactical Air Defense Simulator
 
-A real-time air defense Command-and-Control simulator built with Python and Pygame. You play as the tactical commander of the Royal Thai Air Force (RTAF) Air Defense network, managing radar contacts, authorizing intercepts, and keeping the base alive against escalating threat waves.
+Real-time air defense simulator built with Python + Pygame. You run the RTAF air defense network — manage radar contacts, authorize intercepts, and keep your base alive against escalating threat waves.
+
+![Python](https://img.shields.io/badge/python-3.10+-blue) ![Pygame](https://img.shields.io/badge/pygame-2.0+-green)
+
+---
+
+## What it does
+
+You sit at a radar console watching contacts appear on a rotating AESA sweep. Some are civilian airliners, some are hostile fighters, some are ballistic missiles. Your job is to identify them, prioritize threats, and fire the right weapon before they reach the base.
+
+The sim handles AWACS rotation, combat air patrol scheduling, ammo logistics, and automatic CIWS engagement. You handle the hard calls — which target gets the THAAD round, when to scramble fighters, and whether that unidentified blip is a Boeing 777 or a Su-35.
 
 ---
 
 ## Features
 
-### Radar Display
-- Rotating AESA sweep line with a fading phosphor trail
-- Weapon Engagement Zone (WEZ) range rings: THAAD (400 km), SAM (200/80 km), CIWS (20 km)
-- Real-world Thailand map geometry rendered as vector terrain
-- RTAF airbases: Wing 1, 4, 7, 21, 23 displayed on map
-- Contacts labeled with ID code, speed, and flight level
-- 60 FPS smooth interpolation between 1-second simulation ticks
-
-### Contact Types
-| Type | Description |
-|---|---|
-| Aircraft | Mixed civilian/hostile; hostile includes fighters and EW jets |
-| Airliner | Commercial traffic — do NOT shoot down |
-| Drone / UAV | Slow, low RCS — hard to detect early |
-| Helicopter | Low-altitude CAS threats |
-| TBM | Tactical ballistic missiles — high speed, short warning |
-| ICBM | Near-instant kill on base, only THAAD can reach it |
-| Ghost Track | Radar clutter that auto-clears on identification |
-| EW Ghost | Fake blips injected by enemy jamming aircraft |
-
-### AWACS & CAP
-- Two AWACS aircraft rotate from Wing 7 on patrol orbits over the Gulf of Thailand
-- When primary AWACS fuel drops below 20%, Wing 7 launches a relief aircraft before RTB
-- Two CAP fighters maintain constant standing patrols — one over the north (Wing 4), one over the south (Wing 7)
-- Low-fuel CAP fighters RTB automatically; replacements launch on a staggered schedule
-
-### Weapons
-- **THAAD** — Long-range ballistic missile defense, limited rounds
-- **SAM** — General-purpose air defense; subject to chaff evasion by fast jets
-- **CIWS** — Auto-firing last-ditch close-in weapon; degrades against Mach 2+ targets
-- **Fighter** — Scrambled from the nearest airbase; effective against all aerial threats
-
-### Electronic Warfare
-When a Heavy EW aircraft (EA-18G Growler) is active:
-- The radar sweep line speed becomes erratic and unpredictable
-- All radar contacts jitter on screen, degrading spatial accuracy
-- Floods the scope with 2–6 EW Ghost Tracks per tick
-- Jamming factor reduces radar detection range to 30% inside the EW strobe sector
-
-### Engagement Logic
-- All intercepts start from the geographically nearest airbase
-- Hit probabilities include kinematic penalties: fast targets are harder to hit
-- Fighters are 95% effective against slow targets (drones/helicopters)
-- Shooting down a civilian airliner is an instant game-over
+- **Rotating AESA radar** with phosphor trail, 60fps interpolation, zoom/pan
+- **Real Thailand map** rendered from GeoJSON with terrain contours and airbase markers
+- **9 contact types**: fighters, drones, helicopters, TBMs, ICBMs, airliners, EW jammers, ghosts, and CAP patrols
+- **AWACS/CAP rotation**: auto-launched from Wing 7 and Wing 4, fuel management, relief swaps
+- **4 weapon systems**: THAAD, SAM, CIWS (auto-fire), and fighter scramble from nearest airbase
+- **Electronic warfare**: heavy EW jammer floods your screen with green particle noise, ghost tracks, scan line glitches, and erratic sweep rotation — your whole display goes haywire
+- **Engagement math**: hit probability accounts for target speed, chaff deployment, weapon type, and closure rate
+- **Shoot down an airliner and it's game over** (court-martial)
 
 ---
 
 ## Controls
 
-| Key | Action |
+| Key | What it does |
 |---|---|
-| `Click` | Select / lock a contact |
-| `1` | Fire THAAD at selected contact |
-| `2` | Fire SAM at selected contact |
-| `3` | Fire CIWS at selected contact |
-| `4` | Scramble fighter from nearest airbase |
-| `Backspace` | Abort active engagement on selected contact |
-| `5` | Manual spawn: ICBM |
-| `6` | Manual spawn: Fighter |
-| `7` | Manual spawn: Drone |
-| `8` | Manual spawn: Civilian airliner |
-| `9` | Manual spawn: Heavy EW aircraft |
-| `0` | Manual spawn: AWACS |
-| `W` | Manual spawn: Hostile wave (5 fighters) |
-| `WASD / Arrows` | Pan camera |
-| `Scroll wheel` | Zoom |
-| `F11` | Toggle fullscreen |
-| `R` | Restart (after base destroyed) |
+| `Click` | Select a contact |
+| `1` / `2` / `3` / `4` | Fire THAAD / SAM / CIWS / Scramble fighter |
+| `Backspace` | Abort engagement |
+| `5-9, 0, W` | Spawn: ICBM / Fighter / Drone / Airliner / EW / AWACS / Wave |
+| `WASD` / `Arrows` | Pan camera |
+| `Scroll` | Zoom |
+| `F11` | Fullscreen |
+| `R` | Restart (after death) |
 | `ESC` | Quit |
 
 ---
 
-## Project Structure
+## Project layout
 
 ```
-airdefense_oop_final_project/
-├── main.py            # Entry point
-├── radar_ui.py        # Pygame rendering, input handling, HUD
-├── command_center.py  # Game loop, wave spawning, engagement resolution
-├── targets.py         # All air contact classes (AirContact, Aircraft, AWACS, etc.)
-├── personnel.py       # RadarOperator, WeaponOfficer, ThreatQueue, Engagement
-├── config.py          # All numeric constants and airbase data
-├── requirements.txt   # Python dependencies
-└── *.json             # Country border geometry for map rendering
+├── main.py             # entry point
+├── radar_ui.py         # rendering, input, HUD
+├── command_center.py   # game loop, waves, engagements
+├── targets.py          # all contact classes
+├── personnel.py        # radar operator, weapon officer, threat queue
+├── config.py           # tuning constants, airbase coords
+├── requirements.txt
+└── *.json              # country border geometry
 ```
 
-### Class Overview
+### How the classes fit together
 
-**`targets.py`**
-- `AirContact` (ABC) — base class for all radar contacts
-- `Aircraft`, `Helicopter`, `Drone`, `TacticalBM`, `ICBM`, `Airliner` — threat types
-- `AWACS` — friendly, orbits over Gulf of Thailand, transitions between TRANSIT → ON_STATION → RTB
-- `CAPFighter` — friendly combat air patrol, same state machine as AWACS
-- `GhostTrack` — clutter that fades when identified
-- `EWGhostTrack` — fake blips spawned by active EW jamming
+**targets.py** — `AirContact` is the abstract base. Everything inherits from it: `Aircraft`, `Drone`, `Helicopter`, `TacticalBM`, `ICBM`, `Airliner`, `AWACS`, `CAPFighter`, `GhostTrack`, `EWGhostTrack`. Each overrides `identify_target()` and optionally `move()` and `calculate_threat_score()`.
 
-**`personnel.py`**
-- `RadarOperator` — auto-identifies unidentified contacts by ETA priority
-- `WeaponOfficer` — auto-authorizes fire on highest threat score contacts
-- `ThreatQueue` — priority queue sorted by threat score
-- `Engagement` — tracks a single weapon-target pair through to impact
-- `get_closest_airbase()` — returns nearest RTAF wing for fighter launches
+**personnel.py** — `RadarOperator` auto-IDs contacts by ETA priority. `WeaponOfficer` authorizes fire on highest-scoring threats. `ThreatQueue` is a min-heap. `Engagement` tracks weapon-to-target state. `get_closest_airbase()` picks the nearest RTAF wing for scrambles.
 
-**`command_center.py`**
-- Tick loop: `detect_airspace()` → `process_reloads()` → `process_personnel()` → `process_engagements()` → `process_auto_ciws()` → `update_world()`
-- Manages AWACS/CAP rotation, fighter RTB queue, wave cooldowns, damage resolution
+**command_center.py** — runs the tick loop: detect → reload → personnel → engage → CIWS → world update. Handles AWACS/CAP rotation, fighter RTB, wave spawns, EW ghost injection, and damage.
 
 ---
 
-## Installation & Running
+## Running it
 
 ```bash
-pip install -r requirements.txt
+pip install pygame
 python main.py
 ```
 
-Or run the compiled executable directly:
-```
-AEGIS_Radar.exe
-```
+Or just run `AEGIS_Radar.exe` directly.
 
-To recompile the executable (requires PyInstaller):
+To rebuild the exe:
 ```bash
 pip install pyinstaller
-python -m PyInstaller --onefile --noconsole --name "AEGIS_Radar" \
-  --add-data "tha.json;." --add-data "mmr.json;." --add-data "lao.json;." \
-  --add-data "khm.json;." --add-data "mys.json;." --add-data "vnm.json;." \
-  --add-data "chn.json;." --add-data "idn.json;." --add-data "phl.json;." \
+python -m PyInstaller --onefile --noconsole --name AEGIS_Radar ^
+  --add-data "tha.json;." --add-data "mmr.json;." --add-data "lao.json;." ^
+  --add-data "khm.json;." --add-data "mys.json;." --add-data "vnm.json;." ^
+  --add-data "chn.json;." --add-data "idn.json;." --add-data "phl.json;." ^
   --add-data "twn.json;." main.py
 ```
 
 ---
 
-## Dependencies
+## OOP concepts used
 
-- Python 3.10+
-- pygame >= 2.0.0
+This is a university OOP final project. It demonstrates:
 
----
-
-## Academic Context
-
-This project was developed as an Object-Oriented Programming (OOP) final project demonstrating:
-- Abstract base classes and inheritance hierarchies
-- Polymorphism through overridden `move()` and `identify_target()` methods
-- Encapsulation of state machines (TRANSIT / ON_STATION / RTB) within unit classes
-- Separation of concerns: rendering (radar_ui), simulation logic (command_center), domain models (targets, personnel)
+- Abstract base classes and inheritance (`AirContact` → 10 subclasses)
+- Polymorphism (`move()`, `identify_target()`, `calculate_threat_score()` all overridden per type)
+- Encapsulation (state machines like TRANSIT/ON_STATION/RTB live inside the unit, not the game loop)
+- Composition (CommandCenter owns contacts, engagements, operators)
+- Separation of concerns (rendering vs simulation vs domain models)
