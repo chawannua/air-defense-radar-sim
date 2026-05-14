@@ -404,7 +404,7 @@ class CommandCenter:
             if c.active:
                 c.move()
                 
-                if c.status == "FRIENDLY" and random.random() < 0.03:
+                if c.status == "FRIENDLY" and not isinstance(c, AWACS) and random.random() < 0.03:
                     c.active = False; self.add_log(f"\033[94m[TRAFFIC] {c.id_code} has left the monitored sector.\033[0m")
                     continue
 
