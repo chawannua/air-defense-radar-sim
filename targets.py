@@ -12,7 +12,11 @@ class AirContact(ABC):
         self.active = True
         self.status = "UNIDENTIFIED" 
         
-        self.bearing = random.randint(0, 359)
+        # Spawn predominantly from East (South China Sea/Vietnam) or West (Myanmar/Andaman)
+        if random.random() > 0.3:
+            self.bearing = random.choice([random.randint(45, 135), random.randint(225, 315)])
+        else:
+            self.bearing = random.randint(0, 359)
         self.speed_mach = 0.0
         self.altitude_ft = 0
         # Target flies directly towards the radar (the base)
@@ -321,6 +325,87 @@ class AWACS(AirContact):
             dist = math.hypot(self.home_x - x, self.home_y - y)
             if dist < speed_per_tick:
                 self.active = False # Landed
+            else:
+                angle = math.atan2(self.home_y - y, self.home_x - x)
+                x += speed_per_tick * math.cos(angle)
+                y += speed_per_tick * math.sin(angle)
+                self.heading = (math.degrees(math.atan2(speed_per_tick * math.cos(angle), -(speed_per_tick * math.sin(angle)))) + 360) % 360
+                
+        self.set_xy(x, y)
+
+class CAPFighter(AirContact):
+    def __init__(self, track_number, wing, orbit_x, orbit_y, fighter_type):
+        super().__init__(track_number, 0)
+        self.speed_mach = 1.2
+        self.altitude_ft = 25000
+        self.rcs = 3.0
+        self.is_friendly = True
+        self.has_transponder = True
+        self.true_type = fighter_type
+        self.scenario = "CAP"
+        self.active = True
+        
+        self.fuel = 100.0
+        self.state = "TRANSIT_TO_STATION"
+        
+        # Exact Home Base coordinates based on Wing
+        if wing == 1:
+            self.home_x, self.home_y = 170.0, -130.0 # Korat approx
+        elif wing == 4:
+            self.home_x, self.home_y = -18.0, -167.0 # Takhli approx
+        elif wing == 21:
+            self.home_x, self.home_y = 470.0, -165.0 # Ubon approx
+        else:
+            self.home_x, self.home_y = -148.0, -511.0 # Surat Thani
+            
+        self.orbit_center_x = orbit_x
+        self.orbit_center_y = orbit_y
+        self.orbit_angle = random.randint(0, 360)
+        
+        self.x_km = self.home_x
+        self.y_km = self.home_y
+        self.distance_km = math.hypot(self.x_km, self.y_km)
+        self.bearing = (math.degrees(math.atan2(self.x_km, -self.y_km)) + 360) % 360
+        
+    def identify_target(self):
+        self.type_name = self.true_type
+        self.status = "FRIENDLY"
+        self.id_code = f"CAP-{self.track_number}"
+        
+    def calculate_threat_score(self): return 0
+    
+    def set_xy(self, x, y):
+        self.x_km = x
+        self.y_km = y
+        self.distance_km = math.hypot(x, y)
+        self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
+
+    def move(self):
+        speed_per_tick = self.speed_mach * 1.5
+        x, y = self.x_km, self.y_km
+        
+        if self.state == "TRANSIT_TO_STATION":
+            dist = math.hypot(self.orbit_center_x - x, self.orbit_center_y - y)
+            if dist < speed_per_tick:
+                self.state = "ON_STATION"
+            else:
+                angle = math.atan2(self.orbit_center_y - y, self.orbit_center_x - x)
+                x += speed_per_tick * math.cos(angle)
+                y += speed_per_tick * math.sin(angle)
+                self.heading = (math.degrees(math.atan2(speed_per_tick * math.cos(angle), -(speed_per_tick * math.sin(angle)))) + 360) % 360
+
+        elif self.state == "ON_STATION":
+            self.orbit_angle = (self.orbit_angle + 3) % 360
+            orbit_radius_km = 40
+            x = self.orbit_center_x + orbit_radius_km * math.cos(math.radians(self.orbit_angle))
+            y = self.orbit_center_y + orbit_radius_km * math.sin(math.radians(self.orbit_angle))
+            self.fuel -= 0.015 # Deplete fuel faster than AWACS
+            self.heading = (math.degrees(math.atan2(x - self.x_km, -(y - self.y_km))) + 360) % 360
+
+        elif self.state == "RTB":
+            dist = math.hypot(self.home_x - x, self.home_y - y)
+            if dist < speed_per_tick:
+                self.active = False 
             else:
                 angle = math.atan2(self.home_y - y, self.home_x - x)
                 x += speed_per_tick * math.cos(angle)

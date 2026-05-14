@@ -3,7 +3,7 @@ import time
 import random
 import os
 from config import GameConfig
-from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, Airliner, AWACS
+from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, Airliner, AWACS, CAPFighter
 from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement
 
 class CommandCenter:
@@ -22,6 +22,7 @@ class CommandCenter:
         self.ammo = self.max_ammo.copy()
         self.reload_timers = {"THAAD": 0, "SAM": 0, "CIWS": 0} 
         self.awacs_pool = 2
+        self.cap_pool = 6
         
         # --- Logistics 60s System ---
         self.idle_timers = {wpn: 0 for wpn in self.max_ammo}
@@ -158,6 +159,36 @@ class CommandCenter:
                     self.awacs_pool -= 1
                     self.add_log("\033[94m[AIRBASE] Wing 7 launching relief AWACS. Primary AWACS returning to base.\033[0m")
                 primary_awacs.state = "RTB"
+
+        # Automated Combat Air Patrol (CAP) Swap System
+        active_caps = [c for c in self.contacts if isinstance(c, CAPFighter)]
+        
+        # Recover landed CAPs
+        for c in active_caps:
+            if c.state == "RTB" and not c.active:
+                self.cap_pool += 1
+                self.add_log(f"\033[94m[AIRBASE] {c.id_code} landed safely and refueling.\033[0m")
+                
+        flying_caps = [c for c in active_caps if c.active]
+        # Maintain 2 active CAP stations (North: Wing 4, South: Wing 7)
+        if len(flying_caps) < 2 and self.cap_pool > 0:
+            if self.tick_count % 120 == 0: # Stagger launches
+                self.track_counter += 1
+                is_north = len(flying_caps) == 0 or flying_caps[0].home_y > -300
+                if is_north:
+                    cap = CAPFighter(self.track_counter, 4, 150.0, 300.0, "F-16A/B Block 15 (CAP)")
+                    self.add_log("\033[94m[AIRBASE] Wing 4 (Takhli) launching F-16 for Northern CAP.\033[0m")
+                else:
+                    cap = CAPFighter(self.track_counter, 7, 50.0, -350.0, "JAS-39 Gripen (CAP)")
+                    self.add_log("\033[94m[AIRBASE] Wing 7 (Surat Thani) launching Gripen for Southern CAP.\033[0m")
+                self.contacts.append(cap)
+                self.cap_pool -= 1
+                
+        # Handle RTB for low fuel CAPs
+        for cap in flying_caps:
+            if cap.fuel < 20.0 and cap.state == "ON_STATION":
+                cap.state = "RTB"
+                self.add_log(f"\033[94m[AIRBASE] {cap.id_code} bingo fuel, RTB.\033[0m")
 
         self.contacts = [c for c in self.contacts if c.active]
         
@@ -404,7 +435,7 @@ class CommandCenter:
             if c.active:
                 c.move()
                 
-                if c.status == "FRIENDLY" and not isinstance(c, AWACS) and random.random() < 0.03:
+                if c.status == "FRIENDLY" and not isinstance(c, (AWACS, CAPFighter)) and random.random() < 0.03:
                     c.active = False; self.add_log(f"\033[94m[TRAFFIC] {c.id_code} has left the monitored sector.\033[0m")
                     continue
 
