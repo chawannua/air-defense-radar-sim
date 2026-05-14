@@ -360,13 +360,13 @@ class CommandCenter:
                         c.status = "CLEARED"; c.active = False
                     else:
                         if self.tick_count % 2 == 0: 
-                            self.add_log(f"\033[93;1m[AUTO-CIWS] BRRRRRRT! MISSED {c.id_code} DESPITE SPREAD! TARGET EVADED!\033[0m")
+                self.add_log(f"\033[93;1m[AUTO-CIWS] BRRRRRRT! MISSED {c.id_code} DESPITE SPREAD! TARGET EVADED!\033[0m")
                 else:
                     if self.tick_count % 3 == 0: self.add_log(f"\033[41;97m[AUTO-CIWS] CLICK! CIWS RELOADING! BRACE FOR IMPACT: {c.id_code}!\033[0m")
 
     def update_world(self):
-        # Identify active Jammers and AWACS
-        ew_aircrafts = [c for c in self.contacts + self.unseen_contacts if c.active and "EW" in getattr(c, 'type_name', '')]
+        # Identify active Jammers (must be HOSTILE) and AWACS
+        ew_aircrafts = [c for c in self.contacts if c.active and getattr(c, 'status', '') == 'HOSTILE' and "EW" in getattr(c, 'type_name', '')]
         has_awacs = any(isinstance(c, AWACS) for c in self.contacts if c.active)
         effective_radar_alt = 35000 if has_awacs else 150 # AWACS looks down from 35,000 ft, massively extending radar horizon!
         

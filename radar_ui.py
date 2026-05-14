@@ -440,7 +440,7 @@ def start_radar():
         # ===================================================
         # 3. วาดเป้าหมาย & Electronic Warfare (Jamming)
         # ===================================================
-        ew_aircrafts = [c for c in cmd.contacts if c.active and "EW" in getattr(c, 'type_name', '')]
+        ew_aircrafts = [c for c in cmd.contacts if c.active and getattr(c, 'status', '') == 'HOSTILE' and "EW" in getattr(c, 'type_name', '')]
 
         # --- Draw Realistic Jamming Strobes (Sector Jamming) ---
         for ew in ew_aircrafts:
