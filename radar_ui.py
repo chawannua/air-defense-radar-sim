@@ -37,20 +37,42 @@ def lerp_color(c1, c2, t):
 
 def generate_map_shapes():
     shapes = []
-    island1 = []
-    for angle in range(0, 360, 15):
-        r = 120 + random.uniform(-20, 20)
-        island1.append((-150 + r * math.cos(math.radians(angle)), -200 + r * math.sin(math.radians(angle))))
-    shapes.append(island1)
-    
-    coast = []
-    for y in range(-800, 800, 30):
-        x = 350 + math.sin(y/120.0)*80 + random.uniform(-15, 15)
-        coast.append((x, y))
-    coast.append((1000, 800))
-    coast.append((1000, -800))
-    shapes.append(coast)
+    # Thai Border Approximation (very rough polygon)
+    thai_border = [
+        (-200, 400), (-100, 500), (100, 450), (200, 200),
+        (300, 100), (350, -100), (200, -200), (100, -400),
+        (-50, -600), (-150, -300), (-250, 100)
+    ]
+    shapes.append(thai_border)
     return shapes
+
+def generate_topo_contours(peaks_km):
+    contours = []
+    for px, py, name in peaks_km:
+        height_str = ''.join(filter(str.isdigit, name))
+        height = int(height_str) if height_str else 3000
+        num_rings = max(2, height // 1200)
+        
+        for ring_idx in range(1, num_rings + 1):
+            base_radius = ring_idx * 15 # km
+            ring_points = []
+            num_points = 60
+            seed1 = random.uniform(0, 100)
+            seed2 = random.uniform(0, 100)
+            
+            for i in range(num_points):
+                angle = math.radians(i * (360/num_points))
+                # more organic noise
+                n1 = math.sin(angle * 3 + seed1) * (base_radius * 0.15)
+                n2 = math.cos(angle * 5 + seed2) * (base_radius * 0.05)
+                r = base_radius + n1 + n2
+                
+                cx = px + r * math.cos(angle)
+                cy = py + r * math.sin(angle)
+                ring_points.append((cx, cy))
+            
+            contours.append(ring_points)
+    return contours
 
 def load_real_map():
     shapes_km = []
@@ -112,6 +134,7 @@ def load_real_map():
     return shapes_km, peaks_km, airbases_km
 
 MAP_SHAPES_KM, MAP_PEAKS_KM, MAP_AIRBASES_KM = load_real_map()
+MAP_CONTOURS_KM = generate_topo_contours(MAP_PEAKS_KM)
 
 def start_radar():
     pygame.init()
@@ -321,6 +344,16 @@ def start_radar():
                 # Beautiful Anti-Aliased Map Rendering with CRT Glow
                 pygame.draw.lines(screen, (0, 30, 10), True, pixel_points, 3) # Faint outer glow
                 pygame.draw.aalines(screen, (0, 140, 40), True, pixel_points) # Sharp inner anti-aliased line
+
+        # Draw Topographical Contours
+        for ring_points_km in MAP_CONTOURS_KM:
+            points_px = []
+            for rx_km, ry_km in ring_points_km:
+                px = CX + km_to_px(rx_km)
+                py = CY - km_to_px(ry_km)
+                points_px.append((px, py))
+            if len(points_px) >= 2:
+                pygame.draw.aalines(screen, (30, 45, 20), True, points_px) # Faint green-brown for contours
 
         # Draw Mountain Peaks (Elevation)
         for x_km, y_km, p_name in MAP_PEAKS_KM:
