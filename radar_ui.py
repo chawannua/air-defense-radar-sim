@@ -317,6 +317,14 @@ def start_radar():
             pygame.draw.polygon(screen, (80, 100, 40), [(px, py - 4), (px - 4, py + 4), (px + 4, py + 4)], 1)
             screen.blit(font_xs.render(p_name, True, (80, 100, 40)), (px + 6, py - 3))
 
+        # Draw Military Airbases
+        for x_km, y_km, b_name in [(-50, -400, "WING 7 (SURAT THANI)"), (150, 150, "WING 1 (KORAT)")]:
+            px = CX + km_to_px(x_km)
+            py = CY - km_to_px(y_km)
+            pygame.draw.circle(screen, (0, 150, 255), (px, py), 3, 1)
+            pygame.draw.rect(screen, (0, 150, 255), (px - 5, py - 5, 10, 10), 1)
+            screen.blit(font_xs.render(b_name, True, (0, 150, 255)), (px + 8, py - 4))
+
         r_max = km_to_px(RADAR_MAX_KM)
         pygame.draw.line(screen, GRID_COLOR, (CX, CY - r_max), (CX, CY + r_max), 1)
         pygame.draw.line(screen, GRID_COLOR, (CX - r_max, CY), (CX + r_max, CY), 1)

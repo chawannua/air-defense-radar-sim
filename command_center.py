@@ -21,6 +21,7 @@ class CommandCenter:
         self.max_ammo = GameConfig.MAX_AMMO.copy()
         self.ammo = self.max_ammo.copy()
         self.reload_timers = {"THAAD": 0, "SAM": 0, "CIWS": 0} 
+        self.awacs_pool = 2
         
         # --- Logistics 60s System ---
         self.idle_timers = {wpn: 0 for wpn in self.max_ammo}
@@ -119,22 +120,47 @@ class CommandCenter:
             self.unseen_contacts.append(ghost)
 
     def process_reloads(self):
-        # Ammo tracking and supply system
-        for wpn in self.ammo:
-            if self.ammo[wpn] < self.prev_ammo[wpn]:
-                self.idle_timers[wpn] = 0  
+        # --- Base Defense Logistics ---
+        for wpn, max_qty in self.max_ammo.items():
+            if self.ammo[wpn] == self.prev_ammo[wpn] and self.ammo[wpn] < max_qty:
+                self.idle_timers[wpn] += 1
+                if self.idle_timers[wpn] >= 120:  
+                    self.ammo[wpn] += 1
+                    self.idle_timers[wpn] = 0
             else:
-                self.idle_timers[wpn] += 1 
-            
+                self.idle_timers[wpn] = 0
             self.prev_ammo[wpn] = self.ammo[wpn]
 
-            if self.idle_timers[wpn] >= 60 and self.ammo[wpn] < self.max_ammo[wpn]:
-                self.ammo[wpn] = self.max_ammo[wpn]
-                self.idle_timers[wpn] = 0
-                if wpn in self.reload_timers: self.reload_timers[wpn] = 0
-                if wpn == "JAS-39": self.returning_fighters.clear() 
-                self.add_log(f"\033[96m[SUPPLY]\033[0m {wpn} unused for 60s. Auto-restocked to full capacity!")
+        # Automated AWACS Patrol Swap System
+        active_awacs = [c for c in self.contacts if isinstance(c, AWACS)]
+        
+        # Recover landed AWACS
+        for a in active_awacs:
+            if a.state == "RTB" and not a.active:
+                self.awacs_pool += 1
+                self.add_log(f"\033[94m[AIRBASE] {a.id_code} landed safely at Wing 7 and refueling.\033[0m")
+                
+        # Launch AWACS if none active and pool has aircraft
+        flying_awacs = [a for a in active_awacs if a.active]
+        if len(flying_awacs) == 0 and self.awacs_pool > 0:
+            self.track_counter += 1
+            awacs = AWACS(self.track_counter)
+            self.contacts.append(awacs)
+            self.awacs_pool -= 1
+            self.add_log("\033[94m[AIRBASE] Wing 7 launching Saab 340 AEW&C for CAP orbit.\033[0m")
+        elif len(flying_awacs) > 0:
+            primary_awacs = flying_awacs[0]
+            if primary_awacs.fuel < 20.0 and primary_awacs.state == "ON_STATION":
+                if self.awacs_pool > 0:
+                    self.track_counter += 1
+                    relief = AWACS(self.track_counter)
+                    self.contacts.append(relief)
+                    self.awacs_pool -= 1
+                    self.add_log("\033[94m[AIRBASE] Wing 7 launching relief AWACS. Primary AWACS returning to base.\033[0m")
+                primary_awacs.state = "RTB"
 
+        self.contacts = [c for c in self.contacts if c.active]
+        
         # Standard reload system when ammo depleted
         for wpn in self.reload_timers:
             if self.ammo[wpn] == 0 and self.reload_timers[wpn] == 0:

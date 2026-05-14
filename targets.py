@@ -252,7 +252,7 @@ class Airliner(AirContact):
 
 class AWACS(AirContact):
     def __init__(self, track_number):
-        super().__init__(track_number, random.randint(100, 200))
+        super().__init__(track_number, 0) # Start at base (distance 0)
         self.speed_mach = 0.6
         self.altitude_ft = 35000
         self.rcs = 60.0
@@ -262,9 +262,23 @@ class AWACS(AirContact):
         self.scenario = "AWACS"
         self.active = True
         
-        self.orbit_center_x = random.randint(-150, 150)
-        self.orbit_center_y = random.randint(-150, 150)
+        self.fuel = 100.0
+        self.state = "TRANSIT_TO_STATION"
+        
+        # Surat Thani Wing 7 roughly
+        self.home_x = -50
+        self.home_y = -400
+        
+        # Patrol over Gulf of Thailand
+        self.orbit_center_x = 100
+        self.orbit_center_y = -150
         self.orbit_angle = 0
+        
+        # Start AWACS at Home Base
+        self.x_km = self.home_x
+        self.y_km = self.home_y
+        self.distance_km = math.hypot(self.x_km, self.y_km)
+        self.bearing = (math.degrees(math.atan2(self.x_km, -self.y_km)) + 360) % 360
         
     def identify_target(self):
         self.type_name = self.true_type
@@ -274,14 +288,46 @@ class AWACS(AirContact):
     def calculate_threat_score(self):
         return 0
         
-    def move(self):
-        self.orbit_angle = (self.orbit_angle + 1) % 360
-        orbit_radius_km = 50
-        x = self.orbit_center_x + orbit_radius_km * math.cos(math.radians(self.orbit_angle))
-        y = self.orbit_center_y + orbit_radius_km * math.sin(math.radians(self.orbit_angle))
-        
-        self.distance_km = math.sqrt(x*x + y*y)
+    def set_xy(self, x, y):
+        self.x_km = x
+        self.y_km = y
+        self.distance_km = math.hypot(x, y)
         self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
+
+    def move(self):
+        speed_per_tick = self.speed_mach * 1.0
+        x, y = self.x_km, self.y_km
+        
+        if self.state == "TRANSIT_TO_STATION":
+            dist = math.hypot(self.orbit_center_x - x, self.orbit_center_y - y)
+            if dist < speed_per_tick:
+                self.state = "ON_STATION"
+            else:
+                angle = math.atan2(self.orbit_center_y - y, self.orbit_center_x - x)
+                x += speed_per_tick * math.cos(angle)
+                y += speed_per_tick * math.sin(angle)
+                # Compute heading from movement vector
+                self.heading = (math.degrees(math.atan2(speed_per_tick * math.cos(angle), -(speed_per_tick * math.sin(angle)))) + 360) % 360
+
+        elif self.state == "ON_STATION":
+            self.orbit_angle = (self.orbit_angle + 1) % 360
+            orbit_radius_km = 50
+            x = self.orbit_center_x + orbit_radius_km * math.cos(math.radians(self.orbit_angle))
+            y = self.orbit_center_y + orbit_radius_km * math.sin(math.radians(self.orbit_angle))
+            self.fuel -= 0.005 # Deplete fuel slowly (approx 5.5 mins patrol time)
+            self.heading = (math.degrees(math.atan2(x - self.x_km, -(y - self.y_km))) + 360) % 360
+
+        elif self.state == "RTB":
+            dist = math.hypot(self.home_x - x, self.home_y - y)
+            if dist < speed_per_tick:
+                self.active = False # Landed
+            else:
+                angle = math.atan2(self.home_y - y, self.home_x - x)
+                x += speed_per_tick * math.cos(angle)
+                y += speed_per_tick * math.sin(angle)
+                self.heading = (math.degrees(math.atan2(speed_per_tick * math.cos(angle), -(speed_per_tick * math.sin(angle)))) + 360) % 360
+                
+        self.set_xy(x, y)
 
 class GhostTrack(AirContact):
     def __init__(self, track_number):
