@@ -63,9 +63,13 @@ def load_real_map():
         return (dx, dy) 
     
     for filename in ["gbr.json", "irl.json"]:
-        if os.path.exists(filename):
+        filepath = filename
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            filepath = os.path.join(sys._MEIPASS, filename)
+            
+        if os.path.exists(filepath):
             try:
-                with open(filename, 'r') as f:
+                with open(filepath, 'r') as f:
                     poly_list = json.load(f)
                 for ring in poly_list:
                     ring_km = []
@@ -246,13 +250,18 @@ def start_radar():
                             closest_c = c
                     selected_contact = closest_c
 
-        # 🟢 [PAN CAMERA] Smooth panning with WASD or Arrow keys
+        # 🟢 [PAN CAMERA] Smooth panning with WASD, Arrows, or Mouse Drag
         keys = pygame.key.get_pressed()
         pan_speed = 10
         if keys[pygame.K_LEFT] or keys[pygame.K_a]: camera_x += pan_speed
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]: camera_x -= pan_speed
         if keys[pygame.K_UP] or keys[pygame.K_w]: camera_y += pan_speed
         if keys[pygame.K_DOWN] or keys[pygame.K_s]: camera_y -= pan_speed
+
+        mouse_dx, mouse_dy = pygame.mouse.get_rel()
+        if pygame.mouse.get_pressed()[1] or pygame.mouse.get_pressed()[2]: # Middle or Right Click
+            camera_x += mouse_dx
+            camera_y += mouse_dy
 
         CX = (WIDTH // 2) + int(camera_x)
         CY = (HEIGHT // 2) + int(camera_y)
