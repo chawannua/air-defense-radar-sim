@@ -131,7 +131,13 @@ def start_radar():
                 # 🔴 [ABORT] ระบบยกเลิกการยิงเป้าหมายที่เลือก
                 if event.key == pygame.K_BACKSPACE and selected_contact:
                     cmd.manual_override_abort(selected_contact)
-                                
+
+                # 🛠️ [DEV] Manual Spawn (5=ICBM, 6=Fighter, 7=Drone, 8=Airliner)
+                if not selected_contact:
+                    if event.key == pygame.K_5: cmd.manual_spawn("ICBM")
+                    elif event.key == pygame.K_6: cmd.manual_spawn("FIGHTER")
+                    elif event.key == pygame.K_7: cmd.manual_spawn("DRONE")
+                    elif event.key == pygame.K_8: cmd.manual_spawn("AIRLINER")
                 # 🟢 [FULLSCREEN] สลับโหมดแบบปลอดภัย ไม่ทำจอพัง
                 if event.key == pygame.K_F11:
                     is_fullscreen = not is_fullscreen
@@ -443,7 +449,7 @@ def start_radar():
         screen.blit(font_md.render(f"ARMORY: {armory_str}", True, RADAR_COLOR), (pad_x, 45))
 
         override_color = (255, 255, 255) if selected_contact else (80, 80, 80)
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS)" if selected_contact else "MANUAL OVERRIDE: NO TARGET SELECTED"
+        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS)" if selected_contact else "DESELECTED | Spawn Test: 5=ICBM, 6=Jet, 7=Drone, 8=Airbus"
         screen.blit(font_sm.render(ovr_text, True, override_color), (pad_x, 65))
 
         pygame.draw.line(screen, GRID_COLOR, (sidebar_x, 85), (WIDTH, 85), 1)

@@ -2,9 +2,8 @@
 import time
 import random
 import os
-from datetime import datetime
 from config import GameConfig
-from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack
+from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, Airliner
 from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement
 
 class CommandCenter:
@@ -108,6 +107,7 @@ class CommandCenter:
             elif prob < 0.1: new_contact = TacticalBM(self.track_counter); new_contact.detected_by = "GND-EWR"  
             elif prob < 0.15: new_contact = Drone(self.track_counter); new_contact.detected_by = "AWACS"    
             elif prob < 0.18: new_contact = Helicopter(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
+            elif prob < 0.25: new_contact = Airliner(self.track_counter); new_contact.detected_by = "GND-RADAR" # 7% chance for airliner
             else: new_contact = Aircraft(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
             self.unseen_contacts.append(new_contact)
             
@@ -184,6 +184,18 @@ class CommandCenter:
             if highest_threat: self.add_log(self.weapon_op.authorize_engagement(highest_threat))
 
     def manual_override_fire(self, target, wpn):
+        # Altitude Ceilings Check
+        alt = target.altitude_ft
+        if wpn == "CIWS" and alt > 15000:
+            self.add_log(f"\033[91;1m[ERROR] {wpn} CANNOT REACH {alt} FT!\033[0m")
+            return
+        if wpn == "SAM" and alt > 100000:
+            self.add_log(f"\033[91;1m[ERROR] {wpn} CANNOT REACH {alt} FT!\033[0m")
+            return
+        if wpn == "Interceptors" and alt > 60000:
+            self.add_log(f"\033[91;1m[ERROR] F-16 CANNOT REACH {alt} FT!\033[0m")
+            return
+            
         if self.ammo.get(wpn, 0) > 0:
             self.ammo[wpn] -= 1
             impact_time = max(1, int(target.distance_km / max(1, target.speed_mach * 2)))
@@ -192,6 +204,16 @@ class CommandCenter:
             self.add_log(f"\033[95m[MANUAL OVERRIDE]\033[0m Fired {wpn} at {target.id_code}")
         else:
             self.add_log(f"\033[91m[WARNING]\033[0m {wpn} Out of Ammo!")
+
+    def manual_spawn(self, target_type):
+        self.track_counter += 1
+        if target_type == "ICBM": c = ICBM(self.track_counter); c.detected_by = "SPACE-COM"
+        elif target_type == "FIGHTER": c = Aircraft(self.track_counter); c.detected_by = "GND-RADAR"
+        elif target_type == "DRONE": c = Drone(self.track_counter); c.detected_by = "GND-RADAR"
+        elif target_type == "AIRLINER": c = Airliner(self.track_counter); c.detected_by = "GND-RADAR"
+        else: return
+        self.unseen_contacts.append(c)
+        self.add_log(f"\033[95m[DEV] MANUAL SPAWN: {target_type} inbound.\033[0m")
 
     def manual_override_abort(self, target):
         aborted = False
@@ -228,6 +250,12 @@ class CommandCenter:
                         self.add_log(f"\033[91;1m[MISS] THAAD MISSED {eng.target.id_code}! TARGET STILL INCOMING!\033[0m")
                 
                 elif eng.weapon_name == "SAM":
+                    # Chaff Evasion Mechanic
+                    if isinstance(eng.target, Aircraft) and random.random() < 0.25:
+                        eng.target.status = "HOSTILE"
+                        self.add_log(f"\033[93m[EW] {eng.target.id_code} DEPLOYED CHAFF! SAM DECOYED!\033[0m")
+                        continue
+                        
                     base_hit = GameConfig.HIT_CHANCE_SAM_NUKE if isinstance(eng.target, ICBM) else \
                                (GameConfig.HIT_CHANCE_SAM_TBM if isinstance(eng.target, TacticalBM) else GameConfig.HIT_CHANCE_SAM_NORMAL)
                     
@@ -237,7 +265,11 @@ class CommandCenter:
                     
                     if random.random() <= final_hit_chance: 
                         eng.target.status = "CLEARED"; eng.target.active = False
-                        self.add_log(f"\033[92m[KILL] SPLASH! {eng.target.id_code} destroyed by SAM!\033[0m")
+                        if isinstance(eng.target, Airliner):
+                            self.base_hp = 0
+                            self.add_log(f"\033[41;97m[CRITICAL INCIDENT] YOU SHOT DOWN A COMMERCIAL AIRLINER! COURT-MARTIAL IMMINENT!\033[0m")
+                        else:
+                            self.add_log(f"\033[92m[KILL] SPLASH! {eng.target.id_code} destroyed by SAM!\033[0m")
                     else:
                         eng.target.status = "HOSTILE"
                         self.add_log(f"\033[91;1m[MISS] SAM MISSED {eng.target.id_code}!\033[0m")
@@ -256,7 +288,11 @@ class CommandCenter:
                         
                         if random.random() <= final_hit_chance: 
                             eng.target.status = "CLEARED"; eng.target.active = False
-                            self.add_log(f"\033[92m[KILL]\033[0m FOX-3! {eng.target.id_code} splashed by F-16! F-16 is RTB.\033[0m")
+                            if isinstance(eng.target, Airliner):
+                                self.base_hp = 0
+                                self.add_log(f"\033[41;97m[CRITICAL INCIDENT] YOU SHOT DOWN A COMMERCIAL AIRLINER! COURT-MARTIAL IMMINENT!\033[0m")
+                            else:
+                                self.add_log(f"\033[92m[KILL]\033[0m FOX-3! {eng.target.id_code} splashed by F-16! F-16 is RTB.\033[0m")
                         else:
                             eng.target.status = "HOSTILE"
                             self.add_log(f"\033[91;1m[MISS]\033[0m {eng.target.id_code} survived F-16 attack! F-16 is RTB.\033[0m")

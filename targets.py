@@ -203,6 +203,44 @@ class ICBM(AirContact):
     def calculate_threat_score(self):
         return 1000000 + int(1000 / max(1, self.distance_km))
 
+class Airliner(AirContact):
+    def __init__(self, track_number):
+        super().__init__(track_number, random.randint(300, 800))
+        self.speed_mach = random.uniform(0.7, 0.85)
+        self.altitude_ft = random.randint(30000, 42000)
+        self.rcs = random.uniform(50.0, 200.0)
+        self.is_friendly = True
+        self.has_transponder = True if random.random() < 0.90 else False
+        
+        self.true_type = "COMMERCIAL_FLIGHT"
+        self.scenario = "AIRLINER"
+        
+        # Airliners fly across the screen, not directly at the base
+        self.heading = (self.bearing + random.choice([70, 90, 110, 250, 270, 290])) % 360
+        
+    def identify_target(self):
+        self.type_name = "BOEING 777" if self.rcs > 100 else "AIRBUS A320"
+        self.status = "FRIENDLY"
+        self.id_code = f"FLIGHT-{self.track_number}"
+
+    def move(self):
+        # Cartesian movement so it flies across instead of towards center
+        speed_per_tick = self.speed_mach * 1.0
+        x = self.distance_km * math.sin(math.radians(self.bearing))
+        y = -self.distance_km * math.cos(math.radians(self.bearing))
+        
+        x += speed_per_tick * math.sin(math.radians(self.heading))
+        y -= speed_per_tick * math.cos(math.radians(self.heading))
+        
+        self.distance_km = math.sqrt(x*x + y*y)
+        self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
+        
+        if self.distance_km > 1000:
+            self.active = False
+            
+    def calculate_threat_score(self):
+        return 0
+
 class GhostTrack(AirContact):
     def __init__(self, track_number):
         super().__init__(track_number, random.randint(30, 150))
