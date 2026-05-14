@@ -300,11 +300,9 @@ def start_radar():
                     closest_c = None
                     min_dist = 20 
                     for c in cmd.contacts:
-                        if not c.active or not hasattr(c, 'visible_dist'): continue
-                        bearing = getattr(c, 'bearing', getattr(c, 'heading', 0))
-                        px_dist = km_to_px(min(c.visible_dist, RADAR_MAX_KM))
-                        tx = CX + px_dist * math.sin(math.radians(bearing))
-                        ty = CY - px_dist * math.cos(math.radians(bearing))
+                        if not c.active: continue
+                        tx = CX + km_to_px(c.x_km)
+                        ty = CY - km_to_px(c.y_km)
                         
                         dist_to_mouse = math.hypot(mx - tx, my - ty)
                         if dist_to_mouse < min_dist:
