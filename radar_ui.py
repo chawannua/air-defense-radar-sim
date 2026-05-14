@@ -333,7 +333,11 @@ def start_radar():
         # ===================================================
         # 1. วาดกริดและ Weapon Engagement Zones (WEZ)
         # ===================================================
-        # (Weapon Engagement Zones and Grid Rings removed for cleaner modern map view)
+        # Only display the Weapon Engagement Zones (WEZ)
+        pygame.draw.circle(screen, (0, 30, 80), (CX, CY), int(km_to_px(400)), 1) # THAAD Optimal Range
+        pygame.draw.circle(screen, (80, 80, 0), (CX, CY), int(km_to_px(200)), 1) # SAM Anti-Ballistic Range
+        pygame.draw.circle(screen, (80, 50, 0), (CX, CY), int(km_to_px(80)), 1)  # SAM Anti-Aircraft Range
+        pygame.draw.circle(screen, (80, 0, 0), (CX, CY), int(km_to_px(20)), 1)   # CIWS Range
 
         # Draw map shapes
         for shape_km in MAP_SHAPES_KM:
@@ -372,8 +376,6 @@ def start_radar():
             screen.blit(font_xs.render(b_name, True, (0, 150, 255)), (px + 8, py - 4))
 
         r_max = km_to_px(RADAR_MAX_KM)
-        pygame.draw.line(screen, GRID_COLOR, (CX, CY - r_max), (CX, CY + r_max), 1)
-        pygame.draw.line(screen, GRID_COLOR, (CX - r_max, CY), (CX + r_max, CY), 1)
 
         # ===================================================
         # 2. จำลองการกวาดแบบ Rotary AESA (Mechanical + Electronic Steering)
