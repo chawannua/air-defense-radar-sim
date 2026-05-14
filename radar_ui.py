@@ -120,16 +120,16 @@ def load_real_map():
         peaks_km.append((x_km, y_km, name))
         
     airbases_data = [
-        (14.933, 102.083, "WING 1 (KORAT)"),
-        (15.266, 100.333, "WING 4 (TAKHLI)"),
-        (9.133, 99.133, "WING 7 (SURAT THANI)"),
-        (15.250, 104.866, "WING 21 (UBON)"),
-        (17.383, 102.783, "WING 23 (UDON)")
+        (14.933, 102.083, "WING 1 (KORAT)", "F-16A/B ADF"),
+        (15.266, 100.333, "WING 4 (TAKHLI)", "F-16AM MLU"),
+        (9.133, 99.133, "WING 7 (SURAT THANI)", "JAS-39C GRIPEN"),
+        (15.250, 104.866, "WING 21 (UBON)", "F-5TH SUPER TIGRIS"),
+        (17.383, 102.783, "WING 23 (UDON)", "ALPHA JET")
     ]
     airbases_km = []
-    for lat, lon, name in airbases_data:
+    for lat, lon, name, ac_type in airbases_data:
         x_km, y_km = latlon_to_km(lon, lat)
-        airbases_km.append((x_km, y_km, name))
+        airbases_km.append((x_km, y_km, f"{name} [{ac_type}]"))
         
     return shapes_km, peaks_km, airbases_km
 

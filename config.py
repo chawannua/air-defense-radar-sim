@@ -2,11 +2,11 @@
 class GameConfig:
     # Real-world RTAF airbase positions in relative km from Bangkok (center of map)
     AIRBASES = [
-        (150, 100, "Wing 1 (Korat)"),
-        (0, 150, "Wing 4 (Takhli)"),
-        (20, -350, "Wing 7 (Surat Thani)"),
-        (250, 180, "Wing 21 (Ubon)"),
-        (180, 280, "Wing 23 (Udon)")
+        (150, 100, "Wing 1 (Korat)", "F-16A/B ADF"),
+        (0, 150, "Wing 4 (Takhli)", "F-16AM Fighting Falcon"),
+        (20, -350, "Wing 7 (Surat Thani)", "JAS-39C Gripen"),
+        (250, 180, "Wing 21 (Ubon)", "F-5TH Super Tigris"),
+        (180, 280, "Wing 23 (Udon)", "Alpha Jet")
     ]
 
     # Hit probabilities - tuned so enemies occasionally punch through

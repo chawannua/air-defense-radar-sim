@@ -23,13 +23,13 @@ class ThreatQueue:
         return None
 
 def get_closest_airbase(target):
-    closest_base = (0, 0, "HQ")
+    closest_base = (0, 0, "HQ", "F-16AM Fighting Falcon")
     min_dist = float('inf')
-    for bx, by, bname in getattr(GameConfig, 'AIRBASES', []):
+    for bx, by, bname, baircraft in getattr(GameConfig, 'AIRBASES', []):
         d = math.hypot(target.x_km - bx, target.y_km - by)
         if d < min_dist:
             min_dist = d
-            closest_base = (bx, by, bname)
+            closest_base = (bx, by, bname, baircraft)
     return closest_base
 
 class Engagement:
@@ -114,10 +114,10 @@ class WeaponOfficer:
                         
                 elif isinstance(target, (Drone, Helicopter)):
                     if target.distance_km > 50 and ammo["FIGHTER"] > 0:
-                        fighter_type = random.choice(["F-16AM Fighting Falcon", "JAS-39 Gripen", "F-5TH Super Tigris", "T-50TH Golden Eagle", "Alpha Jet"])
+                        bx, by, bname, baircraft = get_closest_airbase(target)
+                        fighter_type = baircraft
                         weapon, prep_time = fighter_type, GameConfig.PREP_TIME_F16
                         ammo["FIGHTER"] -= 1 
-                        bx, by, bname = get_closest_airbase(target)
                         # Time to impact based on distance from base instead of center
                         dist_from_base = math.hypot(target.x_km - bx, target.y_km - by)
                         closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_F16
@@ -135,10 +135,10 @@ class WeaponOfficer:
                 elif isinstance(target, Aircraft):
                     if target.distance_km > 80:
                         if ammo["FIGHTER"] > 0:
-                            fighter_type = random.choice(["F-16AM Fighting Falcon", "JAS-39 Gripen", "F-5TH Super Tigris", "T-50TH Golden Eagle", "Alpha Jet"])
+                            bx, by, bname, baircraft = get_closest_airbase(target)
+                            fighter_type = baircraft
                             weapon, prep_time = fighter_type, GameConfig.PREP_TIME_F16
                             ammo["FIGHTER"] -= 1 
-                            bx, by, bname = get_closest_airbase(target)
                             dist_from_base = math.hypot(target.x_km - bx, target.y_km - by)
                             closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_F16
                             impact_time = int(dist_from_base / closure_rate) + prep_time
