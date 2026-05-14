@@ -54,15 +54,16 @@ def generate_map_shapes():
 
 def load_real_map():
     shapes_km = []
-    RADAR_LAT = 54.0  # Center of UK
-    RADAR_LON = -2.0
+    RADAR_LAT = 13.7563  # Bangkok, Thailand
+    RADAR_LON = 100.5018
     
     def latlon_to_km(lon, lat):
         dx = (lon - RADAR_LON) * 111.32 * math.cos(math.radians(RADAR_LAT))
         dy = (lat - RADAR_LAT) * 110.574
         return (dx, dy) 
     
-    for filename in ["gbr.json", "irl.json"]:
+    map_files = ["tha.json", "mmr.json", "lao.json", "khm.json", "mys.json", "vnm.json"]
+    for filename in map_files:
         filepath = filename
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             filepath = os.path.join(sys._MEIPASS, filename)
@@ -292,8 +293,9 @@ def start_radar():
                 px_y = CY - km_to_px(y_km) # Minus because Pygame Y is flipped relative to North
                 pixel_points.append((px_x, px_y))
             if len(pixel_points) > 2:
-                # Make map terrain brighter
-                pygame.draw.polygon(screen, (0, 80, 20), pixel_points, 1)
+                # Beautiful Anti-Aliased Map Rendering with CRT Glow
+                pygame.draw.lines(screen, (0, 30, 10), True, pixel_points, 3) # Faint outer glow
+                pygame.draw.aalines(screen, (0, 140, 40), True, pixel_points) # Sharp inner anti-aliased line
 
         r_max = km_to_px(RADAR_MAX_KM)
         pygame.draw.line(screen, GRID_COLOR, (CX, CY - r_max), (CX, CY + r_max), 1)
