@@ -333,15 +333,7 @@ def start_radar():
         # ===================================================
         # 1. วาดกริดและ Weapon Engagement Zones (WEZ)
         # ===================================================
-        for ring_km in [50, 100, 200, 400, 600, 800]:
-            r_px = km_to_px(ring_km)
-            pygame.draw.circle(screen, GRID_COLOR, (CX, CY), int(r_px), 1)
-            screen.blit(font_xs.render(f"{ring_km}", True, GRID_COLOR), (CX + 2, CY - r_px - 12))
-            
-        pygame.draw.circle(screen, (0, 30, 80), (CX, CY), int(km_to_px(400)), 1) # THAAD Optimal Range
-        pygame.draw.circle(screen, (80, 80, 0), (CX, CY), int(km_to_px(200)), 1) # SAM Anti-Ballistic Range
-        pygame.draw.circle(screen, (80, 50, 0), (CX, CY), int(km_to_px(80)), 1)  # SAM Anti-Aircraft Range
-        pygame.draw.circle(screen, (80, 0, 0), (CX, CY), int(km_to_px(20)), 1)   # CIWS Range
+        # (Weapon Engagement Zones and Grid Rings removed for cleaner modern map view)
 
         # Draw map shapes
         for shape_km in MAP_SHAPES_KM:
@@ -503,22 +495,24 @@ def start_radar():
         # --- Draw Realistic Jamming Strobes (Sector Jamming) ---
         for ew in ew_aircrafts:
             ew_bearing = getattr(ew, 'bearing', getattr(ew, 'heading', 0))
-            jam_width = 8.0 # +/- 8 degree cone of noise
+            # Heavy EW gets a wider jamming cone
+            jam_width = 15.0 if getattr(ew, 'is_heavy_ew', False) else 8.0 
             
             # Draw noise particles representing RF interference in this sector
-            for _ in range(80):
-                r_dist = random.uniform(20, r_max)
+            noise_density = 250 if getattr(ew, 'is_heavy_ew', False) else 80
+            for _ in range(noise_density):
+                r_dist = random.uniform(10, r_max * 1.5)
                 j_angle = ew_bearing + random.uniform(-jam_width, jam_width)
                 jx = CX + r_dist * math.sin(math.radians(j_angle))
                 jy = CY - r_dist * math.cos(math.radians(j_angle))
-                noise_color = (random.randint(50, 150), random.randint(150, 255), random.randint(50, 150))
-                pygame.draw.circle(screen, noise_color, (int(jx), int(jy)), random.randint(1, 2))
+                noise_color = random.choice([(0, 255, 0), (200, 255, 0), (50, 150, 50)])
+                pygame.draw.circle(screen, noise_color, (int(jx), int(jy)), 1)
                 
             # Draw faint boundaries of the strobe
             for angle_offset in [-jam_width, jam_width]:
                 sx = CX + r_max * math.sin(math.radians(ew_bearing + angle_offset))
                 sy = CY - r_max * math.cos(math.radians(ew_bearing + angle_offset))
-                pygame.draw.line(screen, (0, 80, 40), (CX, CY), (sx, sy), 1)
+                pygame.draw.line(screen, (0, 100, 50), (CX, CY), (sx, sy), 1)
 
         for c in cmd.contacts:
             if not c.active or not hasattr(c, 'visible_dist'): continue
@@ -566,19 +560,15 @@ def start_radar():
             vec_end_y = y - vec_length * math.cos(math.radians(target_heading))
             pygame.draw.line(screen, color, (x, y), (vec_end_x, vec_end_y), 1)
 
-            screen.blit(font_sm.render(c.id_code, True, color), (vec_end_x + 5, vec_end_y - 10))
+            # Draw info precisely next to the dot instead of the heading vector
+            text_color = base_color if c.brightness > 0.3 else (80, 80, 80)
+            screen.blit(font_sm.render(c.id_code, True, text_color), (x + 10, y - 10))
             alt_k = c.altitude_ft // 1000
-            screen.blit(font_xs.render(f"{c.speed_mach:.1f}M FL{alt_k:02d}", True, color), (vec_end_x + 5, vec_end_y + 2))
+            screen.blit(font_xs.render(f"{c.speed_mach:.1f}M FL{alt_k:02d}", True, text_color), (x + 10, y + 2))
 
             if selected_contact == c:
                 pygame.draw.rect(screen, (255, 255, 255), (x-12, y-12, 24, 24), 1)
                 pygame.draw.circle(screen, (255, 255, 255), (int(x), int(y)), 20, 1)
-                
-            # AWACS Radar Ring Effect
-            if isinstance(c, AWACS):
-                awacs_range_px = km_to_px(300)
-                pygame.draw.circle(screen, (0, 80, 0), (int(x), int(y)), int(awacs_range_px), 1)
-                pygame.draw.circle(screen, (0, 40, 0), (int(x), int(y)), int(awacs_range_px * 0.5), 1)
 
         for eng in cmd.active_engagements:
             target = getattr(eng, 'target', None)
@@ -601,24 +591,7 @@ def start_radar():
             pygame.draw.line(screen, MISSILE_COLOR, (mx-4, my+4), (mx+4, my-4), 2)
             screen.blit(font_sm.render(wpn_name, True, MISSILE_COLOR), (mx + 8, my - 5))
 
-        # ===================================================
-        # 3.5 Dynamic Electronic Warfare Effect (Growler)
-        # ===================================================
-        growler_count = sum(1 for c in cmd.contacts if getattr(c, 'is_heavy_ew', False) and c.status != "UNIDENTIFIED" and c.active)
-
-        if growler_count > 0:
-            noise_areas = []
-            if growler_count >= 1: noise_areas.append(pygame.Rect(CX, 0, CX, CY))       
-            if growler_count >= 2: noise_areas.append(pygame.Rect(CX, CY, CX, CY))      
-            if growler_count >= 3: noise_areas.append(pygame.Rect(0, 0, CX, CY))        
-            if growler_count >= 4: noise_areas.append(pygame.Rect(0, CY, CX, CY))       
-
-            for area in noise_areas:
-                for _ in range(300):
-                    rx = random.randint(area.left, area.right - 1)
-                    ry = random.randint(area.top, area.bottom - 1)
-                    n_color = random.choice([(0, 255, 0), (200, 255, 0), (50, 150, 50)])
-                    pygame.draw.circle(screen, n_color, (rx, ry), random.randint(1, 2))
+        # (Removed Heavy EW Quadrant Logic for realism)
 
         # ===================================================
         # 3.8 Flight Info Panel (On Radar Display)
