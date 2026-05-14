@@ -4,6 +4,7 @@ import sys
 import re
 import random
 from command_center import CommandCenter
+from targets import AWACS
 
 # 🟢 [FIX] แก้ปัญหา Windows แอบซูมหน้าจอ และทำให้ Resolution พัง
 try:
@@ -31,6 +32,25 @@ def lerp_color(c1, c2, t):
         int(c1[1] + (c2[1] - c1[1]) * t),
         int(c1[2] + (c2[2] - c1[2]) * t)
     )
+
+def generate_map_shapes():
+    shapes = []
+    island1 = []
+    for angle in range(0, 360, 15):
+        r = 120 + random.uniform(-20, 20)
+        island1.append((-150 + r * math.cos(math.radians(angle)), -200 + r * math.sin(math.radians(angle))))
+    shapes.append(island1)
+    
+    coast = []
+    for y in range(-800, 800, 30):
+        x = 350 + math.sin(y/120.0)*80 + random.uniform(-15, 15)
+        coast.append((x, y))
+    coast.append((1000, 800))
+    coast.append((1000, -800))
+    shapes.append(coast)
+    return shapes
+
+MAP_SHAPES_KM = generate_map_shapes()
 
 def start_radar():
     pygame.init()
@@ -132,12 +152,15 @@ def start_radar():
                 if event.key == pygame.K_BACKSPACE and selected_contact:
                     cmd.manual_override_abort(selected_contact)
 
-                # 🛠️ [DEV] Manual Spawn (5=ICBM, 6=Fighter, 7=Drone, 8=Airliner)
+                # 🛠️ [DEV] Manual Spawn
                 if not selected_contact:
                     if event.key == pygame.K_5: cmd.manual_spawn("ICBM")
                     elif event.key == pygame.K_6: cmd.manual_spawn("FIGHTER")
                     elif event.key == pygame.K_7: cmd.manual_spawn("DRONE")
                     elif event.key == pygame.K_8: cmd.manual_spawn("AIRLINER")
+                    elif event.key == pygame.K_9: cmd.manual_spawn("EW")
+                    elif event.key == pygame.K_0: cmd.manual_spawn("AWACS")
+                    elif event.key == pygame.K_w: cmd.manual_spawn("WAVE")
                 # 🟢 [FULLSCREEN] สลับโหมดแบบปลอดภัย ไม่ทำจอพัง
                 if event.key == pygame.K_F11:
                     is_fullscreen = not is_fullscreen
@@ -196,6 +219,16 @@ def start_radar():
         pygame.draw.circle(screen, (80, 80, 0), (CX, CY), int(km_to_px(200)), 1) # SAM Anti-Ballistic Range
         pygame.draw.circle(screen, (80, 50, 0), (CX, CY), int(km_to_px(80)), 1)  # SAM Anti-Aircraft Range
         pygame.draw.circle(screen, (80, 0, 0), (CX, CY), int(km_to_px(20)), 1)   # CIWS Range
+
+        # Draw map shapes
+        for shape_km in MAP_SHAPES_KM:
+            pixel_points = []
+            for (x_km, y_km) in shape_km:
+                px_x = CX + km_to_px(x_km)
+                px_y = CY + km_to_px(y_km)
+                pixel_points.append((px_x, px_y))
+            if len(pixel_points) > 2:
+                pygame.draw.polygon(screen, (0, 30, 10), pixel_points, 1)
 
         pygame.draw.line(screen, GRID_COLOR, (CX, CY - RADAR_RADIUS_PX), (CX, CY + RADAR_RADIUS_PX), 1)
         pygame.draw.line(screen, GRID_COLOR, (CX - RADAR_RADIUS_PX, CY), (CX + RADAR_RADIUS_PX, CY), 1)
@@ -395,6 +428,12 @@ def start_radar():
             if selected_contact == c:
                 pygame.draw.rect(screen, (255, 255, 255), (x-12, y-12, 24, 24), 1)
                 pygame.draw.circle(screen, (255, 255, 255), (int(x), int(y)), 20, 1)
+                
+            # AWACS Radar Ring Effect
+            if isinstance(c, AWACS):
+                awacs_range_px = km_to_px(300)
+                pygame.draw.circle(screen, (0, 80, 0), (int(x), int(y)), int(awacs_range_px), 1)
+                pygame.draw.circle(screen, (0, 40, 0), (int(x), int(y)), int(awacs_range_px * 0.5), 1)
 
         for eng in cmd.active_engagements:
             target = getattr(eng, 'target', None)
@@ -456,7 +495,7 @@ def start_radar():
         screen.blit(font_md.render(f"ARMORY: {armory_str}", True, RADAR_COLOR), (pad_x, 45))
 
         override_color = (255, 255, 255) if selected_contact else (80, 80, 80)
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS)" if selected_contact else "DESELECTED | Spawn Test: 5=ICBM, 6=Jet, 7=Drone, 8=Airbus"
+        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS)" if selected_contact else "SPAWN: 5:ICBM 6:Jet 7:Drone 8:CIV 9:EW 0:AWACS W:Wave"
         screen.blit(font_sm.render(ovr_text, True, override_color), (pad_x, 65))
 
         pygame.draw.line(screen, GRID_COLOR, (sidebar_x, 85), (WIDTH, 85), 1)

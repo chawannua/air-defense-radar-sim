@@ -1,10 +1,9 @@
-# command_center.py
 from datetime import datetime
 import time
 import random
 import os
 from config import GameConfig
-from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, Airliner
+from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, Airliner, AWACS
 from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement
 
 class CommandCenter:
@@ -208,10 +207,17 @@ class CommandCenter:
 
     def manual_spawn(self, target_type):
         self.track_counter += 1
+        if target_type == "WAVE":
+            for _ in range(5):
+                self.manual_spawn("FIGHTER")
+            return
+            
         if target_type == "ICBM": c = ICBM(self.track_counter); c.detected_by = "SPACE-COM"
         elif target_type == "FIGHTER": c = Aircraft(self.track_counter); c.detected_by = "GND-RADAR"
         elif target_type == "DRONE": c = Drone(self.track_counter); c.detected_by = "GND-RADAR"
         elif target_type == "AIRLINER": c = Airliner(self.track_counter); c.detected_by = "GND-RADAR"
+        elif target_type == "EW": c = Aircraft(self.track_counter); c.true_type = "EA-18G Growler (HEAVY EW)"; c.is_heavy_ew = True; c.detected_by = "GND-RADAR"
+        elif target_type == "AWACS": c = AWACS(self.track_counter); c.detected_by = "GND-RADAR"
         else: return
         self.unseen_contacts.append(c)
         self.add_log(f"\033[95m[DEV] MANUAL SPAWN: {target_type} inbound.\033[0m")
@@ -328,8 +334,10 @@ class CommandCenter:
                     if self.tick_count % 3 == 0: self.add_log(f"\033[41;97m[AUTO-CIWS] CLICK! CIWS RELOADING! BRACE FOR IMPACT: {c.id_code}!\033[0m")
 
     def update_world(self):
-        # Identify active Jammers (Strobe Jamming / Sector Jamming)
+        # Identify active Jammers and AWACS
         ew_aircrafts = [c for c in self.contacts + self.unseen_contacts if c.active and "EW" in getattr(c, 'type_name', '')]
+        has_awacs = any(isinstance(c, AWACS) for c in self.contacts if c.active)
+        effective_radar_alt = 35000 if has_awacs else 150 # AWACS looks down from 35,000 ft, massively extending radar horizon!
         
         # Process unseen contacts (move them, check if they cross the detection threshold)
         surviving_unseen = []
@@ -349,7 +357,7 @@ class CommandCenter:
                             
                 jamming_factor = 0.3 if is_jammed else 1.0 # 30% range if in the jammer's sector
                 
-                if c.is_detectable_by_radar(radar_alt_ft=150, jamming_factor=jamming_factor):
+                if c.is_detectable_by_radar(radar_alt_ft=effective_radar_alt, jamming_factor=jamming_factor):
                     self.contacts.append(c)
                     self.add_log(f"\033[90m[SYS] NEW TRACK: {c.id_code} appeared on radar.\033[0m")
                 elif c.distance_km <= 0:

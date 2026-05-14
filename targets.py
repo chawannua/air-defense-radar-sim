@@ -241,6 +241,39 @@ class Airliner(AirContact):
     def calculate_threat_score(self):
         return 0
 
+class AWACS(AirContact):
+    def __init__(self, track_number):
+        super().__init__(track_number, random.randint(100, 200))
+        self.speed_mach = 0.6
+        self.altitude_ft = 35000
+        self.rcs = 60.0
+        self.is_friendly = True
+        self.has_transponder = True
+        self.true_type = "E-3 Sentry AWACS"
+        self.scenario = "AWACS"
+        self.active = True
+        
+        self.orbit_center_x = random.randint(-150, 150)
+        self.orbit_center_y = random.randint(-150, 150)
+        self.orbit_angle = 0
+        
+    def identify_target(self):
+        self.type_name = self.true_type
+        self.status = "FRIENDLY"
+        self.id_code = f"OVERLORD-{self.track_number}"
+        
+    def calculate_threat_score(self):
+        return 0
+        
+    def move(self):
+        self.orbit_angle = (self.orbit_angle + 1) % 360
+        orbit_radius_km = 50
+        x = self.orbit_center_x + orbit_radius_km * math.cos(math.radians(self.orbit_angle))
+        y = self.orbit_center_y + orbit_radius_km * math.sin(math.radians(self.orbit_angle))
+        
+        self.distance_km = math.sqrt(x*x + y*y)
+        self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
+
 class GhostTrack(AirContact):
     def __init__(self, track_number):
         super().__init__(track_number, random.randint(30, 150))
