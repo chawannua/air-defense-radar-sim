@@ -674,11 +674,20 @@ def start_radar():
             if val_text:
                 screen.blit(font_sm.render(val_text, True, val_color), (x + w - max(30, len(val_text)*8), y + 4))
                 
-        # Top Row: DEFCON, HP, TICK
+        # Top Row: DEFCON, HP, PHASE
         hp_color = RADAR_COLOR if cmd.base_hp > 50 else (255, 50, 50)
         draw_status_box(top_bar_x, top_bar_y, 180, 22, "DEFCON STATUS", (255,255,255), str(cmd.calculate_defcon()), (255,200,0))
         draw_status_box(top_bar_x + 190, top_bar_y, 220, 22, "BASE INTEGRITY", (255,255,255), f"{cmd.base_hp}%", hp_color)
-        draw_status_box(top_bar_x + 420, top_bar_y, 180, 22, "SYS TICK", (255,255,255), str(cmd.tick_count), RADAR_COLOR)
+        
+        # show escalation phase
+        t = cmd.tick_count
+        if t < 120:
+            phase_str, phase_color = "PEACETIME", (100, 200, 100)
+        elif t < 360:
+            phase_str, phase_color = "TENSIONS", (255, 200, 50)
+        else:
+            phase_str, phase_color = "WARTIME", (255, 60, 60)
+        draw_status_box(top_bar_x + 420, top_bar_y, 180, 22, phase_str, phase_color, f"T+{t}s", (150,150,150))
         
         # Second Row: Armory (Small buttons)
         armory_x = top_bar_x

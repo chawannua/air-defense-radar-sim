@@ -52,32 +52,60 @@ class CommandCenter:
     def detect_airspace(self):
         if self.wave_cooldown > 0: self.wave_cooldown -= 1
         
-        # Difficulty scales up linearly over time, capping at 3x difficulty
-        difficulty_multiplier = min(3.0, 1.0 + (self.tick_count / 1500.0))
+        # --- escalation phases ---
+        # peacetime: mostly civilian traffic, rare unknowns
+        # tensions: hostiles start probing, civilian traffic thins out
+        # wartime: airspace closed to civilians, full hostile engagement
+        tick = self.tick_count
         
-        # Massive wave system (base 10% chance)
-        if self.wave_cooldown <= 0 and random.random() < (0.10 * difficulty_multiplier): 
-            self.wave_cooldown = max(80, int(200 / difficulty_multiplier))
-            wave_size = int(random.randint(8, 15) * difficulty_multiplier)
+        if tick < 120:
+            phase = "PEACETIME"
+            hostile_chance = 0.03          # 3% chance per tick of any contact
+            civilian_chance = 0.35         # lots of airliners
+            wave_enabled = False
+            civilian_ratio = 0.90          # 90% of Aircraft spawns are friendly
+        elif tick < 360:
+            phase = "TENSIONS"
+            progress = (tick - 120) / 240.0  # 0.0 to 1.0 across this phase
+            hostile_chance = 0.08 + progress * 0.15
+            civilian_chance = 0.30 - progress * 0.20
+            wave_enabled = progress > 0.5  # waves start halfway through tensions
+            civilian_ratio = 0.70 - progress * 0.40  # 70% down to 30%
+        else:
+            phase = "WARTIME"
+            escalation = min(2.0, 1.0 + (tick - 360) / 1500.0)
+            hostile_chance = 0.25 * escalation
+            civilian_chance = 0.03         # almost no civvies, airspace is closed
+            wave_enabled = True
+            civilian_ratio = 0.05          # 5% chance a contact is civilian straggler
+        
+        # log phase transitions
+        if tick == 120:
+            self.add_log("\033[93m[INTEL] Unidentified aircraft detected near border. Increasing alert posture.\033[0m")
+        elif tick == 360:
+            self.add_log("\033[41;97m[COMMAND] AIRSPACE CLOSED TO CIVILIAN TRAFFIC. ALL UNKNOWN CONTACTS ARE HOSTILE.\033[0m")
+        
+        # massive wave attacks (wartime / late tensions only)
+        if wave_enabled and self.wave_cooldown <= 0 and random.random() < (0.08 if phase == "TENSIONS" else 0.12 * min(3.0, 1.0 + (tick - 360) / 1500.0)):
+            self.wave_cooldown = max(80, 200 if phase == "TENSIONS" else int(200 / min(3.0, 1.0 + (tick - 360) / 1500.0)))
+            wave_size = random.randint(5, 10) if phase == "TENSIONS" else int(random.randint(8, 15) * min(3.0, 1.0 + (tick - 360) / 1500.0))
             
             wave_theme = random.choices(
                 ["MIXED", "BALLISTIC_RAIN", "DRONE_SWARM", "FIGHTER_STRIKE"], 
                 weights=[40, 20, 20, 20], k=1)[0]
                 
-            # Log appropriate tactical warning per wave type
             if wave_theme == "MIXED":
-                self.add_log("\033[41;97m[TACTICAL WARNING] 🚨 MULTIPLE HOSTILE CONTACTS INBOUND. BATTLE STATIONS. 🚨\033[0m")
+                self.add_log("\033[41;97m[TACTICAL WARNING] MULTIPLE HOSTILE CONTACTS INBOUND. BATTLE STATIONS.\033[0m")
             elif wave_theme == "BALLISTIC_RAIN":
-                self.add_log("\033[41;97m[DEFCON 1] 🚨 BALLISTIC MISSILE LAUNCH DETECTED. THAAD BATTERIES TO STANDBY. 🚨\033[0m")
+                self.add_log("\033[41;97m[DEFCON 1] BALLISTIC MISSILE LAUNCH DETECTED. THAAD BATTERIES TO STANDBY.\033[0m")
             elif wave_theme == "DRONE_SWARM":
-                self.add_log("\033[41;97m[WARNING] 🚨 UNMANNED AERIAL SWARM DETECTED. ACTIVATE CIWS PROTOCOL. 🚨\033[0m")
+                self.add_log("\033[41;97m[WARNING] UNMANNED AERIAL SWARM DETECTED. ACTIVATE CIWS PROTOCOL.\033[0m")
             elif wave_theme == "FIGHTER_STRIKE":
-                self.add_log("\033[41;97m[TACTICAL WARNING] 🚨 HEAVY FIGHTER FORMATION INBOUND. SCRAMBLE ALL INTERCEPTORS. 🚨\033[0m")
+                self.add_log("\033[41;97m[TACTICAL WARNING] HEAVY FIGHTER FORMATION INBOUND. SCRAMBLE ALL INTERCEPTORS.\033[0m")
             
             for _ in range(wave_size):
                 self.track_counter += 1
                 
-                # Pick threat type based on wave theme
                 if wave_theme == "BALLISTIC_RAIN":
                     threat_type = random.choices(["ICBM", "TBM"], weights=[10, 90], k=1)[0]
                 elif wave_theme == "DRONE_SWARM":
@@ -98,20 +126,26 @@ class CommandCenter:
                 elif threat_type == "HELI": 
                     new_contact = Helicopter(self.track_counter); new_contact.scenario = "HOSTILE_HELI"; new_contact.detected_by = "GND-RADAR"
                 else: 
-                    new_contact = Aircraft(self.track_counter); new_contact.scenario = "HOSTILE_FIGHTER"; new_contact.detected_by = "GND-RADAR"
+                    new_contact = Aircraft(self.track_counter, friendly_weight=0); new_contact.scenario = "HOSTILE_FIGHTER"; new_contact.detected_by = "GND-RADAR"
                 
                 self.unseen_contacts.append(new_contact)
-                
-        # Normal target detection system (base 25% chance)
-        elif random.random() < (0.25 * difficulty_multiplier): 
+        
+        # civilian traffic (airliners passing through)
+        if random.random() < civilian_chance:
+            self.track_counter += 1
+            new_contact = Airliner(self.track_counter)
+            new_contact.detected_by = "GND-RADAR"
+            self.unseen_contacts.append(new_contact)
+        
+        # hostile / unknown contacts
+        if random.random() < hostile_chance:
             self.track_counter += 1
             prob = random.random()
-            if prob < 0.05: new_contact = ICBM(self.track_counter); new_contact.detected_by = "SPACE-COM"  
-            elif prob < 0.1: new_contact = TacticalBM(self.track_counter); new_contact.detected_by = "GND-EWR"  
-            elif prob < 0.15: new_contact = Drone(self.track_counter); new_contact.detected_by = "AWACS"    
-            elif prob < 0.18: new_contact = Helicopter(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
-            elif prob < 0.25: new_contact = Airliner(self.track_counter); new_contact.detected_by = "GND-RADAR"
-            else: new_contact = Aircraft(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
+            if prob < 0.04: new_contact = ICBM(self.track_counter); new_contact.detected_by = "SPACE-COM"
+            elif prob < 0.10: new_contact = TacticalBM(self.track_counter); new_contact.detected_by = "GND-EWR"
+            elif prob < 0.25: new_contact = Drone(self.track_counter); new_contact.detected_by = "AWACS"
+            elif prob < 0.30: new_contact = Helicopter(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"])
+            else: new_contact = Aircraft(self.track_counter, friendly_weight=int(civilian_ratio * 100)); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"])
             self.unseen_contacts.append(new_contact)
             
         # False Alarm (Clutter/Ghosts) system (5% chance per tick)

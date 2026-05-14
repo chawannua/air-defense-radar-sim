@@ -92,14 +92,14 @@ class AirContact(ABC):
         self.y_km = self.distance_km * math.cos(math.radians(self.bearing))
 
 class Aircraft(AirContact):
-    def __init__(self, track_number):
+    def __init__(self, track_number, friendly_weight=50):
         super().__init__(track_number, random.randint(600, 1200))
         self.speed_mach = random.uniform(0.7, 2.5)
         self.altitude_ft = random.randint(15000, 45000)
         self.rcs = random.uniform(0.1, 10.0)
         
-        # Adjust civilian to hostile spawn ratio
-        self.is_friendly = random.choices([True, False], weights=[80, 20], k=1)[0]
+        hostile_weight = max(1, 100 - friendly_weight)
+        self.is_friendly = random.choices([True, False], weights=[friendly_weight, hostile_weight], k=1)[0]
         self.has_transponder = self.is_friendly
 
         if self.is_friendly:
