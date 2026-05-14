@@ -326,7 +326,27 @@ def start_radar():
         # ===================================================
         # 3. วาดเป้าหมาย & Electronic Warfare (Jamming)
         # ===================================================
-        ew_aircrafts = [c for c in cmd.contacts if c.active and "EW" in c.type_name]
+        ew_aircrafts = [c for c in cmd.contacts if c.active and "EW" in getattr(c, 'type_name', '')]
+
+        # --- Draw Realistic Jamming Strobes (Sector Jamming) ---
+        for ew in ew_aircrafts:
+            ew_bearing = getattr(ew, 'bearing', getattr(ew, 'heading', 0))
+            jam_width = 8.0 # +/- 8 degree cone of noise
+            
+            # Draw noise particles representing RF interference in this sector
+            for _ in range(80):
+                r_dist = random.uniform(20, RADAR_RADIUS_PX)
+                j_angle = ew_bearing + random.uniform(-jam_width, jam_width)
+                jx = CX + r_dist * math.sin(math.radians(j_angle))
+                jy = CY - r_dist * math.cos(math.radians(j_angle))
+                noise_color = (random.randint(50, 150), random.randint(150, 255), random.randint(50, 150))
+                pygame.draw.circle(screen, noise_color, (int(jx), int(jy)), random.randint(1, 2))
+                
+            # Draw faint boundaries of the strobe
+            for angle_offset in [-jam_width, jam_width]:
+                sx = CX + RADAR_RADIUS_PX * math.sin(math.radians(ew_bearing + angle_offset))
+                sy = CY - RADAR_RADIUS_PX * math.cos(math.radians(ew_bearing + angle_offset))
+                pygame.draw.line(screen, (0, 80, 40), (CX, CY), (sx, sy), 1)
 
         for c in cmd.contacts:
             if not c.active or not hasattr(c, 'visible_dist'): continue
@@ -337,21 +357,8 @@ def start_radar():
             x = CX + px_dist * math.sin(math.radians(bearing))
             y = CY - px_dist * math.cos(math.radians(bearing))
 
-            is_jammed = False
-            for ew in ew_aircrafts:
-                if ew != c and not c.is_friendly and abs(ew.distance_km - c.distance_km) < 80: 
-                    is_jammed = True
-                    break
-
             base_color = (180, 180, 180) 
             render_status = c.status
-
-            if "EW" in c.type_name or is_jammed:
-                if random.random() < 0.4: render_status = "SUSPECT" 
-                if random.random() < 0.3:
-                    gx = x + random.randint(-15, 15)
-                    gy = y + random.randint(-15, 15)
-                    pygame.draw.rect(screen, (255, 220, 50), (gx-4, gy-4, 8, 8), 1)
 
             if render_status in ["HOSTILE", "ENGAGING"]: base_color = (255, 60, 60)
             elif render_status in ["SUSPECT"]: base_color = (255, 220, 0)

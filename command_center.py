@@ -327,16 +327,27 @@ class CommandCenter:
                     if self.tick_count % 3 == 0: self.add_log(f"\033[41;97m[AUTO-CIWS] CLICK! CIWS RELOADING! BRACE FOR IMPACT: {c.id_code}!\033[0m")
 
     def update_world(self):
-        # Calculate Jamming Burn-through
-        # If an active heavy EW aircraft is tracked or unseen, it adds noise to the radar receiver
-        is_jammed = any(c.active and getattr(c, 'is_heavy_ew', False) for c in self.contacts + self.unseen_contacts)
-        jamming_factor = 0.4 if is_jammed else 1.0 # Reduces detection range to 40% if jammed
+        # Identify active Jammers (Strobe Jamming / Sector Jamming)
+        ew_aircrafts = [c for c in self.contacts + self.unseen_contacts if c.active and "EW" in getattr(c, 'type_name', '')]
         
         # Process unseen contacts (move them, check if they cross the detection threshold)
         surviving_unseen = []
         for c in self.unseen_contacts:
             if c.active:
                 c.move()
+                
+                # Check if target is inside any EW jammer's directional strobe (+/- 10 degrees)
+                is_jammed = False
+                for ew in ew_aircrafts:
+                    if ew != c:
+                        # Shortest angle difference between the target and the jammer
+                        angle_diff = abs((c.bearing - ew.bearing + 180) % 360 - 180)
+                        if angle_diff <= 10.0:
+                            is_jammed = True
+                            break
+                            
+                jamming_factor = 0.3 if is_jammed else 1.0 # 30% range if in the jammer's sector
+                
                 if c.is_detectable_by_radar(radar_alt_ft=150, jamming_factor=jamming_factor):
                     self.contacts.append(c)
                     self.add_log(f"\033[90m[SYS] NEW TRACK: {c.id_code} appeared on radar.\033[0m")
