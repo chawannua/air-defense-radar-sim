@@ -97,9 +97,21 @@ def load_real_map():
         x_km, y_km = latlon_to_km(lon, lat)
         peaks_km.append((x_km, y_km, name))
         
-    return shapes_km, peaks_km
+    airbases_data = [
+        (14.933, 102.083, "WING 1 (KORAT)"),
+        (15.266, 100.333, "WING 4 (TAKHLI)"),
+        (9.133, 99.133, "WING 7 (SURAT THANI)"),
+        (15.250, 104.866, "WING 21 (UBON)"),
+        (17.383, 102.783, "WING 23 (UDON)")
+    ]
+    airbases_km = []
+    for lat, lon, name in airbases_data:
+        x_km, y_km = latlon_to_km(lon, lat)
+        airbases_km.append((x_km, y_km, name))
+        
+    return shapes_km, peaks_km, airbases_km
 
-MAP_SHAPES_KM, MAP_PEAKS_KM = load_real_map()
+MAP_SHAPES_KM, MAP_PEAKS_KM, MAP_AIRBASES_KM = load_real_map()
 
 def start_radar():
     pygame.init()
@@ -318,7 +330,7 @@ def start_radar():
             screen.blit(font_xs.render(p_name, True, (80, 100, 40)), (px + 6, py - 3))
 
         # Draw Military Airbases
-        for x_km, y_km, b_name in [(-50, -400, "WING 7 (SURAT THANI)"), (150, 150, "WING 1 (KORAT)")]:
+        for x_km, y_km, b_name in MAP_AIRBASES_KM:
             px = CX + km_to_px(x_km)
             py = CY - km_to_px(y_km)
             pygame.draw.circle(screen, (0, 150, 255), (px, py), 3, 1)

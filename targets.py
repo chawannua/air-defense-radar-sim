@@ -265,13 +265,13 @@ class AWACS(AirContact):
         self.fuel = 100.0
         self.state = "TRANSIT_TO_STATION"
         
-        # Surat Thani Wing 7 roughly
-        self.home_x = -50
-        self.home_y = -400
+        # Surat Thani Wing 7 Exact Coordinate Projection
+        self.home_x = -148.0
+        self.home_y = -511.0
         
         # Patrol over Gulf of Thailand
-        self.orbit_center_x = 100
-        self.orbit_center_y = -150
+        self.orbit_center_x = 20.0
+        self.orbit_center_y = -150.0
         self.orbit_angle = 0
         
         # Start AWACS at Home Base
