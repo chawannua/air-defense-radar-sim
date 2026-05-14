@@ -64,18 +64,14 @@ def start_radar():
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE) 
     pygame.display.set_caption("AEGIS Tactical Air Defense Radar")
 
-    BG_COLOR = (4, 10, 4)
-    GRID_COLOR = (0, 70, 0)
-    RADAR_COLOR = (0, 255, 50)
-    LOG_BG = (8, 12, 8)
+    BG_COLOR = (0, 0, 0) # Pitch black like real radar
+    GRID_COLOR = (0, 40, 0) # Very faint green for grid
+    RADAR_COLOR = (0, 200, 50)
     MISSILE_COLOR = (255, 120, 0)
     
-    RADAR_AREA = HEIGHT 
-    SIDEBAR_WIDTH = max(400, WIDTH - RADAR_AREA) # ล็อคไม่ให้ Sidebar เล็กกว่า 400px
-    sidebar_x = RADAR_AREA
-    
-    CX, CY = RADAR_AREA // 2, HEIGHT // 2
-    RADAR_RADIUS_PX = (HEIGHT // 2) - 60 
+    RADAR_AREA = WIDTH 
+    CX, CY = WIDTH // 2, HEIGHT // 2
+    RADAR_RADIUS_PX = (HEIGHT // 2) - 20 
     RADAR_MAX_KM = 800.0 
     
     def km_to_px(km): return (km / RADAR_MAX_KM) * RADAR_RADIUS_PX
@@ -128,11 +124,9 @@ def start_radar():
                     WIDTH, HEIGHT = event.w, event.h
                     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
                     
-                    RADAR_AREA = HEIGHT 
-                    SIDEBAR_WIDTH = max(400, WIDTH - RADAR_AREA) 
-                    sidebar_x = RADAR_AREA
-                    CX, CY = RADAR_AREA // 2, HEIGHT // 2
-                    RADAR_RADIUS_PX = (HEIGHT // 2) - 60
+                    RADAR_AREA = WIDTH
+                    CX, CY = WIDTH // 2, HEIGHT // 2
+                    RADAR_RADIUS_PX = (HEIGHT // 2) - 20
             
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE: running = False; sys.exit()
@@ -173,11 +167,9 @@ def start_radar():
                         WIDTH, HEIGHT = int(MONITOR_W * 0.9), int(MONITOR_H * 0.9) 
                         screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
                     
-                    RADAR_AREA = HEIGHT 
-                    SIDEBAR_WIDTH = max(400, WIDTH - RADAR_AREA)
-                    sidebar_x = RADAR_AREA
-                    CX, CY = RADAR_AREA // 2, HEIGHT // 2
-                    RADAR_RADIUS_PX = (HEIGHT // 2) - 60
+                    RADAR_AREA = WIDTH
+                    CX, CY = WIDTH // 2, HEIGHT // 2
+                    RADAR_RADIUS_PX = (HEIGHT // 2) - 20
 
                 # 🟢 [RESTART] เริ่มเกมใหม่เมื่อฐานถูกทำลาย
                 if event.key == pygame.K_r and cmd.base_hp <= 0:
@@ -534,78 +526,64 @@ def start_radar():
 
 
         # ===================================================
-        # 4. วาดฝั่งขวา (DASHBOARD & TABLES)
+        # 4. Floating UI Overlays (Air Defender Style)
         # ===================================================
-        pygame.draw.rect(screen, LOG_BG, (sidebar_x, 0, SIDEBAR_WIDTH, HEIGHT))
-        pygame.draw.line(screen, GRID_COLOR, (sidebar_x, 0), (sidebar_x, HEIGHT), 2)
         
-        pad_x = sidebar_x + 20
+        # 4.1 Top Center Status Bar
+        top_bar_w = 600
+        top_bar_x = (WIDTH - top_bar_w) // 2
+        top_bar_y = 10
         
+        def draw_status_box(x, y, w, h, text, color, val_text="", val_color=(255,255,255)):
+            pygame.draw.rect(screen, (10, 15, 10), (x, y, w, h))
+            pygame.draw.rect(screen, GRID_COLOR, (x, y, w, h), 1)
+            screen.blit(font_sm.render(text, True, color), (x + 5, y + 4))
+            if val_text:
+                screen.blit(font_sm.render(val_text, True, val_color), (x + w - max(30, len(val_text)*8), y + 4))
+                
+        # Top Row: DEFCON, HP, TICK
         hp_color = RADAR_COLOR if cmd.base_hp > 50 else (255, 50, 50)
-        screen.blit(font_lg.render(f"DEFCON {cmd.calculate_defcon()} | BASE HP: {cmd.base_hp}% | TICK: {cmd.tick_count}", True, hp_color), (pad_x, 15))
+        draw_status_box(top_bar_x, top_bar_y, 180, 22, "DEFCON STATUS", (255,255,255), str(cmd.calculate_defcon()), (255,200,0))
+        draw_status_box(top_bar_x + 190, top_bar_y, 220, 22, "BASE INTEGRITY", (255,255,255), f"{cmd.base_hp}%", hp_color)
+        draw_status_box(top_bar_x + 420, top_bar_y, 180, 22, "SYS TICK", (255,255,255), str(cmd.tick_count), RADAR_COLOR)
         
-        armory_str = ""
-        for wpn, amount in cmd.ammo.items():
-            armory_str += f"[{wpn}: {amount:02d}/{cmd.max_ammo[wpn]:02d}]   "
-        screen.blit(font_md.render(f"ARMORY: {armory_str}", True, RADAR_COLOR), (pad_x, 45))
-
-        override_color = (255, 255, 255) if selected_contact else (80, 80, 80)
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS)" if selected_contact else "SPAWN: 5:ICBM 6:Jet 7:Drone 8:CIV 9:EW 0:AWACS W:Wave"
-        screen.blit(font_sm.render(ovr_text, True, override_color), (pad_x, 65))
-
-        pygame.draw.line(screen, GRID_COLOR, (sidebar_x, 85), (WIDTH, 85), 1)
-
-        y_table = 95
-        screen.blit(font_md.render("ACTIVE TARGETS (Sorted by Threat)", True, (255, 200, 0)), (pad_x, y_table))
-        
-        # คอลัมน์ครบ 10 ช่องตามต้นฉบับ
-        table_header = f"{'TRACK ID':<9} | {'STATUS':<9} | {'TYPE':<11} | {'ALT':<4} | {'DIST':<4} | {'AZI':<3} | {'SPD':<3} | {'ETA':<3} | {'SENSOR':<6} | {'INT'}"
-        screen.blit(font_sm.render(table_header, True, (150, 150, 150)), (pad_x, y_table + 25))
-        pygame.draw.line(screen, (50, 50, 50), (sidebar_x, y_table + 45), (WIDTH, y_table + 45), 1)
-
-        sorted_contacts = sorted(cmd.contacts, key=lambda c: c.calculate_threat_score(), reverse=True)
-        max_rows = 15
-        
-        for i, c in enumerate(sorted_contacts[:max_rows]):
-            row_y = y_table + 50 + (i * 20)
+        # Second Row: Armory (Small buttons)
+        armory_x = top_bar_x
+        for i, (wpn, amount) in enumerate(cmd.ammo.items()):
+            draw_status_box(armory_x + (i*100), top_bar_y + 25, 95, 20, wpn[:4], (150,150,150), str(amount), RADAR_COLOR)
             
+        # Spawn controls instruction
+        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS)" if selected_contact else "SPAWN: 5:ICBM 6:Jet 7:Drone 8:CIV 9:EW 0:AWACS W:Wave"
+        screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 50))
+            
+        # 4.2 Left Side: Active Operations (Track List)
+        list_w, list_h = 320, 400
+        list_x, list_y = 20, HEIGHT - list_h - 20
+        pygame.draw.rect(screen, (5, 8, 5), (list_x, list_y, list_w, list_h))
+        pygame.draw.rect(screen, GRID_COLOR, (list_x, list_y, list_w, list_h), 1)
+        screen.blit(font_sm.render("ACTIVE OPERATIONS", True, (150, 255, 150)), (list_x + 10, list_y + 5))
+        pygame.draw.line(screen, GRID_COLOR, (list_x, list_y + 25), (list_x + list_w, list_y + 25), 1)
+        
+        sorted_contacts = sorted(cmd.contacts, key=lambda c: c.calculate_threat_score(), reverse=True)
+        for i, c in enumerate(sorted_contacts[:20]):
+            row_y = list_y + 30 + (i * 18)
+            r_color = (150, 150, 150)
             if c.status in ["HOSTILE", "ENGAGING"]: r_color = (255, 80, 80)
             elif c.status == "SUSPECT": r_color = (255, 220, 50)
             elif c.status == "FRIENDLY": r_color = (100, 180, 255)
-            elif c.status == "INTERCEPTING": r_color = (220, 100, 220)
-            else: r_color = (150, 150, 150)
-
-            if selected_contact == c:
-                pygame.draw.rect(screen, (50, 50, 80), (sidebar_x + 5, row_y - 2, SIDEBAR_WIDTH - 10, 18))
-                r_color = (255, 255, 255)
-
-            t_type = c.type_name if c.type_name != "UNKNOWN" else "???"
-            if len(t_type) > 11: t_type = t_type[:9] + ".."
-            eta_str = f"{c.get_eta():.0f}s" if c.get_eta() < 999 else "N/A"
-            alt_str = f"FL{c.altitude_ft//1000:02d}" 
             
-            intercept_str = "---"
-            engs = [e for e in cmd.active_engagements if getattr(e, 'target', None) == c]
-            if engs:
-                soonest = min(engs, key=lambda x: getattr(x, 'time_to_impact', 99))
-                wp_n = "F-16" if soonest.weapon_name == "Interceptors" else soonest.weapon_name
-                intercept_str = f"{wp_n}({getattr(soonest, 'time_to_impact', 0)}s)"
+            prefix = "[*]" if selected_contact == c else " - "
+            row_str = f"{prefix} {c.id_code:<9} {c.status[:3]:<3} {c.distance_km:>4.0f}km {c.speed_mach:>3.1f}M"
+            screen.blit(font_xs.render(row_str, True, r_color), (list_x + 10, row_y))
 
-            bearing = int(getattr(c, 'bearing', getattr(c, 'heading', 0)))
-            sensor = getattr(c, 'detected_by', 'RADAR')[:6] 
-            
-            row_str = f"{c.id_code:<9} | {c.status:<9} | {t_type:<11} | {alt_str:<4} | {c.distance_km:>4.0f} | {bearing:>3}° | {c.speed_mach:>3.1f} | {eta_str:<3} | {sensor:<6} | {intercept_str}"
-            screen.blit(font_sm.render(row_str, True, r_color), (pad_x, row_y))
-
-        y_log = y_table + 50 + (max_rows * 20) + 15
-        pygame.draw.line(screen, GRID_COLOR, (sidebar_x, y_log - 10), (WIDTH, y_log - 10), 1)
-        screen.blit(font_md.render("TACTICAL LOG:", True, RADAR_COLOR), (pad_x, y_log))
-        
-        max_log_lines = (HEIGHT - y_log - 40) // 18
-        recent_logs = cmd.tactical_log[-max_log_lines:] 
-        
+        # 4.3 Right Side: Minimalist Tactical Log
+        log_w = 400
+        log_x = WIDTH - log_w - 20
+        log_y = HEIGHT // 2 - 150
+        recent_logs = cmd.tactical_log[-20:]
         for i, log in enumerate(recent_logs):
-            screen.blit(font_sm.render(clean_ansi(log)[:85], True, get_log_color(log)), (pad_x, y_log + 25 + (i * 18)))
+            clean_str = clean_ansi(log)[:70]
+            screen.blit(font_xs.render(clean_str, True, get_log_color(log)), (log_x, log_y + (i * 16)))
 
         if cmd.base_hp <= 0:
             pygame.draw.rect(screen, (100, 0, 0), (CX - 220, CY - 40, 440, 80))
