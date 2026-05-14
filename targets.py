@@ -18,13 +18,16 @@ class AirContact(ABC):
         else:
             self.bearing = random.randint(0, 359)
         self.speed_mach = 0.0
-        self.altitude_ft = 0
-        # Target flies directly towards the radar (the base)
         self.heading = (self.bearing + 180) % 360
         self.rcs = 0.0
         self.size = "UNKNOWN"
         self.type_name = "UNKNOWN"
         self.is_friendly = False
+        
+        self.x_km = 0.0
+        self.y_km = 0.0
+        self.prev_x_km = 0.0
+        self.prev_y_km = 0.0
         
         self.has_transponder = False
         self.squawk_code = f"{random.randint(1000, 7700)}"
@@ -299,6 +302,8 @@ class AWACS(AirContact):
         self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
 
     def move(self):
+        self.prev_x_km = self.x_km
+        self.prev_y_km = self.y_km
         speed_per_tick = self.speed_mach * 1.0
         x, y = self.x_km, self.y_km
         
@@ -381,6 +386,8 @@ class CAPFighter(AirContact):
         self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
 
     def move(self):
+        self.prev_x_km = self.x_km
+        self.prev_y_km = self.y_km
         speed_per_tick = self.speed_mach * 1.5
         x, y = self.x_km, self.y_km
         

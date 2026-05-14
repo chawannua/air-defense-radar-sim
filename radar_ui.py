@@ -419,12 +419,15 @@ def start_radar():
             target = getattr(eng, 'target', None)
             if not target or not target.active: continue
             if not hasattr(eng, 'total_time'): eng.total_time = max(1, getattr(eng, 'time_to_impact', 1))
-            progress = 1.0 - (max(0, getattr(eng, 'time_to_impact', 0)) / max(1, eng.total_time))
+            
+            # 60 FPS Visual Physics Interpolation for Missiles
+            smooth_time = max(0, getattr(eng, 'time_to_impact', 0) - alpha)
+            progress = 1.0 - (smooth_time / max(1, eng.total_time))
             bearing = getattr(target, 'bearing', getattr(target, 'heading', 0))
             
             if angle_diff(bearing, sweep_angle) <= AESA_FOV:
                 # Calculate expected impact distance to ensure linear missile trajectory
-                impact_dist = max(0, target.distance_km - (target.speed_mach * getattr(eng, 'time_to_impact', 0)))
+                impact_dist = max(0, target.distance_km - (target.speed_mach * smooth_time))
                 eng.visible_dist = impact_dist * progress
                 eng.brightness = 1.0
                 if not hasattr(eng, 'trail'): eng.trail = []
@@ -477,6 +480,7 @@ def start_radar():
         pygame.draw.line(screen, (0, 60, 20), (CX, CY), (rx, ry), 1)
 
         # --- Main Sweep Line (Mechanical Boresight) ---
+        alpha = min(1.0, (current_time - LAST_TICK_TIME) / 1000.0)
         # ยังคงเส้นหลักไว้เพื่อให้เห็นทิศทางการหมุนของจานเรดาร์
         end_x = CX + r_max * math.sin(math.radians(sweep_angle))
         end_y = CY - r_max * math.cos(math.radians(sweep_angle))
@@ -521,9 +525,15 @@ def start_radar():
             if c.brightness <= 0: continue 
             
             bearing = getattr(c, 'bearing', getattr(c, 'heading', 0)) 
-            px_dist = km_to_px(c.visible_dist)
-            x = CX + px_dist * math.sin(math.radians(bearing))
-            y = CY - px_dist * math.cos(math.radians(bearing))
+            
+            # 60 FPS Visual Physics Interpolation
+            prev_x = getattr(c, 'prev_x_km', c.x_km)
+            prev_y = getattr(c, 'prev_y_km', c.y_km)
+            interp_x_km = prev_x + (c.x_km - prev_x) * alpha
+            interp_y_km = prev_y + (c.y_km - prev_y) * alpha
+            
+            x = CX + km_to_px(interp_x_km)
+            y = CY - km_to_px(interp_y_km)
 
             base_color = (180, 180, 180) 
             render_status = c.status
