@@ -172,7 +172,7 @@ class CommandCenter:
         flying_caps = [c for c in active_caps if c.active]
         # Maintain 2 active CAP stations (North: Wing 4, South: Wing 7)
         if len(flying_caps) < 2 and self.cap_pool > 0:
-            if self.tick_count % 120 == 0: # Stagger launches
+            if self.tick_count % 5 == 0: # Stagger launches by 5 seconds
                 self.track_counter += 1
                 is_north = len(flying_caps) == 0 or flying_caps[0].home_y > -300
                 if is_north:
