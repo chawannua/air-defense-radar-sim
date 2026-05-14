@@ -23,6 +23,9 @@ class AirContact(ABC):
         self.is_friendly = False
         
         self.has_transponder = False
+        self.squawk_code = f"{random.randint(1000, 7700)}"
+        self.departure = "UNKNOWN"
+        self.destination = "UNKNOWN"
         self.detected_by = "UNKNOWN"
         
         # 🟢 เพิ่มคุณสมบัติจอมกวนสัญญาณระดับหนัก
@@ -125,6 +128,10 @@ class Aircraft(AirContact):
         self.status = "FRIENDLY" if self.is_friendly else "HOSTILE"
         prefix = "CIV" if self.is_friendly else "BOGEY"
         self.id_code = f"{prefix}-{self.track_number}"
+        self.callsign = f"{prefix}{random.randint(100, 999)}"
+        if self.is_friendly:
+            self.departure = random.choice(["LHR", "JFK", "CDG", "FRA", "AMS", "DXB"])
+            self.destination = random.choice(["MAN", "EDI", "GLA", "ABZ", "NCL"])
 
 class Helicopter(AirContact):
     def __init__(self, track_number):
@@ -222,6 +229,9 @@ class Airliner(AirContact):
         self.type_name = "BOEING 777" if self.rcs > 100 else "AIRBUS A320"
         self.status = "FRIENDLY"
         self.id_code = f"FLIGHT-{self.track_number}"
+        self.callsign = f"JET{random.randint(100, 999)}"
+        self.departure = random.choice(["EGLL", "EGCC", "EGPH", "EGPF", "EGPD"])
+        self.destination = random.choice(["KJFK", "LFPG", "EHAM", "EDDF", "LEMD"])
 
     def move(self):
         # Cartesian movement so it flies across instead of towards center

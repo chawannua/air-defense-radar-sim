@@ -189,7 +189,26 @@ def start_radar():
             # 🟢 [CLICK] คลิกเมาส์เพื่อล็อคเป้าหมาย
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mx, my = event.pos
-                if mx < RADAR_AREA:
+                
+                # Check Flight Info Panel buttons first
+                panel_clicked = False
+                if selected_contact:
+                    panel_x, panel_y = 20, 120
+                    btn_y = panel_y + 165
+                    labels = ["H", "S", "F", "U"]
+                    for i, lbl in enumerate(labels):
+                        bx = panel_x + 70 + (i * 30)
+                        brect = pygame.Rect(bx, btn_y, 25, 20)
+                        if brect.collidepoint(mx, my):
+                            if lbl == "H": selected_contact.status = "HOSTILE"
+                            elif lbl == "S": selected_contact.status = "SUSPECT"
+                            elif lbl == "F": selected_contact.status = "FRIENDLY"
+                            elif lbl == "U": selected_contact.status = "UNIDENTIFIED"
+                            panel_clicked = True
+                            cmd.add_log(f"\033[94m[SYS] OPERATOR CHANGED {selected_contact.id_code} ID TO {selected_contact.status}\033[0m")
+                            break
+                            
+                if not panel_clicked and mx < RADAR_AREA:
                     closest_c = None
                     min_dist = 20 
                     for c in cmd.contacts:
@@ -459,24 +478,60 @@ def start_radar():
         # ===================================================
         # 3.5 Dynamic Electronic Warfare Effect (Growler)
         # ===================================================
-        # นับจำนวน Growler ที่ระบุตัวตนได้แล้วบนจอ
         growler_count = sum(1 for c in cmd.contacts if getattr(c, 'is_heavy_ew', False) and c.status != "UNIDENTIFIED" and c.active)
 
         if growler_count > 0:
-            # กำหนดพื้นที่รวนตามจำนวนตัว
-            # 1 ตัว = มุมขวาบน, 2 ตัว = ครึ่งขวา, 3 ตัว = ครึ่งขวา+มุมซ้ายบน, 4 ตัว = ทั้งจอ
             noise_areas = []
-            if growler_count >= 1: noise_areas.append(pygame.Rect(CX, 0, CX, CY))       # มุมขวาบน
-            if growler_count >= 2: noise_areas.append(pygame.Rect(CX, CY, CX, CY))      # มุมขวาล่าง
-            if growler_count >= 3: noise_areas.append(pygame.Rect(0, 0, CX, CY))        # มุมซ้ายบน
-            if growler_count >= 4: noise_areas.append(pygame.Rect(0, CY, CX, CY))       # มุมซ้ายล่าง
+            if growler_count >= 1: noise_areas.append(pygame.Rect(CX, 0, CX, CY))       
+            if growler_count >= 2: noise_areas.append(pygame.Rect(CX, CY, CX, CY))      
+            if growler_count >= 3: noise_areas.append(pygame.Rect(0, 0, CX, CY))        
+            if growler_count >= 4: noise_areas.append(pygame.Rect(0, CY, CX, CY))       
 
             for area in noise_areas:
-                for _ in range(300): # ความหนาแน่นต่อพื้นที่
+                for _ in range(300):
                     rx = random.randint(area.left, area.right - 1)
                     ry = random.randint(area.top, area.bottom - 1)
                     n_color = random.choice([(0, 255, 0), (200, 255, 0), (50, 150, 50)])
                     pygame.draw.circle(screen, n_color, (rx, ry), random.randint(1, 2))
+
+        # ===================================================
+        # 3.8 Flight Info Panel (On Radar Display)
+        # ===================================================
+        if selected_contact:
+            c = selected_contact
+            panel_x, panel_y = 20, 120
+            panel_w, panel_h = 240, 200
+            
+            # Draw Panel Background
+            pygame.draw.rect(screen, (8, 12, 8), (panel_x, panel_y, panel_w, panel_h))
+            pygame.draw.rect(screen, GRID_COLOR, (panel_x, panel_y, panel_w, panel_h), 1)
+            
+            # Header
+            pygame.draw.rect(screen, (20, 40, 20), (panel_x, panel_y, panel_w, 20))
+            screen.blit(font_sm.render("Flight Info | Aircraft Data", True, (200, 255, 200)), (panel_x + 5, panel_y + 3))
+            
+            texts = [
+                f"DEPARTURE: {getattr(c, 'departure', 'UNKNOWN')}",
+                f"DEST     : {getattr(c, 'destination', 'UNKNOWN')}",
+                f"CALLSIGN : {getattr(c, 'callsign', 'UNKNOWN')}",
+                f"ALT      : {c.altitude_ft} ft",
+                f"SPD      : {int(c.speed_mach * 666)} kt",
+                f"TYPE     : {c.type_name[:15]}",
+                f"MODE 3   : {getattr(c, 'squawk_code', 'NONE')}"
+            ]
+            for i, txt in enumerate(texts):
+                screen.blit(font_xs.render(txt, True, (180, 220, 180)), (panel_x + 10, panel_y + 30 + (i * 18)))
+            
+            # Set ID Buttons
+            btn_y = panel_y + 165
+            screen.blit(font_xs.render("Set ID:", True, (150, 150, 150)), (panel_x + 10, btn_y + 4))
+            labels = ["H", "S", "F", "U"]
+            for i, lbl in enumerate(labels):
+                bx = panel_x + 70 + (i * 30)
+                pygame.draw.rect(screen, (40, 40, 40), (bx, btn_y, 25, 20))
+                pygame.draw.rect(screen, GRID_COLOR, (bx, btn_y, 25, 20), 1)
+                screen.blit(font_sm.render(lbl, True, (255, 255, 255)), (bx + 8, btn_y + 3))
+
 
         # ===================================================
         # 4. วาดฝั่งขวา (DASHBOARD & TABLES)
