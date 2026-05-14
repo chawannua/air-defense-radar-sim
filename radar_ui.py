@@ -84,7 +84,7 @@ def load_real_map():
         dy = (lat - RADAR_LAT) * 110.574
         return (dx, dy) 
     
-    map_files = ["tha.json", "mmr.json", "lao.json", "khm.json", "mys.json", "vnm.json"]
+    map_files = ["tha.json", "mmr.json", "lao.json", "khm.json", "mys.json", "vnm.json", "chn.json", "idn.json", "phl.json", "twn.json"]
     for filename in map_files:
         filepath = filename
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
