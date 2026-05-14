@@ -162,10 +162,10 @@ def start_radar():
     
     def km_to_px(km): return km * zoom_level
 
-    font_xs = pygame.font.SysFont('consolas', 10)
-    font_sm = pygame.font.SysFont('consolas', 12)
-    font_md = pygame.font.SysFont('consolas', 16, bold=True)
-    font_lg = pygame.font.SysFont('consolas', 22, bold=True)
+    font_xs = pygame.font.SysFont('consolas', 12)
+    font_sm = pygame.font.SysFont('consolas', 14)
+    font_md = pygame.font.SysFont('consolas', 18, bold=True)
+    font_lg = pygame.font.SysFont('consolas', 24, bold=True)
 
     cmd = CommandCenter()
     sweep_angle = 0.0
@@ -285,6 +285,16 @@ def start_radar():
                             panel_clicked = True
                             cmd.add_log(f"\033[94m[SYS] OPERATOR CHANGED {selected_contact.id_code} ID TO {selected_contact.status}\033[0m")
                             break
+                
+                # Check Active Operations Panel Click
+                list_w, list_h = 360, 480
+                list_x, list_y = 20, HEIGHT - list_h - 20
+                if not panel_clicked and list_x <= mx <= list_x + list_w and list_y <= my <= list_y + list_h:
+                    sorted_contacts = sorted(cmd.contacts, key=lambda c: c.calculate_threat_score(), reverse=True)
+                    click_idx = (my - (list_y + 30)) // 22 # Updated row height
+                    if 0 <= click_idx < len(sorted_contacts[:20]):
+                        selected_contact = sorted_contacts[click_idx]
+                        panel_clicked = True
                             
                 if not panel_clicked and mx < RADAR_AREA:
                     closest_c = None
@@ -672,7 +682,7 @@ def start_radar():
         screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 50))
             
         # 4.2 Left Side: Active Operations (Track List)
-        list_w, list_h = 320, 400
+        list_w, list_h = 360, 480
         list_x, list_y = 20, HEIGHT - list_h - 20
         pygame.draw.rect(screen, (5, 8, 5), (list_x, list_y, list_w, list_h))
         pygame.draw.rect(screen, GRID_COLOR, (list_x, list_y, list_w, list_h), 1)
@@ -681,7 +691,7 @@ def start_radar():
         
         sorted_contacts = sorted(cmd.contacts, key=lambda c: c.calculate_threat_score(), reverse=True)
         for i, c in enumerate(sorted_contacts[:20]):
-            row_y = list_y + 30 + (i * 18)
+            row_y = list_y + 30 + (i * 22)
             r_color = (150, 150, 150)
             if c.status in ["HOSTILE", "ENGAGING"]: r_color = (255, 80, 80)
             elif c.status == "SUSPECT": r_color = (255, 220, 50)
@@ -698,7 +708,11 @@ def start_radar():
         recent_logs = cmd.tactical_log[-20:]
         for i, log in enumerate(recent_logs):
             clean_str = clean_ansi(log)[:70]
-            screen.blit(font_xs.render(clean_str, True, get_log_color(log)), (log_x, log_y + (i * 16)))
+            # Draw semi-transparent background for logs to increase readability
+            text_surf = font_xs.render(clean_str, True, get_log_color(log))
+            bg_rect = pygame.Rect(log_x - 5, log_y + (i * 20) - 2, text_surf.get_width() + 10, 20)
+            pygame.draw.rect(screen, (5, 8, 5, 180), bg_rect)
+            screen.blit(text_surf, (log_x, log_y + (i * 20)))
 
         if cmd.base_hp <= 0:
             pygame.draw.rect(screen, (100, 0, 0), (CX - 220, CY - 40, 440, 80))
