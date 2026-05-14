@@ -4,7 +4,8 @@ import random
 import os
 from config import GameConfig
 from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, Airliner, AWACS, CAPFighter
-from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement
+from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement, get_closest_airbase
+import math
 
 class CommandCenter:
     def __init__(self):
@@ -257,13 +258,19 @@ class CommandCenter:
             self.ammo[wpn] -= 1
             
             display_wpn = wpn
+            bx, by = 0.0, 0.0
             if wpn == "FIGHTER":
                 display_wpn = random.choice(["F-16AM Fighting Falcon", "JAS-39 Gripen", "F-5TH Super Tigris", "T-50TH Golden Eagle", "Alpha Jet"])
+                bx, by, bname = get_closest_airbase(target)
                 
-            impact_time = max(1, int(target.distance_km / max(1, target.speed_mach * 2)))
-            self.active_engagements.append(Engagement(target, display_wpn, impact_time))
+            dist_from_origin = math.hypot(target.x_km - bx, target.y_km - by)
+            weapon_speed = GameConfig.WEAPON_SPEED_F16 if wpn == "FIGHTER" else GameConfig.WEAPON_SPEED_SAM
+            impact_time = max(1, int(dist_from_origin / max(1, target.speed_mach + weapon_speed)))
+            self.active_engagements.append(Engagement(target, display_wpn, impact_time, bx, by))
             target.status = "ENGAGING"
-            self.add_log(f"\033[95m[MANUAL OVERRIDE]\033[0m SCRAMBLED {display_wpn} intercepting {target.id_code}")
+            
+            origin_str = f" from {bname}" if wpn == "FIGHTER" else ""
+            self.add_log(f"\033[95m[MANUAL OVERRIDE]\033[0m SCRAMBLED {display_wpn}{origin_str} intercepting {target.id_code}")
         else:
             self.add_log(f"\033[91m[WARNING]\033[0m {wpn} Out of Ammo!")
 
@@ -352,8 +359,12 @@ class CommandCenter:
                         self.add_log(f"\033[94m[INTERCEPT]\033[0m {eng.target.id_code} complied. {eng.weapon_name} is RTB.\033[0m")
                     else:
                         # Kinematics for FIGHTER AMRAAMs
+                        base_hit_chance = GameConfig.HIT_CHANCE_F16
+                        if isinstance(eng.target, (Drone, Helicopter)):
+                            base_hit_chance = 0.95 # Fighters dominate slow/defenseless targets
+
                         speed_penalty = max(0.0, (eng.target.speed_mach - 1.5) * 0.15)
-                        final_hit_chance = max(0.10, GameConfig.HIT_CHANCE_F16 - speed_penalty)
+                        final_hit_chance = max(0.10, base_hit_chance - speed_penalty)
                         
                         if random.random() <= final_hit_chance: 
                             eng.target.status = "CLEARED"; eng.target.active = False

@@ -420,13 +420,18 @@ def start_radar():
             bearing = getattr(target, 'bearing', getattr(target, 'heading', 0))
             
             if angle_diff(bearing, sweep_angle) <= AESA_FOV:
-                # Calculate expected impact distance to ensure linear missile trajectory
-                impact_dist = max(0, target.distance_km - (target.speed_mach * smooth_time))
-                eng.visible_dist = impact_dist * progress
+                ox = getattr(eng, 'origin_x_km', 0.0)
+                oy = getattr(eng, 'origin_y_km', 0.0)
+                
+                target_x = getattr(target, 'prev_x_km', target.x_km) + (target.x_km - getattr(target, 'prev_x_km', target.x_km)) * alpha
+                target_y = getattr(target, 'prev_y_km', target.y_km) + (target.y_km - getattr(target, 'prev_y_km', target.y_km)) * alpha
+                
+                eng.x_km = ox + (target_x - ox) * progress
+                eng.y_km = oy + (target_y - oy) * progress
                 eng.brightness = 1.0
                 if not hasattr(eng, 'trail'): eng.trail = []
                 if random.random() < 0.1:
-                    eng.trail.append((eng.visible_dist, bearing))
+                    eng.trail.append((eng.x_km, eng.y_km))
                     if len(eng.trail) > 8: eng.trail.pop(0)
             else:
                 if hasattr(eng, 'brightness') and eng.brightness > 0:
@@ -574,19 +579,17 @@ def start_radar():
 
         for eng in cmd.active_engagements:
             target = getattr(eng, 'target', None)
-            if not target or not target.active or not hasattr(eng, 'visible_dist'): continue
+            if not target or not target.active or not hasattr(eng, 'x_km'): continue
             
             wpn_name = "FIGHTER" if eng.weapon_name == "Interceptors" else eng.weapon_name
-            bearing = getattr(target, 'bearing', getattr(target, 'heading', 0))
-            m_px = km_to_px(min(eng.visible_dist, RADAR_MAX_KM))
-            mx = CX + m_px * math.sin(math.radians(bearing))
-            my = CY - m_px * math.cos(math.radians(bearing))
+            
+            mx = CX + km_to_px(eng.x_km)
+            my = CY - km_to_px(eng.y_km)
             
             if hasattr(eng, 'trail'):
-                for i, (tr_dist, tr_bear) in enumerate(eng.trail):
-                    tr_px = km_to_px(min(tr_dist, RADAR_MAX_KM))
-                    tx = CX + tr_px * math.sin(math.radians(tr_bear))
-                    ty = CY - tr_px * math.cos(math.radians(tr_bear))
+                for i, (tx_km, ty_km) in enumerate(eng.trail):
+                    tx = CX + km_to_px(tx_km)
+                    ty = CY - km_to_px(ty_km)
                     pygame.draw.circle(screen, lerp_color(BG_COLOR, MISSILE_COLOR, ((i + 1) / len(eng.trail)) * 0.8), (int(tx), int(ty)), 2)
 
             pygame.draw.line(screen, MISSILE_COLOR, (mx-4, my-4), (mx+4, my+4), 2)

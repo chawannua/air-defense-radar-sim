@@ -1,5 +1,12 @@
 # config.py
 class GameConfig:
+    AIRBASES = [
+        (150, 100, "Wing 1 (Korat)"),
+        (0, 150, "Wing 4 (Takhli)"),
+        (20, -350, "Wing 7 (Surat Thani)"),
+        (250, 180, "Wing 21 (Ubon)"),
+        (180, 280, "Wing 23 (Udon)")
+    ]
     # --- อัตราความแม่นยำ (Nerfed: ปรับลดลงเพื่อให้ข้าศึกมีโอกาสหลุดมาโจมตีฐานได้มากขึ้น) ---
     HIT_CHANCE_THAAD = 0.35        
     HIT_CHANCE_SAM_NUKE = 0.10     

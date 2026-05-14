@@ -1,6 +1,7 @@
 # personnel.py
 import random
 import heapq
+import math
 from config import GameConfig
 from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft
 
@@ -21,11 +22,23 @@ class ThreatQueue:
         if self.heap: return heapq.heappop(self.heap)[2]
         return None
 
+def get_closest_airbase(target):
+    closest_base = (0, 0, "HQ")
+    min_dist = float('inf')
+    for bx, by, bname in getattr(GameConfig, 'AIRBASES', []):
+        d = math.hypot(target.x_km - bx, target.y_km - by)
+        if d < min_dist:
+            min_dist = d
+            closest_base = (bx, by, bname)
+    return closest_base
+
 class Engagement:
-    def __init__(self, target, weapon_name, time_to_impact):
+    def __init__(self, target, weapon_name, time_to_impact, origin_x=0.0, origin_y=0.0):
         self.target = target
         self.weapon_name = weapon_name
         self.time_to_impact = time_to_impact
+        self.origin_x_km = origin_x
+        self.origin_y_km = origin_y
 
 class RadarOperator:
     def __init__(self, name):
@@ -100,12 +113,22 @@ class WeaponOfficer:
                         target.status = "HOSTILE"; return f"\033[41;93m[WEAPON] OUT OF OPTIONS FOR {target.id_code}!\033[0m", None
                         
                 elif isinstance(target, (Drone, Helicopter)):
-                    if ammo["SAM"] > 0:
+                    if target.distance_km > 50 and ammo["FIGHTER"] > 0:
+                        fighter_type = random.choice(["F-16AM Fighting Falcon", "JAS-39 Gripen", "F-5TH Super Tigris", "T-50TH Golden Eagle", "Alpha Jet"])
+                        weapon, prep_time = fighter_type, GameConfig.PREP_TIME_F16
+                        ammo["FIGHTER"] -= 1 
+                        bx, by, bname = get_closest_airbase(target)
+                        # Time to impact based on distance from base instead of center
+                        dist_from_base = math.hypot(target.x_km - bx, target.y_km - by)
+                        closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_F16
+                        impact_time = int(dist_from_base / closure_rate) + prep_time
+                        return f"\033[95m[LAUNCH]\033[0m SCRAMBLE! {fighter_type} launched from {bname} intercepting {target.id_code}.", Engagement(target, weapon, impact_time, bx, by)
+                    elif ammo["SAM"] > 0:
                         weapon, prep_time = "SAM", GameConfig.PREP_TIME_SAM
                         ammo["SAM"] -= 1
                         closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_SAM
                         impact_time = int(target.distance_km / closure_rate) + prep_time
-                        return f"\033[95m[LAUNCH]\033[0m Firing SAM at {target.id_code}. ({ammo['SAM']} left)", Engagement(target, weapon, impact_time)
+                        return f"\033[95m[LAUNCH]\033[0m Firing SAM at {target.id_code}. ({ammo['SAM']} left)", Engagement(target, weapon, impact_time, 0, 0)
                     else:
                         target.status = "HOSTILE"; return f"\033[91m[WEAPON] SAM RELOADING! {target.id_code} slipping through!\033[0m", None
                 
@@ -115,9 +138,11 @@ class WeaponOfficer:
                             fighter_type = random.choice(["F-16AM Fighting Falcon", "JAS-39 Gripen", "F-5TH Super Tigris", "T-50TH Golden Eagle", "Alpha Jet"])
                             weapon, prep_time = fighter_type, GameConfig.PREP_TIME_F16
                             ammo["FIGHTER"] -= 1 
+                            bx, by, bname = get_closest_airbase(target)
+                            dist_from_base = math.hypot(target.x_km - bx, target.y_km - by)
                             closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_F16
-                            impact_time = int(target.distance_km / closure_rate) + prep_time
-                            return f"\033[95m[LAUNCH]\033[0m SCRAMBLE! {fighter_type} Airborne. ({ammo['FIGHTER']} jets left on ground)", Engagement(target, weapon, impact_time)
+                            impact_time = int(dist_from_base / closure_rate) + prep_time
+                            return f"\033[95m[LAUNCH]\033[0m SCRAMBLE! {fighter_type} launched from {bname}. ({ammo['FIGHTER']} jets left)", Engagement(target, weapon, impact_time, bx, by)
                         else:
                             target.status = "HOSTILE"; return f"\033[93m[WEAPON] ALL FIGHTERs ARE BUSY! Waiting for SAM range.\033[0m", None
                     else:
