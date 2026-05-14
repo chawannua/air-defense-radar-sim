@@ -111,14 +111,14 @@ class WeaponOfficer:
                 
                 elif isinstance(target, Aircraft):
                     if target.distance_km > 80:
-                        if ammo["F-16"] > 0:
+                        if ammo["JAS-39"] > 0:
                             weapon, prep_time = "Interceptors", GameConfig.PREP_TIME_F16
-                            ammo["F-16"] -= 1 
+                            ammo["JAS-39"] -= 1 
                             closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_F16
                             impact_time = int(target.distance_km / closure_rate) + prep_time
-                            return f"\033[95m[LAUNCH]\033[0m SCRAMBLE! F-16 Airborne. ({ammo['F-16']} left on ground)", Engagement(target, weapon, impact_time)
+                            return f"\033[95m[LAUNCH]\033[0m SCRAMBLE! JAS-39 Airborne. ({ammo['JAS-39']} left on ground)", Engagement(target, weapon, impact_time)
                         else:
-                            target.status = "HOSTILE"; return f"\033[93m[WEAPON] ALL F-16s ARE BUSY! Waiting for SAM range.\033[0m", None
+                            target.status = "HOSTILE"; return f"\033[93m[WEAPON] ALL JAS-39s ARE BUSY! Waiting for SAM range.\033[0m", None
                     else:
                         if ammo["SAM"] > 0:
                             weapon, prep_time = "SAM", GameConfig.PREP_TIME_SAM

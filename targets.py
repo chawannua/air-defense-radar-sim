@@ -92,7 +92,7 @@ class Aircraft(AirContact):
         if self.is_friendly:
             self.true_type = random.choice([
                 "Boeing 737", "Boeing 777", "Airbus A320", "Airbus A380", "Cessna 172", 
-                "F-16 VIP Escort", "C-130 Hercules"
+                "JAS-39 VIP Escort", "C-130 Hercules"
             ])
             self.scenario = "COMMERCIAL"
         else:
@@ -107,7 +107,7 @@ class Aircraft(AirContact):
                 "EC-130H Compass Call EW", "RC-135 Rivet Joint EW", 
                 "Su-34 Fullback EW", "Il-22PP Porubschik EW", "Tu-214R EW",
                 "J-16D Roaring Dragon EW", "Y-8 High New EW", "Y-9G EW",
-                "E-3 Sentry AWACS", "A-50 Mainstay AWACS", "KJ-500 AWACS"
+                "Saab 340 AEW&C", "A-50 Mainstay AWACS", "KJ-500 AWACS"
             ]
             
             # โอกาส 35% เป็น EW (จาก 30% ของข้าศึกทั้งหมด)
@@ -259,7 +259,7 @@ class AWACS(AirContact):
         self.rcs = 60.0
         self.is_friendly = True
         self.has_transponder = True
-        self.true_type = "E-3 Sentry AWACS"
+        self.true_type = "Saab 340 AEW&C"
         self.scenario = "AWACS"
         self.active = True
         
@@ -270,7 +270,7 @@ class AWACS(AirContact):
     def identify_target(self):
         self.type_name = self.true_type
         self.status = "FRIENDLY"
-        self.id_code = f"OVERLORD-{self.track_number}"
+        self.id_code = f"ERIE-{self.track_number}"
         
     def calculate_threat_score(self):
         return 0
