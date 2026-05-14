@@ -3,7 +3,7 @@ import time
 import random
 import os
 from config import GameConfig
-from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, Airliner, AWACS, CAPFighter
+from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, EWGhostTrack, Airliner, AWACS, CAPFighter
 from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement, get_closest_airbase
 import math
 
@@ -120,6 +120,15 @@ class CommandCenter:
             ghost = GhostTrack(self.track_counter)
             ghost.detected_by = "GND-RADAR"
             self.unseen_contacts.append(ghost)
+
+        # EW Glitch Mechanics (Floods radar with false targets)
+        ew_active = any(getattr(c, 'is_heavy_ew', False) and c.active for c in self.contacts)
+        if ew_active and random.random() < 0.4: # 40% chance per tick to spawn false ghosts
+            for _ in range(random.randint(2, 6)): # Flood the screen
+                self.track_counter += 1
+                ghost = EWGhostTrack(self.track_counter)
+                ghost.detected_by = "GND-RADAR"
+                self.unseen_contacts.append(ghost)
 
     def process_reloads(self):
         # --- Base Defense Logistics ---
@@ -285,7 +294,7 @@ class CommandCenter:
         elif target_type == "FIGHTER": c = Aircraft(self.track_counter); c.detected_by = "GND-RADAR"
         elif target_type == "DRONE": c = Drone(self.track_counter); c.detected_by = "GND-RADAR"
         elif target_type == "AIRLINER": c = Airliner(self.track_counter); c.detected_by = "GND-RADAR"
-        elif target_type == "EW": c = Aircraft(self.track_counter); c.true_type = "EA-18G Growler (HEAVY EW)"; c.is_heavy_ew = True; c.detected_by = "GND-RADAR"
+        elif target_type == "EW": c = Aircraft(self.track_counter); c.true_type = "EA-18G Growler (HEAVY EW)"; c.is_heavy_ew = True; c.is_friendly = False; c.has_transponder = False; c.detected_by = "GND-RADAR"
         elif target_type == "AWACS": c = AWACS(self.track_counter); c.detected_by = "GND-RADAR"
         else: return
         self.unseen_contacts.append(c)

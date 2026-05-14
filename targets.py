@@ -451,3 +451,37 @@ class GhostTrack(AirContact):
         self.lifespan -= 1
         if self.lifespan <= 0:
             self.active = False # Ghost vanishes from scope
+
+class EWGhostTrack(AirContact):
+    def __init__(self, track_number):
+        super().__init__(track_number, random.randint(50, 600))
+        self.speed_mach = random.uniform(0.8, 3.5) # Fake fast targets
+        self.altitude_ft = random.randint(5000, 60000)
+        self.rcs = random.uniform(1.0, 10.0) 
+        self.is_friendly = False
+        self.has_transponder = False
+        self.bearing = random.randint(0, 359)
+        
+        self.true_type = "ELECTRONIC_DECEPTION"
+        self.scenario = "EW"
+        self.lifespan = random.randint(2, 8) # Vanish quickly
+        
+        # Override spawn position to ensure it spawns everywhere
+        self.x_km = self.distance_km * math.sin(math.radians(self.bearing))
+        self.y_km = self.distance_km * math.cos(math.radians(self.bearing))
+        
+    def identify_target(self):
+        self.type_name = "FALSE TARGET"
+        self.status = "CLEARED" 
+        self.active = False
+        self.id_code = f"GHOST-{self.track_number}"
+
+    def move(self):
+        super().move()
+        self.lifespan -= 1
+        # Erratic movement
+        if random.random() < 0.3:
+            self.bearing = (self.bearing + random.randint(-45, 45)) % 360
+            self.heading = (self.bearing + 180) % 360
+        if self.lifespan <= 0:
+            self.active = False

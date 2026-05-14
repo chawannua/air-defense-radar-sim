@@ -378,6 +378,13 @@ def start_radar():
         # ===================================================
         # 2. จำลองการกวาดแบบ Rotary AESA (Mechanical + Electronic Steering)
         # ===================================================
+        ew_active = any(getattr(c, 'is_heavy_ew', False) and c.active for c in cmd.contacts)
+        
+        if ew_active:
+            sweep_speed = random.choice([-25, -10, 2.8, 15, 30, 60, -40]) # Glitch rotation
+        else:
+            sweep_speed = 2.8
+            
         old_sweep_angle = sweep_angle
         sweep_angle = (sweep_angle + sweep_speed) % 360
 
@@ -523,6 +530,13 @@ def start_radar():
             if not c.active or not hasattr(c, 'visible_dist'): continue
             if c.brightness <= 0: continue 
             
+            # EW glitch jitter
+            if ew_active:
+                glitch_x = random.randint(-8, 8)
+                glitch_y = random.randint(-8, 8)
+            else:
+                glitch_x, glitch_y = 0, 0
+
             bearing = getattr(c, 'bearing', getattr(c, 'heading', 0)) 
             
             # 60 FPS Visual Physics Interpolation
@@ -531,8 +545,8 @@ def start_radar():
             interp_x_km = prev_x + (c.x_km - prev_x) * alpha
             interp_y_km = prev_y + (c.y_km - prev_y) * alpha
             
-            x = CX + km_to_px(interp_x_km)
-            y = CY - km_to_px(interp_y_km)
+            x = CX + km_to_px(interp_x_km) + glitch_x
+            y = CY - km_to_px(interp_y_km) + glitch_y
 
             base_color = (180, 180, 180) 
             render_status = c.status
