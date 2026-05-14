@@ -1,8 +1,10 @@
 import pygame
 import math
 import sys
-import re
 import random
+import json
+import os
+import re
 from command_center import CommandCenter
 from targets import AWACS
 
@@ -50,7 +52,36 @@ def generate_map_shapes():
     shapes.append(coast)
     return shapes
 
-MAP_SHAPES_KM = generate_map_shapes()
+def load_real_map():
+    shapes_km = []
+    RADAR_LAT = 54.0  # Center of UK
+    RADAR_LON = -2.0
+    
+    def latlon_to_km(lon, lat):
+        dx = (lon - RADAR_LON) * 111.32 * math.cos(math.radians(RADAR_LAT))
+        dy = (lat - RADAR_LAT) * 110.574
+        return (dx, dy) 
+    
+    for filename in ["gbr.json", "irl.json"]:
+        if os.path.exists(filename):
+            try:
+                with open(filename, 'r') as f:
+                    poly_list = json.load(f)
+                for ring in poly_list:
+                    ring_km = []
+                    for lon, lat in ring:
+                        x_km, y_km = latlon_to_km(lon, lat)
+                        ring_km.append((x_km, y_km))
+                    shapes_km.append(ring_km)
+            except Exception as e:
+                print("Map load error:", e)
+    
+    if not shapes_km:
+        shapes_km = generate_map_shapes()
+        
+    return shapes_km
+
+MAP_SHAPES_KM = load_real_map()
 
 def start_radar():
     pygame.init()
@@ -70,9 +101,11 @@ def start_radar():
     MISSILE_COLOR = (255, 120, 0)
     
     RADAR_AREA = WIDTH 
-    CX, CY = WIDTH // 2, HEIGHT // 2
     RADAR_RADIUS_PX = (HEIGHT // 2) - 20 
     RADAR_MAX_KM = 800.0 
+    
+    camera_x = 0.0
+    camera_y = 0.0
     
     def km_to_px(km): return (km / RADAR_MAX_KM) * RADAR_RADIUS_PX
 
@@ -123,9 +156,7 @@ def start_radar():
                 if not is_fullscreen:
                     WIDTH, HEIGHT = event.w, event.h
                     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
-                    
                     RADAR_AREA = WIDTH
-                    CX, CY = WIDTH // 2, HEIGHT // 2
                     RADAR_RADIUS_PX = (HEIGHT // 2) - 20
             
             if event.type == pygame.KEYDOWN:
@@ -168,7 +199,6 @@ def start_radar():
                         screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
                     
                     RADAR_AREA = WIDTH
-                    CX, CY = WIDTH // 2, HEIGHT // 2
                     RADAR_RADIUS_PX = (HEIGHT // 2) - 20
 
                 # 🟢 [RESTART] เริ่มเกมใหม่เมื่อฐานถูกทำลาย
@@ -216,6 +246,17 @@ def start_radar():
                             closest_c = c
                     selected_contact = closest_c
 
+        # 🟢 [PAN CAMERA] Smooth panning with WASD or Arrow keys
+        keys = pygame.key.get_pressed()
+        pan_speed = 10
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]: camera_x += pan_speed
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: camera_x -= pan_speed
+        if keys[pygame.K_UP] or keys[pygame.K_w]: camera_y += pan_speed
+        if keys[pygame.K_DOWN] or keys[pygame.K_s]: camera_y -= pan_speed
+
+        CX = (WIDTH // 2) + int(camera_x)
+        CY = (HEIGHT // 2) + int(camera_y)
+
         screen.fill(BG_COLOR)
 
         # ===================================================
@@ -236,7 +277,7 @@ def start_radar():
             pixel_points = []
             for (x_km, y_km) in shape_km:
                 px_x = CX + km_to_px(x_km)
-                px_y = CY + km_to_px(y_km)
+                px_y = CY - km_to_px(y_km) # Minus because Pygame Y is flipped relative to North
                 pixel_points.append((px_x, px_y))
             if len(pixel_points) > 2:
                 pygame.draw.polygon(screen, (0, 30, 10), pixel_points, 1)
