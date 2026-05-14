@@ -1,5 +1,6 @@
 # targets.py
 import random
+import math
 from abc import ABC, abstractmethod
 
 class AirContact(ABC):
@@ -28,6 +29,27 @@ class AirContact(ABC):
 
     @abstractmethod
     def identify_target(self): pass
+
+    def is_detectable_by_radar(self, radar_alt_ft=150, jamming_factor=1.0):
+        # Space-Command and Strategic Early Warning Radars bypass local horizon
+        if self.detected_by in ["SPACE-COM", "GND-EWR"]:
+            return True
+            
+        # 1. Radar Horizon Check (Earth's curvature)
+        # Formula: Distance to horizon (nm) = 1.23 * (sqrt(radar_alt) + sqrt(target_alt))
+        # 1 nm = 1.852 km
+        radar_horizon_km = 1.852 * 1.23 * (math.sqrt(max(0, radar_alt_ft)) + math.sqrt(max(0, self.altitude_ft)))
+        if self.distance_km > radar_horizon_km:
+            return False
+            
+        # 2. RCS Detection Check with Jamming (Simplified Radar Range Equation & Burn-through)
+        # Baseline: Can detect 1.0 m^2 target at 400 km
+        # Max Range = Baseline_Range * (RCS / Baseline_RCS)^(1/4) * Jamming_Factor
+        max_detection_range = 400.0 * (max(0.001, self.rcs) ** 0.25) * jamming_factor
+        if self.distance_km > max_detection_range:
+            return False
+            
+        return True
 
     def get_eta(self):
         speed_per_tick = self.speed_mach * 1.0 
@@ -179,3 +201,28 @@ class ICBM(AirContact):
 
     def calculate_threat_score(self):
         return 1000000 + int(1000 / max(1, self.distance_km))
+
+class GhostTrack(AirContact):
+    def __init__(self, track_number):
+        super().__init__(track_number, random.randint(30, 150))
+        self.speed_mach = random.uniform(0.02, 0.15) # Birds or slow moving clutter
+        self.altitude_ft = random.randint(100, 5000)
+        self.rcs = random.uniform(0.001, 0.1) # Very small cross section
+        self.is_friendly = False
+        self.has_transponder = False
+        
+        self.true_type = "BIRD_FLOCK/WEATHER"
+        self.scenario = "CLUTTER"
+        self.lifespan = random.randint(6, 18) # Will naturally vanish after a few seconds
+        
+    def identify_target(self):
+        self.type_name = "CLUTTER"
+        self.status = "CLEARED" # Radar operator realizes it's a ghost and clears it
+        self.active = False
+        self.id_code = f"GHOST-{self.track_number}"
+
+    def move(self):
+        super().move()
+        self.lifespan -= 1
+        if self.lifespan <= 0:
+            self.active = False # Ghost vanishes from scope

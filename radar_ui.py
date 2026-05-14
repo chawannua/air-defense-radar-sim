@@ -126,44 +126,11 @@ def start_radar():
                     elif event.key == pygame.K_4: wpn = 'F-16' 
                     
                     if wpn:
-                        if cmd.ammo.get(wpn, 0) > 0:
-                            cmd.ammo[wpn] -= 1
-                            
-                            class DummyEng:
-                                def __init__(self, t, w):
-                                    self.target = t
-                                    self.weapon_name = w
-                                    self.time_to_impact = max(1, int(t.distance_km / max(1, t.speed_mach * 2)))
-                                    self.total_time = self.time_to_impact
-                                    self.active = True 
-                                
-                                def update(self):
-                                    if self.time_to_impact > 0:
-                                        self.time_to_impact -= 1
-
-                            cmd.active_engagements.append(DummyEng(selected_contact, wpn))
-                            selected_contact.status = "ENGAGING"
-                            
-                            log_msg = f"\033[95m[MANUAL OVERRIDE]\033[0m Fired {wpn} at {selected_contact.id_code}"
-                            if hasattr(cmd, 'add_log'): cmd.add_log(log_msg)
-                            else: cmd.tactical_log.append(log_msg)
-                        else:
-                            warn_msg = f"\033[91m[WARNING]\033[0m {wpn} Out of Ammo!"
-                            if hasattr(cmd, 'add_log'): cmd.add_log(warn_msg)
-                            else: cmd.tactical_log.append(warn_msg)
+                        cmd.manual_override_fire(selected_contact, wpn)
 
                 # 🔴 [ABORT] ระบบยกเลิกการยิงเป้าหมายที่เลือก
                 if event.key == pygame.K_BACKSPACE and selected_contact:
-                    aborted = False
-                    for eng in list(cmd.active_engagements):
-                        if getattr(eng, 'target', None) == selected_contact:
-                            cmd.active_engagements.remove(eng)
-                            aborted = True
-                    if aborted:
-                        selected_contact.status = "HOSTILE"
-                        abt_msg = f"\033[41m[ABORT]\033[0m Cancelled engagement on {selected_contact.id_code}"
-                        if hasattr(cmd, 'add_log'): cmd.add_log(abt_msg)
-                        else: cmd.tactical_log.append(abt_msg)
+                    cmd.manual_override_abort(selected_contact)
                                 
                 # 🟢 [FULLSCREEN] สลับโหมดแบบปลอดภัย ไม่ทำจอพัง
                 if event.key == pygame.K_F11:
@@ -182,6 +149,13 @@ def start_radar():
                     sidebar_x = RADAR_AREA
                     CX, CY = RADAR_AREA // 2, HEIGHT // 2
                     RADAR_RADIUS_PX = (HEIGHT // 2) - 60
+
+                # 🟢 [RESTART] เริ่มเกมใหม่เมื่อฐานถูกทำลาย
+                if event.key == pygame.K_r and cmd.base_hp <= 0:
+                    cmd = CommandCenter()
+                    selected_contact = None
+                    sweep_angle = 0.0
+                    LAST_TICK_TIME = pygame.time.get_ticks()
 
             # 🟢 [CLICK] คลิกเมาส์เพื่อล็อคเป้าหมาย
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -212,8 +186,9 @@ def start_radar():
             pygame.draw.circle(screen, GRID_COLOR, (CX, CY), int(r_px), 1)
             screen.blit(font_xs.render(f"{ring_km}", True, GRID_COLOR), (CX + 2, CY - r_px - 12))
             
-        pygame.draw.circle(screen, (0, 30, 80), (CX, CY), int(km_to_px(400)), 1) # THAAD Range
-        pygame.draw.circle(screen, (80, 80, 0), (CX, CY), int(km_to_px(150)), 1) # SAM Range
+        pygame.draw.circle(screen, (0, 30, 80), (CX, CY), int(km_to_px(400)), 1) # THAAD Optimal Range
+        pygame.draw.circle(screen, (80, 80, 0), (CX, CY), int(km_to_px(200)), 1) # SAM Anti-Ballistic Range
+        pygame.draw.circle(screen, (80, 50, 0), (CX, CY), int(km_to_px(80)), 1)  # SAM Anti-Aircraft Range
         pygame.draw.circle(screen, (80, 0, 0), (CX, CY), int(km_to_px(20)), 1)   # CIWS Range
 
         pygame.draw.line(screen, GRID_COLOR, (CX, CY - RADAR_RADIUS_PX), (CX, CY + RADAR_RADIUS_PX), 1)
@@ -236,27 +211,36 @@ def start_radar():
                 pygame.draw.line(screen, GRID_COLOR, (inner_x, inner_y), (outer_x, outer_y), 1)
 
         # ===================================================
-        # 2. จำลองการกวาดแบบ Rotary AESA (Multi-Beam & Tracking)
+        # 2. จำลองการกวาดแบบ Rotary AESA (Mechanical + Electronic Steering)
         # ===================================================
         old_sweep_angle = sweep_angle
         sweep_angle = (sweep_angle + sweep_speed) % 360
 
-        def is_swept(bearing, old_a, new_a):
-            if old_a < new_a: return old_a <= bearing <= new_a
-            return bearing >= old_a or bearing <= new_a
+        # AESA Field of View (FOV) - e.g., +/- 60 degrees from mechanical boresight
+        AESA_FOV = 60.0
+
+        def angle_diff(a1, a2):
+            diff = (a1 - a2 + 180) % 360 - 180
+            return abs(diff)
 
         # --- Update brightness & detection for all contacts ---
         for c in cmd.contacts:
             if not c.active: continue
             bearing = getattr(c, 'bearing', getattr(c, 'heading', 0)) 
-            if is_swept(bearing, old_sweep_angle, sweep_angle):
+            
+            # If target is within the AESA Field of View, it gets actively tracked
+            if angle_diff(bearing, sweep_angle) <= AESA_FOV:
                 c.visible_dist = c.distance_km
                 c.brightness = 1.0 
                 if not hasattr(c, 'trail'): c.trail = []
-                c.trail.append((c.visible_dist, bearing))
-                if len(c.trail) > 8: c.trail.pop(0)
-            if hasattr(c, 'brightness') and c.brightness > 0:
-                c.brightness = max(0.0, c.brightness - 0.001)  # ลดเร็วกว่า เพื่อเป้าหมายคงอยู่นานขึ้น
+                
+                # Record trail position occasionally
+                if random.random() < 0.1:
+                    c.trail.append((c.visible_dist, bearing))
+                    if len(c.trail) > 8: c.trail.pop(0)
+            else:
+                if hasattr(c, 'brightness') and c.brightness > 0:
+                    c.brightness = max(0.0, c.brightness - 0.005)  # Fade when out of FOV
 
         for eng in cmd.active_engagements:
             target = getattr(eng, 'target', None)
@@ -265,49 +249,58 @@ def start_radar():
             progress = 1.0 - (max(0, getattr(eng, 'time_to_impact', 0)) / max(1, eng.total_time))
             bearing = getattr(target, 'bearing', getattr(target, 'heading', 0))
             
-            eng.visible_dist = target.distance_km * progress
-            eng.brightness = 1.0
-            if not hasattr(eng, 'trail'): eng.trail = []
-            eng.trail.append((eng.visible_dist, bearing))
-            if len(eng.trail) > 8: eng.trail.pop(0)
+            if angle_diff(bearing, sweep_angle) <= AESA_FOV:
+                eng.visible_dist = target.distance_km * progress
+                eng.brightness = 1.0
+                if not hasattr(eng, 'trail'): eng.trail = []
+                if random.random() < 0.1:
+                    eng.trail.append((eng.visible_dist, bearing))
+                    if len(eng.trail) > 8: eng.trail.pop(0)
+            else:
+                if hasattr(eng, 'brightness') and eng.brightness > 0:
+                    eng.brightness = max(0.0, eng.brightness - 0.005)
 
-        # --- AESA Random Search Beams (ลำแสงสุ่มกวาด) ---
-        # จำลองการที่ AESA ยิงลำแสงย่อยๆ ไปสำรวจพื้นที่ต่างๆ พร้อมกันหลายทิศทาง
-        for _ in range(10): # ยิง 10 ลำแสงสุ่มต่อเฟรม (เพิ่มจาก 4 เป็น 10)
-            r_angle = random.randint(0, 359)
+        # --- AESA Random Search Beams (Electronic steering within FOV) ---
+        for _ in range(12): 
+            e_angle = random.uniform(-AESA_FOV, AESA_FOV)
+            r_angle = (sweep_angle + e_angle) % 360
             r_len = RADAR_RADIUS_PX * random.uniform(0.3, 0.95)
             bx = CX + r_len * math.sin(math.radians(r_angle))
             by = CY - r_len * math.cos(math.radians(r_angle))
-            # ใช้สีเขียวเข้มขึ้น เพื่อให้เห็นการยิงลำแสงสุ่มชัดเชียน
             pygame.draw.line(screen, (0, 80, 40), (CX, CY), (bx, by), 1)
 
-        # --- AESA Tracking Beams (ลำแสงจี้เป้าหมาย) ---
-        # เรดาร์ AESA จะส่ง Beam ไปตรวจสอบเป้าหมายที่ตรวจพบแล้วบ่อยครั้ง (Update rate สูง)
+        # --- AESA Tracking Beams (Tracking targets within FOV) ---
         for c in cmd.contacts:
             if c.active and c.distance_km < RADAR_MAX_KM:
                 target_bearing = getattr(c, 'bearing', 0)
-                dist_px = (c.distance_km / RADAR_MAX_KM) * RADAR_RADIUS_PX
-                tx = CX + dist_px * math.sin(math.radians(target_bearing))
-                ty = CY - dist_px * math.cos(math.radians(target_bearing))
                 
-                # กำหนดสี Beam ตามสถานะ (มิตร=เขียว, ศัตรู=ส้ม/แดง)
-                b_color = (0, 180, 80) if c.status != "HOSTILE" else (200, 100, 0)
-                
-                # Tracking probability: 30% สำหรับเป้าทั่วไป, 100% สำหรับเป้าที่เลือก
-                track_probability = 1.0 if selected_contact == c else 0.30
-                
-                # Multiple tracking updates per target (ทำให้เป้าสำคัญได้รับการจี้บ่อยขึ้น)
-                track_count = 3 if selected_contact == c else 1
-                for _ in range(track_count):
-                    if random.random() < track_probability:
-                        # เพิ่ม jitter เล็กน้อยเพื่อให้ tracking beam ดูสมจริง
-                        jitter_angle = random.uniform(-2, 2)
-                        jit_bearing = target_bearing + jitter_angle
-                        tx_jit = CX + dist_px * math.sin(math.radians(jit_bearing))
-                        ty_jit = CY - dist_px * math.cos(math.radians(jit_bearing))
-                        pygame.draw.line(screen, b_color, (CX, CY), (tx_jit, ty_jit), 1)
+                # Only track if the mechanical dish is pointing roughly towards it
+                if angle_diff(target_bearing, sweep_angle) <= AESA_FOV:
+                    dist_px = (c.distance_km / RADAR_MAX_KM) * RADAR_RADIUS_PX
+                    
+                    b_color = (0, 180, 80) if c.status != "HOSTILE" else (200, 100, 0)
+                    track_probability = 1.0 if selected_contact == c else 0.40
+                    
+                    track_count = 3 if selected_contact == c else 1
+                    for _ in range(track_count):
+                        if random.random() < track_probability:
+                            jitter_angle = random.uniform(-1.5, 1.5)
+                            jit_bearing = target_bearing + jitter_angle
+                            tx_jit = CX + dist_px * math.sin(math.radians(jit_bearing))
+                            ty_jit = CY - dist_px * math.cos(math.radians(jit_bearing))
+                            pygame.draw.line(screen, b_color, (CX, CY), (tx_jit, ty_jit), 1)
 
-        # --- Main Sweep Line (เส้นกวาดหลักของจานหมุน) ---
+        # Draw AESA FOV Boundaries Faintly
+        fov_left = (sweep_angle - AESA_FOV) % 360
+        fov_right = (sweep_angle + AESA_FOV) % 360
+        lx = CX + RADAR_RADIUS_PX * math.sin(math.radians(fov_left))
+        ly = CY - RADAR_RADIUS_PX * math.cos(math.radians(fov_left))
+        rx = CX + RADAR_RADIUS_PX * math.sin(math.radians(fov_right))
+        ry = CY - RADAR_RADIUS_PX * math.cos(math.radians(fov_right))
+        pygame.draw.line(screen, (0, 60, 20), (CX, CY), (lx, ly), 1)
+        pygame.draw.line(screen, (0, 60, 20), (CX, CY), (rx, ry), 1)
+
+        # --- Main Sweep Line (Mechanical Boresight) ---
         # ยังคงเส้นหลักไว้เพื่อให้เห็นทิศทางการหมุนของจานเรดาร์
         end_x = CX + RADAR_RADIUS_PX * math.sin(math.radians(sweep_angle))
         end_y = CY - RADAR_RADIUS_PX * math.cos(math.radians(sweep_angle))
@@ -508,9 +501,13 @@ def start_radar():
         if cmd.base_hp <= 0:
             pygame.draw.rect(screen, (100, 0, 0), (CX - 220, CY - 40, 440, 80))
             pygame.draw.rect(screen, (255, 0, 0), (CX - 220, CY - 40, 440, 80), 3)
-            screen.blit(font_lg.render("BASE DESTROYED! ALL SYSTEMS OFFLINE", True, (255, 255, 255)), (CX - 200, CY - 10))
+            screen.blit(font_lg.render("BASE DESTROYED! ALL SYSTEMS OFFLINE", True, (255, 255, 255)), (CX - 200, CY - 20))
+            
+            # Text to indicate restart option
+            restart_text = font_md.render("Press [R] to Restart Simulation", True, (255, 200, 200))
+            screen.blit(restart_text, (CX - (restart_text.get_width() // 2), CY + 10))
 
-        screen.blit(font_sm.render("Press [ESC] to Quit | [CLICK] Select | [1-4] Fire | [BACKSPACE] Abort | [F11] Fullscreen", True, (80, 80, 80)), (10, HEIGHT - 25))
+        screen.blit(font_sm.render("Press [ESC] to Quit | [CLICK] Select | [1-4] Fire | [BACKSPACE] Abort | [F11] Fullscreen | [R] Restart (On Death)", True, (80, 80, 80)), (10, HEIGHT - 25))
 
         pygame.display.flip()
         clock.tick(60)

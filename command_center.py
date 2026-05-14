@@ -4,12 +4,13 @@ import random
 import os
 from datetime import datetime
 from config import GameConfig
-from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft
+from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack
 from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement
 
 class CommandCenter:
     def __init__(self):
         self.contacts = []
+        self.unseen_contacts = []
         self.active_engagements = []
         self.returning_fighters = [] 
         self.base_hp = 100
@@ -49,10 +50,13 @@ class CommandCenter:
     def detect_airspace(self):
         if self.wave_cooldown > 0: self.wave_cooldown -= 1
         
-        # Massive wave system (10% chance)
-        if self.wave_cooldown <= 0 and random.random() < 0.10: 
-            self.wave_cooldown = 200
-            wave_size = random.randint(8, 15)
+        # Difficulty scales up linearly over time, capping at 3x difficulty
+        difficulty_multiplier = min(3.0, 1.0 + (self.tick_count / 1500.0))
+        
+        # Massive wave system (base 10% chance)
+        if self.wave_cooldown <= 0 and random.random() < (0.10 * difficulty_multiplier): 
+            self.wave_cooldown = max(80, int(200 / difficulty_multiplier))
+            wave_size = int(random.randint(8, 15) * difficulty_multiplier)
             
             wave_theme = random.choices(
                 ["MIXED", "BALLISTIC_RAIN", "DRONE_SWARM", "FIGHTER_STRIKE"], 
@@ -94,10 +98,10 @@ class CommandCenter:
                 else: 
                     new_contact = Aircraft(self.track_counter); new_contact.scenario = "HOSTILE_FIGHTER"; new_contact.detected_by = "GND-RADAR"
                 
-                self.contacts.append(new_contact)
+                self.unseen_contacts.append(new_contact)
                 
-        # Normal target detection system
-        elif random.random() < 0.25: 
+        # Normal target detection system (base 25% chance)
+        elif random.random() < (0.25 * difficulty_multiplier): 
             self.track_counter += 1
             prob = random.random()
             if prob < 0.05: new_contact = ICBM(self.track_counter); new_contact.detected_by = "SPACE-COM"  
@@ -105,8 +109,14 @@ class CommandCenter:
             elif prob < 0.15: new_contact = Drone(self.track_counter); new_contact.detected_by = "AWACS"    
             elif prob < 0.18: new_contact = Helicopter(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
             else: new_contact = Aircraft(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
-            self.contacts.append(new_contact)
-            self.add_log(f"\033[90m[SYS] RAW CONTACT: {new_contact.id_code} detected by {new_contact.detected_by}.\033[0m")
+            self.unseen_contacts.append(new_contact)
+            
+        # False Alarm (Clutter/Ghosts) system (5% chance per tick)
+        if random.random() < 0.05:
+            self.track_counter += 1
+            ghost = GhostTrack(self.track_counter)
+            ghost.detected_by = "GND-RADAR"
+            self.unseen_contacts.append(ghost)
 
     def process_reloads(self):
         # Ammo tracking and supply system
@@ -173,6 +183,26 @@ class CommandCenter:
             highest_threat = self.threat_queue.pop_highest_priority()
             if highest_threat: self.add_log(self.weapon_op.authorize_engagement(highest_threat))
 
+    def manual_override_fire(self, target, wpn):
+        if self.ammo.get(wpn, 0) > 0:
+            self.ammo[wpn] -= 1
+            impact_time = max(1, int(target.distance_km / max(1, target.speed_mach * 2)))
+            self.active_engagements.append(Engagement(target, wpn, impact_time))
+            target.status = "ENGAGING"
+            self.add_log(f"\033[95m[MANUAL OVERRIDE]\033[0m Fired {wpn} at {target.id_code}")
+        else:
+            self.add_log(f"\033[91m[WARNING]\033[0m {wpn} Out of Ammo!")
+
+    def manual_override_abort(self, target):
+        aborted = False
+        for eng in list(self.active_engagements):
+            if getattr(eng, 'target', None) == target:
+                self.active_engagements.remove(eng)
+                aborted = True
+        if aborted:
+            target.status = "HOSTILE"
+            self.add_log(f"\033[41m[ABORT]\033[0m Cancelled engagement on {target.id_code}")
+
     def process_engagements(self):
         surviving_engagements = []
         for eng in self.active_engagements:
@@ -198,10 +228,14 @@ class CommandCenter:
                         self.add_log(f"\033[91;1m[MISS] THAAD MISSED {eng.target.id_code}! TARGET STILL INCOMING!\033[0m")
                 
                 elif eng.weapon_name == "SAM":
-                    hit_chance = GameConfig.HIT_CHANCE_SAM_NUKE if isinstance(eng.target, ICBM) else \
-                                 (GameConfig.HIT_CHANCE_SAM_TBM if isinstance(eng.target, TacticalBM) else GameConfig.HIT_CHANCE_SAM_NORMAL)
+                    base_hit = GameConfig.HIT_CHANCE_SAM_NUKE if isinstance(eng.target, ICBM) else \
+                               (GameConfig.HIT_CHANCE_SAM_TBM if isinstance(eng.target, TacticalBM) else GameConfig.HIT_CHANCE_SAM_NORMAL)
                     
-                    if random.random() <= hit_chance: 
+                    # Kinematic modifier: Harder to hit fast targets
+                    speed_penalty = max(0.0, (eng.target.speed_mach - 1.0) * 0.10) # -10% per Mach above Mach 1
+                    final_hit_chance = max(0.05, base_hit - speed_penalty)
+                    
+                    if random.random() <= final_hit_chance: 
                         eng.target.status = "CLEARED"; eng.target.active = False
                         self.add_log(f"\033[92m[KILL] SPLASH! {eng.target.id_code} destroyed by SAM!\033[0m")
                     else:
@@ -216,7 +250,11 @@ class CommandCenter:
                         eng.target.status = "CLEARED"; eng.target.active = False
                         self.add_log(f"\033[94m[INTERCEPT]\033[0m {eng.target.id_code} complied. F-16 is RTB.\033[0m")
                     else:
-                        if random.random() <= GameConfig.HIT_CHANCE_F16: 
+                        # Kinematics for F-16 AMRAAMs
+                        speed_penalty = max(0.0, (eng.target.speed_mach - 1.5) * 0.15)
+                        final_hit_chance = max(0.10, GameConfig.HIT_CHANCE_F16 - speed_penalty)
+                        
+                        if random.random() <= final_hit_chance: 
                             eng.target.status = "CLEARED"; eng.target.active = False
                             self.add_log(f"\033[92m[KILL]\033[0m FOX-3! {eng.target.id_code} splashed by F-16! F-16 is RTB.\033[0m")
                         else:
@@ -240,7 +278,8 @@ class CommandCenter:
                     self.ammo["CIWS"] -= ammo_used
                     
                     hit_multiplier = 1.0 + (ammo_used * 0.10) 
-                    final_hit_chance = min(0.95, GameConfig.HIT_CHANCE_CIWS * hit_multiplier)
+                    speed_penalty = max(0.0, (c.speed_mach - 0.5) * 0.15) # CIWS struggles with Mach 2+ targets
+                    final_hit_chance = max(0.05, min(0.95, GameConfig.HIT_CHANCE_CIWS * hit_multiplier - speed_penalty))
                     
                     if random.random() <= final_hit_chance:
                         self.add_log(f"\033[91;1m[AUTO-CIWS] BRRRRRRT! (Spread x{ammo_used}) {c.id_code} SHREDDED! (Ammo: {self.ammo['CIWS']})\033[0m")
@@ -252,6 +291,28 @@ class CommandCenter:
                     if self.tick_count % 3 == 0: self.add_log(f"\033[41;97m[AUTO-CIWS] CLICK! CIWS RELOADING! BRACE FOR IMPACT: {c.id_code}!\033[0m")
 
     def update_world(self):
+        # Calculate Jamming Burn-through
+        # If an active heavy EW aircraft is tracked or unseen, it adds noise to the radar receiver
+        is_jammed = any(c.active and getattr(c, 'is_heavy_ew', False) for c in self.contacts + self.unseen_contacts)
+        jamming_factor = 0.4 if is_jammed else 1.0 # Reduces detection range to 40% if jammed
+        
+        # Process unseen contacts (move them, check if they cross the detection threshold)
+        surviving_unseen = []
+        for c in self.unseen_contacts:
+            if c.active:
+                c.move()
+                if c.is_detectable_by_radar(radar_alt_ft=150, jamming_factor=jamming_factor):
+                    self.contacts.append(c)
+                    self.add_log(f"\033[90m[SYS] NEW TRACK: {c.id_code} appeared on radar.\033[0m")
+                elif c.distance_km <= 0:
+                    c.active = False
+                    self.base_hp -= GameConfig.DAMAGE_AIRCRAFT
+                    self.add_log(f"\033[41;97m[DEFENSE] AMBUSH! {c.id_code} hit base below radar horizon!\033[0m")
+                else:
+                    surviving_unseen.append(c)
+        self.unseen_contacts = surviving_unseen
+
+        # Process visible contacts
         for c in self.contacts:
             if c.active:
                 c.move()
@@ -265,8 +326,8 @@ class CommandCenter:
                     if c.status == "FRIENDLY": 
                         self.add_log(f"\033[94m[TRAFFIC] {c.id_code} safely passed through airspace.\033[0m")
                     elif c.status in ["HOSTILE", "ENGAGING", "UNIDENTIFIED", "IDENTIFYING", "SUSPECT", "INTERCEPTING"]:
-                        damage = GameConfig.DAMAGE_NUKE if isinstance(c, ICBM) else \
-                                 (GameConfig.DAMAGE_TBM if isinstance(c, TacticalBM) else GameConfig.DAMAGE_NORMAL)
+                        damage = GameConfig.DAMAGE_ICBM if isinstance(c, ICBM) else \
+                                 (GameConfig.DAMAGE_TBM if isinstance(c, TacticalBM) else GameConfig.DAMAGE_AIRCRAFT)
                         self.base_hp -= damage
                         self.add_log(f"\033[41;97m[DEFENSE] CRITICAL! {c.id_code} hit the base! HP -{damage}\033[0m")
                         
@@ -281,82 +342,3 @@ class CommandCenter:
                             if lost_ammo_msgs: self.add_log(f"\033[43;30m[DAMAGE] Ammo cache hit by explosion! Lost: {', '.join(lost_ammo_msgs)}\033[0m")
 
         self.contacts = [c for c in self.contacts if c.active]
-
-    def format_ammo_display(self, wpn):
-        if wpn != "F-16" and self.reload_timers[wpn] > 0:
-            return f"\033[33mRLD {self.reload_timers[wpn]:02d}s\033[0m"
-        return f"{self.ammo[wpn]:02d}/{self.max_ammo[wpn]:02d}"
-
-    def get_intercept_info(self, contact):
-        engs = [e for e in self.active_engagements if e.target == contact]
-        if engs:
-            soonest = min(engs, key=lambda x: x.time_to_impact)
-            wpn_name = "F-16" if soonest.weapon_name == "Interceptors" else soonest.weapon_name
-            return f"{wpn_name}:{soonest.time_to_impact}s"
-        return "---"
-
-    def display_dashboard(self):
-        os.system('cls' if os.name == 'nt' else 'clear')
-        width = 162 
-        defcon_level = self.calculate_defcon()
-        if defcon_level == 1: defcon_color = "\033[41;97m" 
-        elif defcon_level == 2: defcon_color = "\033[41;33m" 
-        elif defcon_level == 3: defcon_color = "\033[43;30m" 
-        elif defcon_level == 4: defcon_color = "\033[44;97m" 
-        else: defcon_color = "\033[42;97m" 
-
-        print(f" {defcon_color} [ DEFCON {defcon_level} ] \033[0m  🛡️  CEI TACTICAL AIRSPACE  |  TICK: {self.tick_count:04d}  |  BASE HP: {self.base_hp}%")
-        
-        airborne_f16 = len(self.returning_fighters)
-        f16_status = f"{self.format_ammo_display('F-16')} \033[94m(RTB: {airborne_f16})\033[0m" if airborne_f16 > 0 else self.format_ammo_display('F-16')
-        
-        armory_str = f" 💣 ARMORY: [THAAD: {self.format_ammo_display('THAAD')}] | [F-16s: {f16_status}] | [SAMs: {self.format_ammo_display('SAM')}] | [CIWS: {self.format_ammo_display('CIWS')}]"
-        print(armory_str)
-        
-        print("="*width)
-        print(f" {'TRACK/CALLSIGN':<16} | {'THREAT':<7} | {'STATUS':<12} | {'AIRCRAFT TYPE':<24} | {'DIST (km)':<9} | {'ALT (ft)':<8} | {'SPD (M)':<7} | {'ETA (s)':<7} | {'WPN/INTCPT':<12} | {'SENSOR'}")
-        print("-" * width)
-
-        sorted_contacts = sorted(self.contacts, key=lambda c: c.calculate_threat_score(), reverse=True)
-        if not sorted_contacts: 
-            print(f" {'--':<16} | {'--':<7} | {'CLEAR':<12} | {'--':<24} | {'--':<9} | {'--':<8} | {'--':<7} | {'--':<7} | {'--':<12} | {'--'}")
-        else:
-            for c in sorted_contacts:
-                reset = "\033[0m"
-                if isinstance(c, ICBM) and c.status in ["HOSTILE", "ENGAGING"]: color = "\033[41;97m" 
-                elif isinstance(c, TacticalBM) and c.status in ["HOSTILE", "ENGAGING"]: color = "\033[43;30m" 
-                else:
-                    if c.status == "UNIDENTIFIED": color = "\033[90m" 
-                    elif c.status == "IDENTIFYING": color = "\033[37m" 
-                    elif c.status == "FRIENDLY": color = "\033[94m" 
-                    elif c.status == "SUSPECT": color = "\033[33m" 
-                    elif c.status == "INTERCEPTING": color = "\033[95m" 
-                    elif c.status == "HOSTILE": color = "\033[91m" 
-                    elif c.status == "ENGAGING": color = "\033[91;1m" 
-                    else: color = reset
-                t_type = c.type_name if c.type_name != "UNKNOWN" else "???"
-                eta_str = f"{c.get_eta():.0f}" if c.get_eta() < 999 else "N/A"
-                score = c.calculate_threat_score() if c.status not in ["FRIENDLY", "UNIDENTIFIED", "IDENTIFYING"] else "---"
-                intercept_str = self.get_intercept_info(c)
-                
-                print(f" {color}{c.id_code:<16} | {score:<7} | {c.status:<12} | {t_type:<24} | {c.distance_km:>7.1f}   | {c.altitude_ft:>8} | {c.speed_mach:>7.1f} | {eta_str:>7} | {intercept_str:<12} | {c.detected_by}{reset}")
-
-        print("\n" + "="*width)
-        print(" 📻 TACTICAL LOG:")
-        for log in self.tactical_log: print(f"  > {log}")
-        print("="*width)
-
-    def run(self):
-        for _ in range(5): self.detect_airspace() 
-        while self.base_hp > 0:
-            self.tick_count += 1
-            self.detect_airspace()
-            self.process_reloads()
-            self.process_personnel()
-            self.process_engagements()
-            self.process_auto_ciws()
-            self.update_world()
-            self.display_dashboard()
-            time.sleep(1.0)
-            
-        print("\n\033[41;97m 💀 BASE DESTROYED! ALL SYSTEMS OFFLINE! 💀 \033[0m\n")
