@@ -186,7 +186,7 @@ def start_radar():
                     if event.key == pygame.K_1: wpn = 'THAAD'
                     elif event.key == pygame.K_2: wpn = 'SAM'
                     elif event.key == pygame.K_3: wpn = 'CIWS'
-                    elif event.key == pygame.K_4: wpn = 'JAS-39' 
+                    elif event.key == pygame.K_4: wpn = 'FIGHTER' 
                     
                     if wpn:
                         cmd.manual_override_fire(selected_contact, wpn)
@@ -520,7 +520,7 @@ def start_radar():
             target = getattr(eng, 'target', None)
             if not target or not target.active or not hasattr(eng, 'visible_dist'): continue
             
-            wpn_name = "JAS-39" if eng.weapon_name == "Interceptors" else eng.weapon_name
+            wpn_name = "FIGHTER" if eng.weapon_name == "Interceptors" else eng.weapon_name
             bearing = getattr(target, 'bearing', getattr(target, 'heading', 0))
             m_px = km_to_px(min(eng.visible_dist, RADAR_MAX_KM))
             mx = CX + m_px * math.sin(math.radians(bearing))
@@ -623,7 +623,7 @@ def start_radar():
             draw_status_box(armory_x + (i*100), top_bar_y + 25, 95, 20, wpn[:4], (150,150,150), str(amount), RADAR_COLOR)
             
         # Spawn controls instruction
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:JAS-39)" if selected_contact else "SPAWN: 5:ICBM 6:Jet 7:Drone 8:CIV 9:EW 0:AWACS W:Wave"
+        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else "SPAWN: 5:ICBM 6:Jet 7:Drone 8:CIV 9:EW 0:AWACS W:Wave"
         screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 50))
             
         # 4.2 Left Side: Active Operations (Track List)

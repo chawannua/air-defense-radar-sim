@@ -14,7 +14,7 @@ class GameConfig:
     WEAPON_SPEED_F16 = 3.5
 
     # --- โลจิสติกส์และเวลาบรรจุ (เพิ่มคูลดาวน์เพื่อสร้างช่วงโหว่ในการป้องกัน) ---
-    MAX_AMMO = {"THAAD": 8, "JAS-39": 15, "SAM": 50, "CIWS": 150}
+    MAX_AMMO = {"THAAD": 8, "FIGHTER": 15, "SAM": 50, "CIWS": 150}
     RELOAD_TIMES = {"THAAD": 60, "SAM": 25, "CIWS": 10} 
     
     # --- เวลาเตรียมยิง (เพิ่มเวลาตอบโต้ให้ช้าลง เพื่อให้ข้าศึกเข้าใกล้ฐานได้มากขึ้น) ---
@@ -22,7 +22,7 @@ class GameConfig:
     PREP_TIME_SAM = 12
     PREP_TIME_F16 = 10
 
-    # JAS-39 RTB times
+    # FIGHTER RTB times
     F16_RTB_TIME_KILL = 15         
     F16_RTB_TIME_ASSIST = 10       
 

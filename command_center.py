@@ -173,14 +173,14 @@ class CommandCenter:
                     self.ammo[wpn] = self.max_ammo[wpn]
                     self.add_log(f"\033[92m[LOGISTICS]\033[0m {wpn} fully reloaded and ready!")
 
-        # JAS-39 return to base (RTB) system
+        # FIGHTER return to base (RTB) system
         updated_rtb = []
         for rtb_time in self.returning_fighters:
             rtb_time -= 1
             if rtb_time <= 0:
-                if self.ammo["JAS-39"] < self.max_ammo["JAS-39"]:
-                    self.ammo["JAS-39"] += 1
-                    self.add_log(f"\033[94m[ATC] JAS-39 landed rearmed & refueled. Ready for tasking. (Standby: {self.ammo['JAS-39']})\033[0m")
+                if self.ammo["FIGHTER"] < self.max_ammo["FIGHTER"]:
+                    self.ammo["FIGHTER"] += 1
+                    self.add_log(f"\033[94m[ATC] FIGHTER landed rearmed & refueled. Ready for tasking. (Standby: {self.ammo['FIGHTER']})\033[0m")
             else:
                 updated_rtb.append(rtb_time)
         self.returning_fighters = updated_rtb
@@ -218,16 +218,21 @@ class CommandCenter:
         if wpn == "SAM" and alt > 100000:
             self.add_log(f"\033[91;1m[ERROR] {wpn} CANNOT REACH {alt} FT!\033[0m")
             return
-        if wpn == "Interceptors" and alt > 60000:
-            self.add_log(f"\033[91;1m[ERROR] JAS-39 CANNOT REACH {alt} FT!\033[0m")
+        if wpn == "FIGHTER" and alt > 60000:
+            self.add_log(f"\033[91;1m[ERROR] FIGHTER CANNOT REACH {alt} FT!\033[0m")
             return
             
         if self.ammo.get(wpn, 0) > 0:
             self.ammo[wpn] -= 1
+            
+            display_wpn = wpn
+            if wpn == "FIGHTER":
+                display_wpn = random.choice(["F-16AM Fighting Falcon", "JAS-39 Gripen", "F-5TH Super Tigris", "T-50TH Golden Eagle", "Alpha Jet"])
+                
             impact_time = max(1, int(target.distance_km / max(1, target.speed_mach * 2)))
-            self.active_engagements.append(Engagement(target, wpn, impact_time))
+            self.active_engagements.append(Engagement(target, display_wpn, impact_time))
             target.status = "ENGAGING"
-            self.add_log(f"\033[95m[MANUAL OVERRIDE]\033[0m Fired {wpn} at {target.id_code}")
+            self.add_log(f"\033[95m[MANUAL OVERRIDE]\033[0m SCRAMBLED {display_wpn} intercepting {target.id_code}")
         else:
             self.add_log(f"\033[91m[WARNING]\033[0m {wpn} Out of Ammo!")
 
@@ -267,9 +272,9 @@ class CommandCenter:
 
 
             if not eng.target.active: 
-                if eng.weapon_name == "Interceptors":
+                if eng.weapon_name not in ["THAAD", "SAM", "CIWS"]:
                     self.returning_fighters.append(GameConfig.F16_RTB_TIME_ASSIST)
-                    self.add_log(f"\033[94m[ATC] Target eliminated by other unit. JAS-39 returning to base (RTB).\033[0m")
+                    self.add_log(f"\033[94m[ATC] Target eliminated by other unit. {eng.weapon_name} returning to base (RTB).\033[0m")
                 continue 
             
             eng.time_to_impact -= 1
@@ -307,15 +312,15 @@ class CommandCenter:
                         eng.target.status = "HOSTILE"
                         self.add_log(f"\033[91;1m[MISS] SAM MISSED {eng.target.id_code}!\033[0m")
                 
-                elif eng.weapon_name == "Interceptors":
+                elif eng.weapon_name not in ["THAAD", "SAM", "CIWS"]: # Fighter Intercept
                     self.returning_fighters.append(GameConfig.F16_RTB_TIME_KILL) 
                     
                     scen = getattr(eng.target, 'scenario', None)
                     if scen in ["RADIO_FAIL", "STRAYED"]: 
                         eng.target.status = "CLEARED"; eng.target.active = False
-                        self.add_log(f"\033[94m[INTERCEPT]\033[0m {eng.target.id_code} complied. JAS-39 is RTB.\033[0m")
+                        self.add_log(f"\033[94m[INTERCEPT]\033[0m {eng.target.id_code} complied. {eng.weapon_name} is RTB.\033[0m")
                     else:
-                        # Kinematics for JAS-39 AMRAAMs
+                        # Kinematics for FIGHTER AMRAAMs
                         speed_penalty = max(0.0, (eng.target.speed_mach - 1.5) * 0.15)
                         final_hit_chance = max(0.10, GameConfig.HIT_CHANCE_F16 - speed_penalty)
                         
@@ -325,10 +330,10 @@ class CommandCenter:
                                 self.base_hp = 0
                                 self.add_log(f"\033[41;97m[CRITICAL INCIDENT] YOU SHOT DOWN A COMMERCIAL AIRLINER! COURT-MARTIAL IMMINENT!\033[0m")
                             else:
-                                self.add_log(f"\033[92m[KILL]\033[0m FOX-3! {eng.target.id_code} splashed by JAS-39! JAS-39 is RTB.\033[0m")
+                                self.add_log(f"\033[92m[KILL]\033[0m FOX-3! {eng.target.id_code} splashed by {eng.weapon_name}! {eng.weapon_name} is RTB.\033[0m")
                         else:
                             eng.target.status = "HOSTILE"
-                            self.add_log(f"\033[91;1m[MISS]\033[0m {eng.target.id_code} survived JAS-39 attack! JAS-39 is RTB.\033[0m")
+                            self.add_log(f"\033[91;1m[MISS]\033[0m {eng.target.id_code} survived {eng.weapon_name} attack! {eng.weapon_name} is RTB.\033[0m")
             else:
                 surviving_engagements.append(eng)
 
