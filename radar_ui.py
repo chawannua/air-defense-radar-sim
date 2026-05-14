@@ -84,9 +84,22 @@ def load_real_map():
     if not shapes_km:
         shapes_km = generate_map_shapes()
         
-    return shapes_km
+    peaks_data = [
+        (18.588, 98.487, "DOI INTHANON 8415FT"),
+        (8.544, 99.736, "KHAO LUANG 6024FT"),
+        (16.883, 101.783, "PHU KRADUENG 4301FT"),
+        (13.5, 99.3, "TENASSERIM 3500FT"),
+        (14.3, 102.0, "KHAO YAI 4400FT"),
+        (19.9, 99.0, "DOI PHA HOM POK 7500FT")
+    ]
+    peaks_km = []
+    for lat, lon, name in peaks_data:
+        x_km, y_km = latlon_to_km(lon, lat)
+        peaks_km.append((x_km, y_km, name))
+        
+    return shapes_km, peaks_km
 
-MAP_SHAPES_KM = load_real_map()
+MAP_SHAPES_KM, MAP_PEAKS_KM = load_real_map()
 
 def start_radar():
     pygame.init()
@@ -296,6 +309,13 @@ def start_radar():
                 # Beautiful Anti-Aliased Map Rendering with CRT Glow
                 pygame.draw.lines(screen, (0, 30, 10), True, pixel_points, 3) # Faint outer glow
                 pygame.draw.aalines(screen, (0, 140, 40), True, pixel_points) # Sharp inner anti-aliased line
+
+        # Draw Mountain Peaks (Elevation)
+        for x_km, y_km, p_name in MAP_PEAKS_KM:
+            px = CX + km_to_px(x_km)
+            py = CY - km_to_px(y_km)
+            pygame.draw.polygon(screen, (80, 100, 40), [(px, py - 4), (px - 4, py + 4), (px + 4, py + 4)], 1)
+            screen.blit(font_xs.render(p_name, True, (80, 100, 40)), (px + 6, py - 3))
 
         r_max = km_to_px(RADAR_MAX_KM)
         pygame.draw.line(screen, GRID_COLOR, (CX, CY - r_max), (CX, CY + r_max), 1)

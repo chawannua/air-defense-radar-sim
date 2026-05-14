@@ -91,16 +91,15 @@ class Aircraft(AirContact):
 
         if self.is_friendly:
             self.true_type = random.choice([
-                "Boeing 737", "Boeing 777", "Airbus A320", "Airbus A380", "Cessna 172", 
-                "JAS-39 VIP Escort", "C-130 Hercules"
+                "Thai Airways B777", "AirAsia A320", "Nok Air B737", "Bangkok Airways A319", "Cessna 172", 
+                "JAS-39 VIP Escort", "C-130H Hercules (RTAF)"
             ])
             self.scenario = "COMMERCIAL"
         else:
             combat_aircraft = [
-                "F-22 Raptor", "F-35 Lightning II", "Su-57 Felon", "J-20 Mighty Dragon", "FC-31 Gyrfalcon",
-                "Su-35 Flanker-E", "Su-27 Flanker", "MiG-31 Foxhound", "MiG-35 Fulcrum", 
-                "F-15E Strike Eagle", "Eurofighter Typhoon", "Dassault Rafale", "J-10 Vigorous Dragon",
-                "B-2 Spirit", "B-1B Lancer", "B-52 Stratofortress", "Tu-160 Blackjack", "Tu-95 Bear", "H-6K Badger"
+                "Su-30MKM Flanker", "MiG-29 Fulcrum", "J-10C Vigorous Dragon", "FC-1 Xiaolong",
+                "Su-27SK Flanker", "Su-35S Flanker-E", "F-16A/B Block 15", "Yak-130", 
+                "H-6K Badger", "Su-22M4 Fitter"
             ]
             
             ew_aircraft = [
@@ -130,8 +129,8 @@ class Aircraft(AirContact):
         self.id_code = f"{prefix}-{self.track_number}"
         self.callsign = f"{prefix}{random.randint(100, 999)}"
         if self.is_friendly:
-            self.departure = random.choice(["LHR", "JFK", "CDG", "FRA", "AMS", "DXB"])
-            self.destination = random.choice(["MAN", "EDI", "GLA", "ABZ", "NCL"])
+            self.departure = random.choice(["VTBS", "VTBD", "VTSP", "VTCC", "VTSG"]) # BKK, DMK, HKT, CNX, KBV
+            self.destination = random.choice(["WMKK", "VYYY", "VLVT", "VVDN", "WSSS"]) # KUL, RGN, VTE, DAD, SIN
 
 class Helicopter(AirContact):
     def __init__(self, track_number):
@@ -226,12 +225,12 @@ class Airliner(AirContact):
         self.heading = (self.bearing + random.choice([70, 90, 110, 250, 270, 290])) % 360
         
     def identify_target(self):
-        self.type_name = "BOEING 777" if self.rcs > 100 else "AIRBUS A320"
+        self.type_name = "THAI B777" if self.rcs > 100 else "AIRASIA A320"
         self.status = "FRIENDLY"
         self.id_code = f"FLIGHT-{self.track_number}"
-        self.callsign = f"JET{random.randint(100, 999)}"
-        self.departure = random.choice(["EGLL", "EGCC", "EGPH", "EGPF", "EGPD"])
-        self.destination = random.choice(["KJFK", "LFPG", "EHAM", "EDDF", "LEMD"])
+        self.callsign = f"TG{random.randint(100, 999)}" if self.rcs > 100 else f"FD{random.randint(100, 999)}"
+        self.departure = random.choice(["VTBS", "VTBD", "VTSP", "VTCC", "VTSG"])
+        self.destination = random.choice(["WMKK", "VYYY", "VLVT", "VVDN", "WSSS"])
 
     def move(self):
         # Cartesian movement so it flies across instead of towards center
