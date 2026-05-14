@@ -8,7 +8,7 @@ import re
 from command_center import CommandCenter
 from targets import AWACS
 
-# 🟢 [FIX] แก้ปัญหา Windows แอบซูมหน้าจอ และทำให้ Resolution พัง
+# Fix DPI scaling issues on Windows
 try:
     import ctypes
     ctypes.windll.user32.SetProcessDPIAware()
@@ -204,7 +204,7 @@ def start_radar():
             if event.type == pygame.QUIT:
                 running = False; sys.exit()
 
-            # 🟢 [RESIZE] ระบบลากขอบหน้าต่างอิสระ (Smooth Resize แบบ Roblox)
+            # Window resizing event
             if event.type == pygame.VIDEORESIZE:
                 if not is_fullscreen:
                     WIDTH, HEIGHT = event.w, event.h
@@ -215,7 +215,7 @@ def start_radar():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE: running = False; sys.exit()
                 
-                # 🟢 [FIRE] กดยิงเป้าหมายที่เลือก
+                # Fire weapon at selected target
                 if selected_contact:
                     wpn = None
                     if event.key == pygame.K_1: wpn = 'THAAD'
@@ -239,7 +239,7 @@ def start_radar():
                     elif event.key == pygame.K_9: cmd.manual_spawn("EW")
                     elif event.key == pygame.K_0: cmd.manual_spawn("AWACS")
                     elif event.key == pygame.K_w: cmd.manual_spawn("WAVE")
-                # 🟢 [FULLSCREEN] สลับโหมดแบบปลอดภัย ไม่ทำจอพัง
+                # Toggle fullscreen mode
                 if event.key == pygame.K_F11:
                     is_fullscreen = not is_fullscreen
                     if is_fullscreen:
@@ -253,7 +253,7 @@ def start_radar():
                     
                     RADAR_AREA = WIDTH
 
-                # 🟢 [RESTART] เริ่มเกมใหม่เมื่อฐานถูกทำลาย
+                # Restart game after base is destroyed
                 if event.key == pygame.K_r and cmd.base_hp <= 0:
                     cmd = CommandCenter()
                     selected_contact = None
@@ -264,7 +264,7 @@ def start_radar():
                 zoom_level += event.y * 0.15
                 zoom_level = max(0.2, min(10.0, zoom_level))
 
-            # 🟢 [CLICK] คลิกเมาส์เพื่อล็อคเป้าหมาย
+            # Handle mouse click for selection
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mx, my = event.pos
                 
@@ -310,7 +310,7 @@ def start_radar():
                             closest_c = c
                     selected_contact = closest_c
 
-        # 🟢 [PAN CAMERA] Smooth panning with WASD, Arrows, or Mouse Drag
+        # Smooth panning with WASD, Arrows, or Mouse Drag
         keys = pygame.key.get_pressed()
         pan_speed = 10
         if keys[pygame.K_LEFT] or keys[pygame.K_a]: camera_x += pan_speed
@@ -328,9 +328,7 @@ def start_radar():
 
         screen.fill(BG_COLOR)
 
-        # ===================================================
-        # 1. วาดกริดและ Weapon Engagement Zones (WEZ)
-        # ===================================================
+        # --- 1. Weapon Engagement Zones (WEZ) ---
         # Only display the Weapon Engagement Zones (WEZ)
         pygame.draw.circle(screen, (0, 30, 80), (CX, CY), int(km_to_px(400)), 1) # THAAD Optimal Range
         pygame.draw.circle(screen, (80, 80, 0), (CX, CY), int(km_to_px(200)), 1) # SAM Anti-Ballistic Range
@@ -375,9 +373,7 @@ def start_radar():
 
         r_max = km_to_px(RADAR_MAX_KM)
 
-        # ===================================================
-        # 2. จำลองการกวาดแบบ Rotary AESA (Mechanical + Electronic Steering)
-        # ===================================================
+        # --- 2. Rotary AESA Radar Sweep ---
         ew_active = any(getattr(c, 'is_heavy_ew', False) and c.active for c in cmd.contacts)
         
         if ew_active:
@@ -485,12 +481,12 @@ def start_radar():
 
         # --- Main Sweep Line (Mechanical Boresight) ---
         alpha = min(1.0, (current_time - LAST_TICK_TIME) / 1000.0)
-        # ยังคงเส้นหลักไว้เพื่อให้เห็นทิศทางการหมุนของจานเรดาร์
+        # Retain main mechanical boresight visual
         end_x = CX + r_max * math.sin(math.radians(sweep_angle))
         end_y = CY - r_max * math.cos(math.radians(sweep_angle))
         pygame.draw.line(screen, (150, 255, 180), (CX, CY), (end_x, end_y), 3)
 
-        # วาด Tail (เงาของเส้นกวาด) ให้ดูนวลขึ้น
+        # Draw fading sweep tail
         for i in range(1, 10):
             t_angle = (sweep_angle - (i * 3)) % 360
             t_alpha = 1.0 - (i / 10.0)
@@ -499,9 +495,7 @@ def start_radar():
             ty = CY - r_max * math.cos(math.radians(t_angle))
             pygame.draw.line(screen, t_color, (CX, CY), (tx, ty), 2)
 
-        # ===================================================
-        # 3. วาดเป้าหมาย & Electronic Warfare (Jamming)
-        # ===================================================
+        # --- 3. Contacts & Electronic Warfare Jamming ---
         ew_aircrafts = [c for c in cmd.contacts if c.active and getattr(c, 'status', '') == 'HOSTILE' and "EW" in getattr(c, 'type_name', '')]
 
         # --- Draw Realistic Jamming Strobes (Sector Jamming) ---
@@ -610,9 +604,7 @@ def start_radar():
 
         # (Removed Heavy EW Quadrant Logic for realism)
 
-        # ===================================================
-        # 3.8 Flight Info Panel (On Radar Display)
-        # ===================================================
+        # --- Flight Info Panel ---
         if selected_contact:
             c = selected_contact
             panel_x, panel_y = 20, 120
@@ -649,9 +641,7 @@ def start_radar():
                 screen.blit(font_sm.render(lbl, True, (255, 255, 255)), (bx + 8, btn_y + 3))
 
 
-        # ===================================================
-        # 4. Floating UI Overlays (Air Defender Style)
-        # ===================================================
+        # --- 4. HUD Overlays ---
         
         # 4.1 Top Center Status Bar
         top_bar_w = 600

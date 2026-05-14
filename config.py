@@ -1,5 +1,6 @@
 # config.py
 class GameConfig:
+    # Real-world RTAF airbase positions in relative km from Bangkok (center of map)
     AIRBASES = [
         (150, 100, "Wing 1 (Korat)"),
         (0, 150, "Wing 4 (Takhli)"),
@@ -7,39 +8,40 @@ class GameConfig:
         (250, 180, "Wing 21 (Ubon)"),
         (180, 280, "Wing 23 (Udon)")
     ]
-    # --- อัตราความแม่นยำ (Nerfed: ปรับลดลงเพื่อให้ข้าศึกมีโอกาสหลุดมาโจมตีฐานได้มากขึ้น) ---
-    HIT_CHANCE_THAAD = 0.35        
-    HIT_CHANCE_SAM_NUKE = 0.10     
-    HIT_CHANCE_SAM_TBM = 0.15      
-    HIT_CHANCE_SAM_NORMAL = 0.40   
-    HIT_CHANCE_F16 = 0.45          
-    HIT_CHANCE_CIWS = 0.30         
 
-    # --- ความเร็วอาวุธ (Mach/Tick) ---
+    # Hit probabilities - tuned so enemies occasionally punch through
+    HIT_CHANCE_THAAD = 0.35
+    HIT_CHANCE_SAM_NUKE = 0.10
+    HIT_CHANCE_SAM_TBM = 0.15
+    HIT_CHANCE_SAM_NORMAL = 0.40
+    HIT_CHANCE_F16 = 0.45
+    HIT_CHANCE_CIWS = 0.30
+
+    # Weapon speeds (km/tick)
     WEAPON_SPEED_THAAD = 30.0
     WEAPON_SPEED_SAM = 12.0
     WEAPON_SPEED_F16 = 3.5
 
-    # --- โลจิสติกส์และเวลาบรรจุ (เพิ่มคูลดาวน์เพื่อสร้างช่วงโหว่ในการป้องกัน) ---
+    # Inventory and reload times
     MAX_AMMO = {"THAAD": 8, "FIGHTER": 15, "SAM": 50, "CIWS": 150}
-    RELOAD_TIMES = {"THAAD": 60, "SAM": 25, "CIWS": 10} 
-    
-    # --- เวลาเตรียมยิง (เพิ่มเวลาตอบโต้ให้ช้าลง เพื่อให้ข้าศึกเข้าใกล้ฐานได้มากขึ้น) ---
+    RELOAD_TIMES = {"THAAD": 60, "SAM": 25, "CIWS": 10}
+
+    # Weapon preparation times (ticks)
     PREP_TIME_THAAD = 20
     PREP_TIME_SAM = 12
     PREP_TIME_F16 = 10
 
-    # FIGHTER RTB times
-    F16_RTB_TIME_KILL = 15         
-    F16_RTB_TIME_ASSIST = 10       
+    # Fighter RTB times after engagement (ticks)
+    F16_RTB_TIME_KILL = 15
+    F16_RTB_TIME_ASSIST = 10
 
-    # --- ค่าความเสียหายต่อฐาน (Base HP Damage) ---
+    # Damage values per contact type reaching the base
     DAMAGE_AIRCRAFT = 10
     DAMAGE_BOMBER = 15
     DAMAGE_TBM = 25
-    DAMAGE_ICBM = 80               # เกือบ One-shot kill
+    DAMAGE_ICBM = 80
 
-    # Massive Wave Settings
+    # Massive wave settings
     WAVE_CHANCE = 0.20
     WAVE_COOLDOWN_INITIAL = 120
     WAVE_COOLDOWN_AFTER = 180

@@ -35,7 +35,7 @@ class AirContact(ABC):
         self.destination = "UNKNOWN"
         self.detected_by = "UNKNOWN"
         
-        # 🟢 เพิ่มคุณสมบัติจอมกวนสัญญาณระดับหนัก
+        # Set heavy EW capability
         self.is_heavy_ew = False
 
     @abstractmethod
@@ -98,7 +98,7 @@ class Aircraft(AirContact):
         self.altitude_ft = random.randint(15000, 45000)
         self.rcs = random.uniform(0.1, 10.0)
         
-        # 🟢 ปรับเรทเกิดใหม่: พลเรือน (Commercial) 70%, ข้าศึก 30%
+        # Adjust civilian to hostile spawn ratio
         self.is_friendly = random.choices([True, False], weights=[80, 20], k=1)[0]
         self.has_transponder = self.is_friendly
 
@@ -122,9 +122,9 @@ class Aircraft(AirContact):
                 "Saab 340 AEW&C", "A-50 Mainstay AWACS", "KJ-500 AWACS"
             ]
             
-            # โอกาส 35% เป็น EW (จาก 30% ของข้าศึกทั้งหมด)
+            # 30% chance the hostile aircraft is an EW platform; 20% of those are EA-18G Growlers
             if random.randint(1, 100) <= 30:
-                # โอกาส 10% ของกลุ่ม EW ที่จะเป็นบอสใหญ่ EA-18G
+                # 20% chance of being the heavy EW boss: EA-18G Growler
                 if random.randint(1, 100) <= 20:
                     self.true_type = "EA-18G Growler (HEAVY EW)"
                     self.is_heavy_ew = True 

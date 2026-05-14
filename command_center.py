@@ -64,7 +64,7 @@ class CommandCenter:
                 ["MIXED", "BALLISTIC_RAIN", "DRONE_SWARM", "FIGHTER_STRIKE"], 
                 weights=[40, 20, 20, 20], k=1)[0]
                 
-            # ประกาศแบบทางการทหาร
+            # Log appropriate tactical warning per wave type
             if wave_theme == "MIXED":
                 self.add_log("\033[41;97m[TACTICAL WARNING] 🚨 MULTIPLE HOSTILE CONTACTS INBOUND. BATTLE STATIONS. 🚨\033[0m")
             elif wave_theme == "BALLISTIC_RAIN":
@@ -77,17 +77,17 @@ class CommandCenter:
             for _ in range(wave_size):
                 self.track_counter += 1
                 
-                # ตัด Decoy ออกทั้งหมด
+                # Pick threat type based on wave theme
                 if wave_theme == "BALLISTIC_RAIN":
                     threat_type = random.choices(["ICBM", "TBM"], weights=[10, 90], k=1)[0]
                 elif wave_theme == "DRONE_SWARM":
                     threat_type = "DRONE"
                 elif wave_theme == "FIGHTER_STRIKE":
-                    threat_type = "FIGHTER" # เครื่องบินรบล้วน
+                    threat_type = "FIGHTER"
                 else: 
                     threat_type = random.choices(
                         ["ICBM", "TBM", "DRONE", "FIGHTER", "HELI"], 
-                        weights=[5, 20, 30, 30, 15], k=1)[0] # ปรับน้ำหนักใหม่
+                        weights=[5, 20, 30, 30, 15], k=1)[0]
                 
                 if threat_type == "ICBM": 
                     new_contact = ICBM(self.track_counter); new_contact.detected_by = "SPACE-COM"
@@ -110,7 +110,7 @@ class CommandCenter:
             elif prob < 0.1: new_contact = TacticalBM(self.track_counter); new_contact.detected_by = "GND-EWR"  
             elif prob < 0.15: new_contact = Drone(self.track_counter); new_contact.detected_by = "AWACS"    
             elif prob < 0.18: new_contact = Helicopter(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
-            elif prob < 0.25: new_contact = Airliner(self.track_counter); new_contact.detected_by = "GND-RADAR" # 7% chance for airliner
+            elif prob < 0.25: new_contact = Airliner(self.track_counter); new_contact.detected_by = "GND-RADAR"
             else: new_contact = Aircraft(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"]) 
             self.unseen_contacts.append(new_contact)
             
