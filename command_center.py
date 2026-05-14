@@ -122,13 +122,16 @@ class CommandCenter:
             self.unseen_contacts.append(ghost)
 
         # EW Glitch Mechanics (Floods radar with false targets)
+        # Ghost tracks go directly into contacts — they're injected radar returns, not real aircraft
         ew_active = any(getattr(c, 'is_heavy_ew', False) and c.active for c in self.contacts)
-        if ew_active and random.random() < 0.4: # 40% chance per tick to spawn false ghosts
-            for _ in range(random.randint(2, 6)): # Flood the screen
+        if ew_active and random.random() < 0.4:
+            for _ in range(random.randint(3, 8)):
                 self.track_counter += 1
                 ghost = EWGhostTrack(self.track_counter)
-                ghost.detected_by = "GND-RADAR"
-                self.unseen_contacts.append(ghost)
+                ghost.detected_by = "EW-INJECT"
+                ghost.brightness = 1.0
+                ghost.visible_dist = ghost.distance_km
+                self.contacts.append(ghost)
 
     def process_reloads(self):
         # --- Base Defense Logistics ---
@@ -461,6 +464,8 @@ class CommandCenter:
 
                 if c.distance_km <= 0:
                     c.active = False
+                    if isinstance(c, EWGhostTrack):
+                        continue  # False target, no damage
                     if c.status == "FRIENDLY": 
                         self.add_log(f"\033[94m[TRAFFIC] {c.id_code} safely passed through airspace.\033[0m")
                     elif c.status in ["HOSTILE", "ENGAGING", "UNIDENTIFIED", "IDENTIFYING", "SUSPECT", "INTERCEPTING"]:

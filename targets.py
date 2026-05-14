@@ -247,15 +247,19 @@ class Airliner(AirContact):
 
     def move(self):
         # Cartesian movement so it flies across instead of towards center
+        self.prev_x_km = self.x_km
+        self.prev_y_km = self.y_km
         speed_per_tick = self.speed_mach * 1.0
-        x = self.distance_km * math.sin(math.radians(self.bearing))
-        y = -self.distance_km * math.cos(math.radians(self.bearing))
+        x = self.x_km
+        y = self.y_km
         
         x += speed_per_tick * math.sin(math.radians(self.heading))
-        y -= speed_per_tick * math.cos(math.radians(self.heading))
+        y += speed_per_tick * math.cos(math.radians(self.heading))
         
+        self.x_km = x
+        self.y_km = y
         self.distance_km = math.sqrt(x*x + y*y)
-        self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
+        self.bearing = (math.degrees(math.atan2(x, y)) + 360) % 360
         
         if self.distance_km > 1000:
             self.active = False
@@ -291,7 +295,7 @@ class AWACS(AirContact):
         self.x_km = self.home_x
         self.y_km = self.home_y
         self.distance_km = math.hypot(self.x_km, self.y_km)
-        self.bearing = (math.degrees(math.atan2(self.x_km, -self.y_km)) + 360) % 360
+        self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
         
     def identify_target(self):
         self.type_name = self.true_type
@@ -305,7 +309,7 @@ class AWACS(AirContact):
         self.x_km = x
         self.y_km = y
         self.distance_km = math.hypot(x, y)
-        self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
+        self.bearing = (math.degrees(math.atan2(x, y)) + 360) % 360
 
     def move(self):
         self.prev_x_km = self.x_km
@@ -376,7 +380,7 @@ class CAPFighter(AirContact):
         self.x_km = self.home_x
         self.y_km = self.home_y
         self.distance_km = math.hypot(self.x_km, self.y_km)
-        self.bearing = (math.degrees(math.atan2(self.x_km, -self.y_km)) + 360) % 360
+        self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
         
     def identify_target(self):
         self.type_name = self.true_type
@@ -389,7 +393,7 @@ class CAPFighter(AirContact):
         self.x_km = x
         self.y_km = y
         self.distance_km = math.hypot(x, y)
-        self.bearing = (math.degrees(math.atan2(x, -y)) + 360) % 360
+        self.bearing = (math.degrees(math.atan2(x, y)) + 360) % 360
 
     def move(self):
         self.prev_x_km = self.x_km
