@@ -2,12 +2,21 @@
 class GameConfig:
     # Real-world RTAF airbase positions in relative km from Bangkok (center of map)
     AIRBASES = [
-        (150, 100, "Wing 1 (Korat)", "F-16A/B ADF"),
-        (0, 150, "Wing 4 (Takhli)", "F-16AM Fighting Falcon"),
-        (20, -350, "Wing 7 (Surat Thani)", "JAS-39C Gripen"),
-        (250, 180, "Wing 21 (Ubon)", "F-5TH Super Tigris"),
-        (180, 280, "Wing 23 (Udon)", "Alpha Jet")
+        (150, 100, "Wing 1 (Korat)"),
+        (0, 150, "Wing 4 (Takhli)"),
+        (20, -350, "Wing 7 (Surat Thani)"),
+        (250, 180, "Wing 21 (Ubon)"),
+        (180, 280, "Wing 23 (Udon)")
     ]
+
+    # aircraft assigned to each wing (real RTAF inventory)
+    WING_AIRCRAFT = {
+        "Wing 1 (Korat)":        ["F-16A Block 15 OCU", "F-16B Block 15 OCU"],
+        "Wing 4 (Takhli)":       ["F-16A Block 15 ADF", "F-16B Block 15 ADF"],
+        "Wing 7 (Surat Thani)":  ["JAS-39C Gripen", "JAS-39D Gripen"],
+        "Wing 21 (Ubon)":        ["F-16A Block 15 OCU", "F-16B Block 15 OCU"],
+        "Wing 23 (Udon)":        ["Alpha Jet", "T-50TH Golden Eagle"],
+    }
 
     # Hit probabilities - tuned so enemies occasionally punch through
     HIT_CHANCE_THAAD = 0.35

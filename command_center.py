@@ -4,7 +4,7 @@ import random
 import os
 from config import GameConfig
 from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, GhostTrack, EWGhostTrack, Airliner, AWACS, CAPFighter
-from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement, get_closest_airbase
+from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement, get_closest_airbase, get_wing_aircraft
 import math
 
 class CommandCenter:
@@ -306,8 +306,8 @@ class CommandCenter:
             display_wpn = wpn
             bx, by = 0.0, 0.0
             if wpn == "FIGHTER":
-                display_wpn = random.choice(["F-16AM Fighting Falcon", "JAS-39 Gripen", "F-5TH Super Tigris", "T-50TH Golden Eagle", "Alpha Jet"])
                 bx, by, bname = get_closest_airbase(target)
+                display_wpn = get_wing_aircraft(bname)
                 
             dist_from_origin = math.hypot(target.x_km - bx, target.y_km - by)
             weapon_speed = GameConfig.WEAPON_SPEED_F16 if wpn == "FIGHTER" else GameConfig.WEAPON_SPEED_SAM
