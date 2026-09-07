@@ -118,7 +118,13 @@ Defend the base by intercepting hostile contacts before they reach distance zero
 
 ---
 
-## Controls
+## Quick Start
+
+Download the latest standalone executable (`AEGIS_Radar.exe`) from the [GitHub Releases](https://github.com/chawannua/air-defense-radar-sim/releases) page. No Python installation is required.
+
+---
+
+## Tactical Keybindings
 
 ### Engagement Controls (requires a selected contact)
 

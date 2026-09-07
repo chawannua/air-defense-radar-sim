@@ -3,6 +3,8 @@ import random
 import math
 from abc import ABC, abstractmethod
 
+MACH_TO_KM_PER_SEC = 0.3403
+
 class AirContact(ABC):
     def __init__(self, track_number, distance_km):
         self.track_number = track_number
@@ -63,7 +65,7 @@ class AirContact(ABC):
         return True
 
     def get_eta(self):
-        speed_per_tick = self.speed_mach * 1.0 
+        speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC 
         return self.distance_km / speed_per_tick if speed_per_tick > 0 else 999
 
     def calculate_threat_score(self):
@@ -83,7 +85,7 @@ class AirContact(ABC):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
         
-        speed_per_tick = self.speed_mach * 1.0
+        speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC
         self.distance_km -= speed_per_tick
         if self.distance_km < 0:
             self.distance_km = 0
@@ -249,7 +251,7 @@ class Airliner(AirContact):
         # Cartesian movement so it flies across instead of towards center
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
-        speed_per_tick = self.speed_mach * 1.0
+        speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC
         x = self.x_km
         y = self.y_km
         
@@ -261,7 +263,7 @@ class Airliner(AirContact):
         self.distance_km = math.sqrt(x*x + y*y)
         self.bearing = (math.degrees(math.atan2(x, y)) + 360) % 360
         
-        if self.distance_km > 1000:
+        if self.distance_km > 1200:
             self.active = False
             
     def calculate_threat_score(self):
@@ -314,7 +316,7 @@ class AWACS(AirContact):
     def move(self):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
-        speed_per_tick = self.speed_mach * 1.0
+        speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC
         x, y = self.x_km, self.y_km
         
         if self.state == "TRANSIT_TO_STATION":
@@ -398,7 +400,7 @@ class CAPFighter(AirContact):
     def move(self):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
-        speed_per_tick = self.speed_mach * 1.5
+        speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC * 1.5
         x, y = self.x_km, self.y_km
         
         if self.state == "TRANSIT_TO_STATION":
