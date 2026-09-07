@@ -1,4 +1,13 @@
+<div align="center">
+
 # AEGIS Radar — RTAF Tactical Air Defense Simulator
+
+[![GitHub Release](https://img.shields.io/github/v/release/chawannua/air-defense-radar-sim?style=for-the-badge&logo=github&color=2196F3)](https://github.com/chawannua/air-defense-radar-sim/releases/latest)
+[![Windows Download](https://img.shields.io/badge/Download-AEGIS__Radar.exe-success?style=for-the-badge&logo=windows&color=0078D6)](https://github.com/chawannua/air-defense-radar-sim/releases/download/v1.0.0/AEGIS_Radar.exe)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Pygame](https://img.shields.io/badge/Pygame-2.0+-FF6F00?style=for-the-badge&logo=python&logoColor=white)](https://pygame.org)
+
+</div>
 
 A real-time air defense Command-and-Control (C2) simulator built with Python and Pygame. The player assumes the role of a tactical air defense commander for the Royal Thai Air Force (RTAF), responsible for monitoring the national airspace, identifying radar contacts, authorizing weapon engagements, and defending the base against escalating waves of hostile threats.
 
@@ -176,8 +185,10 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Pre-built Executable
-A compiled Windows executable (`AEGIS_Radar.exe`) is included in the repository. No Python installation is required to run it.
+### Pre-built Executable (Windows)
+A standalone pre-compiled executable (`AEGIS_Radar.exe`) is published on [GitHub Releases](https://github.com/chawannua/air-defense-radar-sim/releases/latest). No Python installation or setup is required:
+1. Download **[`AEGIS_Radar.exe`](https://github.com/chawannua/air-defense-radar-sim/releases/download/v1.0.0/AEGIS_Radar.exe)** (Release v1.0.0).
+2. Double-click `AEGIS_Radar.exe` to start the simulation immediately.
 
 ### Building the Executable
 To recompile the standalone executable using PyInstaller:
