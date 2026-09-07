@@ -15,3 +15,12 @@ venv/
 .pytest_cache/
 .DS_Store
 Thumbs.db
+dist/
+build/
+*.spec
+AEGIS_Radar.exe
+full_log.txt
+*.log
+__pycache__/
+*.pyc
+.env
