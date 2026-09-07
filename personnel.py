@@ -3,7 +3,7 @@ import random
 import heapq
 import math
 from config import GameConfig
-from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft
+from targets import ICBM, TacticalBM, Drone, Helicopter, Aircraft, AntiRadiationMissile, CruiseMissile
 
 class ThreatQueue:
     def __init__(self):
@@ -40,12 +40,14 @@ def get_wing_aircraft(wing_name):
     return "F-16A Block 15 OCU"
 
 class Engagement:
-    def __init__(self, target, weapon_name, time_to_impact, origin_x=0.0, origin_y=0.0):
+    def __init__(self, target, weapon_name, time_to_impact, origin_x=0.0, origin_y=0.0, salvo_count=1, salvo_mode="SINGLE"):
         self.target = target
         self.weapon_name = weapon_name
         self.time_to_impact = time_to_impact
         self.origin_x_km = origin_x
         self.origin_y_km = origin_y
+        self.salvo_count = salvo_count
+        self.salvo_mode = salvo_mode
 
 class RadarOperator:
     def __init__(self, name):
@@ -95,30 +97,57 @@ class WeaponOfficer:
         if target.status == "SUSPECT": target.status = "INTERCEPTING"; return f"\033[95m[WEAPON]\033[0m Scramble ordered for: {target.id_code}..."
         else: target.status = "ENGAGING"; return f"\033[93m[WEAPON]\033[0m Target Locked: {target.id_code}. Authorizing launch sequence..."
 
-    def tick(self, ammo):
+    def tick(self, ammo, salvo_mode="SINGLE"):
         if self.is_busy:
             self.timer -= 1
             if self.timer <= 0:
                 self.is_busy = False; target = self.current_task; self.current_task = None
                 if not target.active: return None
                 
-                if isinstance(target, (ICBM, TacticalBM)):
+                needed_salvo = 2 if salvo_mode == "RIPPLE" else (3 if salvo_mode == "SALVO" else 1)
+                
+                if isinstance(target, (ICBM, TacticalBM, AntiRadiationMissile)):
                     if ammo["THAAD"] > 0:
                         weapon, prep_time = "THAAD", GameConfig.PREP_TIME_THAAD
-                        ammo["THAAD"] -= 1
+                        count = min(needed_salvo, ammo["THAAD"])
+                        ammo["THAAD"] -= count
                         # Head-on intercept physics
                         closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_THAAD
                         impact_time = int(target.distance_km / closure_rate) + prep_time
-                        return f"\033[41;97m[LAUNCH]\033[0m FIRING THAAD AT {target.id_code}! ({ammo['THAAD']} left)", Engagement(target, weapon, impact_time)
+                        salvo_str = f" ({salvo_mode} x{count})" if count > 1 else ""
+                        return f"\033[41;97m[LAUNCH]\033[0m FIRING THAAD{salvo_str} AT {target.id_code}! ({ammo['THAAD']} left)", Engagement(target, weapon, impact_time, salvo_count=count, salvo_mode=salvo_mode)
                     elif ammo["SAM"] > 0 and target.distance_km <= 200:
                         weapon, prep_time = "SAM", GameConfig.PREP_TIME_SAM
-                        ammo["SAM"] -= 1
+                        count = min(needed_salvo, ammo["SAM"])
+                        ammo["SAM"] -= count
                         closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_SAM
                         impact_time = int(target.distance_km / closure_rate) + prep_time
-                        return f"\033[43;30m[LAUNCH]\033[0m DESPERATE MEASURE! FIRING SAM AT BALLISTIC TARGET {target.id_code}! ({ammo['SAM']} left)", Engagement(target, weapon, impact_time)
+                        salvo_str = f" ({salvo_mode} x{count})" if count > 1 else ""
+                        return f"\033[43;30m[LAUNCH]\033[0m DESPERATE MEASURE! FIRING SAM{salvo_str} AT HIGH-SPEED TARGET {target.id_code}! ({ammo['SAM']} left)", Engagement(target, weapon, impact_time, salvo_count=count, salvo_mode=salvo_mode)
                     else:
                         target.status = "HOSTILE"; return f"\033[41;93m[WEAPON] OUT OF OPTIONS FOR {target.id_code}!\033[0m", None
                         
+                elif isinstance(target, CruiseMissile):
+                    if target.distance_km > 60 and ammo["FIGHTER"] > 0:
+                        bx, by, bname = get_closest_airbase(target)
+                        fighter_type = get_wing_aircraft(bname)
+                        weapon, prep_time = fighter_type, GameConfig.PREP_TIME_F16
+                        ammo["FIGHTER"] -= 1
+                        dist_from_base = math.hypot(target.x_km - bx, target.y_km - by)
+                        closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_F16
+                        impact_time = int(dist_from_base / closure_rate) + prep_time
+                        return f"\033[95m[LAUNCH]\033[0m SCRAMBLE! {fighter_type} launched from {bname} intercepting low cruise missile {target.id_code}.", Engagement(target, weapon, impact_time, bx, by)
+                    elif ammo["SAM"] > 0:
+                        weapon, prep_time = "SAM", GameConfig.PREP_TIME_SAM
+                        count = min(needed_salvo, ammo["SAM"])
+                        ammo["SAM"] -= count
+                        closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_SAM
+                        impact_time = int(target.distance_km / closure_rate) + prep_time
+                        salvo_str = f" ({salvo_mode} x{count})" if count > 1 else ""
+                        return f"\033[95m[LAUNCH]\033[0m Firing SAM{salvo_str} at cruise missile {target.id_code}. ({ammo['SAM']} left)", Engagement(target, weapon, impact_time, 0, 0, salvo_count=count, salvo_mode=salvo_mode)
+                    else:
+                        target.status = "HOSTILE"; return f"\033[91m[WEAPON] SAM RELOADING! Cruise missile {target.id_code} slipping through!\033[0m", None
+
                 elif isinstance(target, (Drone, Helicopter)):
                     if target.distance_km > 50 and ammo["FIGHTER"] > 0:
                         bx, by, bname = get_closest_airbase(target)
@@ -132,10 +161,12 @@ class WeaponOfficer:
                         return f"\033[95m[LAUNCH]\033[0m SCRAMBLE! {fighter_type} launched from {bname} intercepting {target.id_code}.", Engagement(target, weapon, impact_time, bx, by)
                     elif ammo["SAM"] > 0:
                         weapon, prep_time = "SAM", GameConfig.PREP_TIME_SAM
-                        ammo["SAM"] -= 1
+                        count = min(needed_salvo, ammo["SAM"])
+                        ammo["SAM"] -= count
                         closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_SAM
                         impact_time = int(target.distance_km / closure_rate) + prep_time
-                        return f"\033[95m[LAUNCH]\033[0m Firing SAM at {target.id_code}. ({ammo['SAM']} left)", Engagement(target, weapon, impact_time, 0, 0)
+                        salvo_str = f" ({salvo_mode} x{count})" if count > 1 else ""
+                        return f"\033[95m[LAUNCH]\033[0m Firing SAM{salvo_str} at {target.id_code}. ({ammo['SAM']} left)", Engagement(target, weapon, impact_time, 0, 0, salvo_count=count, salvo_mode=salvo_mode)
                     else:
                         target.status = "HOSTILE"; return f"\033[91m[WEAPON] SAM RELOADING! {target.id_code} slipping through!\033[0m", None
                 
@@ -155,10 +186,12 @@ class WeaponOfficer:
                     else:
                         if ammo["SAM"] > 0:
                             weapon, prep_time = "SAM", GameConfig.PREP_TIME_SAM
-                            ammo["SAM"] -= 1
+                            count = min(needed_salvo, ammo["SAM"])
+                            ammo["SAM"] -= count
                             closure_rate = target.speed_mach + GameConfig.WEAPON_SPEED_SAM
                             impact_time = int(target.distance_km / closure_rate) + prep_time
-                            return f"\033[93m[LAUNCH]\033[0m LETHAL RANGE! Firing SAM at {target.id_code} ({ammo['SAM']} left)", Engagement(target, weapon, impact_time)
+                            salvo_str = f" ({salvo_mode} x{count})" if count > 1 else ""
+                            return f"\033[93m[LAUNCH]\033[0m LETHAL RANGE! Firing SAM{salvo_str} at {target.id_code} ({ammo['SAM']} left)", Engagement(target, weapon, impact_time, salvo_count=count, salvo_mode=salvo_mode)
                         else:
                             target.status = "HOSTILE"; return f"\033[91m[WEAPON] SAM RELOADING! Brace for impact!\033[0m", None
         return None

@@ -1,5 +1,7 @@
 # config.py
 class GameConfig:
+    VERSION = "1.1.0"
+
     # Real-world RTAF airbase positions in relative km from Bangkok (center of map)
     AIRBASES = [
         (150, 100, "Wing 1 (Korat)"),
@@ -49,6 +51,18 @@ class GameConfig:
     DAMAGE_BOMBER = 15
     DAMAGE_TBM = 25
     DAMAGE_ICBM = 80
+    DAMAGE_ARM = 35
+    DAMAGE_CRUISE = 25
+
+    # Mountain peaks for terrain masking (x_km, y_km, altitude_ft, name)
+    MOUNTAIN_PEAKS = [
+        (-217.9, 534.3, 8415, "DOI INTHANON 8415FT"),
+        (-82.8, -576.3, 6024, "KHAO LUANG 6024FT"),
+        (138.5, 345.7, 4301, "PHU KRADUENG 4301FT"),
+        (-129.9, -28.3, 3500, "TENASSERIM 3500FT"),
+        (162.0, 60.1, 4400, "KHAO YAI 4400FT"),
+        (-162.4, 679.3, 7500, "DOI PHA HOM POK 7500FT")
+    ]
 
     # Massive wave settings
     WAVE_CHANCE = 0.20

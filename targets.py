@@ -2,6 +2,7 @@
 import random
 import math
 from abc import ABC, abstractmethod
+from config import GameConfig
 
 MACH_TO_KM_PER_SEC = 0.3403
 
@@ -81,7 +82,7 @@ class AirContact(ABC):
         if self.rcs < 1.0: score += 200 
         return score
 
-    def move(self):
+    def move(self, *args, **kwargs):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
         
@@ -247,7 +248,7 @@ class Airliner(AirContact):
         self.departure = random.choice(["VTBS", "VTBD", "VTSP", "VTCC", "VTSG"])
         self.destination = random.choice(["WMKK", "VYYY", "VLVT", "VVDN", "WSSS"])
 
-    def move(self):
+    def move(self, *args, **kwargs):
         # Cartesian movement so it flies across instead of towards center
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
@@ -313,7 +314,7 @@ class AWACS(AirContact):
         self.distance_km = math.hypot(x, y)
         self.bearing = (math.degrees(math.atan2(x, y)) + 360) % 360
 
-    def move(self):
+    def move(self, *args, **kwargs):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
         speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC
@@ -397,7 +398,7 @@ class CAPFighter(AirContact):
         self.distance_km = math.hypot(x, y)
         self.bearing = (math.degrees(math.atan2(x, y)) + 360) % 360
 
-    def move(self):
+    def move(self, *args, **kwargs):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
         speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC * 1.5
@@ -452,8 +453,8 @@ class GhostTrack(AirContact):
         self.active = False
         self.id_code = f"GHOST-{self.track_number}"
 
-    def move(self):
-        super().move()
+    def move(self, *args, **kwargs):
+        super().move(*args, **kwargs)
         self.lifespan -= 1
         if self.lifespan <= 0:
             self.active = False # Ghost vanishes from scope
@@ -482,8 +483,8 @@ class EWGhostTrack(AirContact):
         self.active = False
         self.id_code = f"GHOST-{self.track_number}"
 
-    def move(self):
-        super().move()
+    def move(self, *args, **kwargs):
+        super().move(*args, **kwargs)
         self.lifespan -= 1
         # Erratic movement
         if random.random() < 0.3:
@@ -491,3 +492,247 @@ class EWGhostTrack(AirContact):
             self.heading = (self.bearing + 180) % 360
         if self.lifespan <= 0:
             self.active = False
+
+
+def is_line_of_sight_masked(x, y, target_alt_ft, peaks=None):
+    """
+    Checks if line-of-sight from radar origin (0, 0) to (x, y) passes
+    within 25km of any mountain peak taller than target_alt_ft.
+    """
+    if peaks is None:
+        peaks = getattr(GameConfig, 'MOUNTAIN_PEAKS', [
+            (-217.9, 534.3, 8415, "DOI INTHANON 8415FT"),
+            (-82.8, -576.3, 6024, "KHAO LUANG 6024FT"),
+            (138.5, 345.7, 4301, "PHU KRADUENG 4301FT"),
+            (-129.9, -28.3, 3500, "TENASSERIM 3500FT"),
+            (162.0, 60.1, 4400, "KHAO YAI 4400FT"),
+            (-162.4, 679.3, 7500, "DOI PHA HOM POK 7500FT")
+        ])
+
+    line_len_sq = x * x + y * y
+    if line_len_sq < 1e-6:
+        return False
+
+    for peak in peaks:
+        px, py, peak_alt = peak[0], peak[1], peak[2]
+        if peak_alt > target_alt_ft:
+            t = (px * x + py * y) / line_len_sq
+            if 0.0 <= t <= 1.0:
+                closest_x = t * x
+                closest_y = t * y
+                dist = math.hypot(px - closest_x, py - closest_y)
+                if dist <= 25.0:
+                    return True
+    return False
+
+
+class AntiRadiationMissile(AirContact):
+    def __init__(self, track_number, distance_km=None):
+        if distance_km is None:
+            distance_km = random.randint(350, 650)
+        super().__init__(track_number, distance_km)
+        self.speed_mach = random.uniform(3.5, 4.5)
+        self.altitude_ft = random.randint(18000, 35000)
+        self.rcs = random.uniform(0.05, 0.15)
+        self.is_friendly = False
+        self.has_transponder = False
+        self.true_type = random.choice([
+            "Kh-31P Krypton (ARM)", "AGM-88 HARM (ARM)", "LD-10 ARM", "YJ-91 ARM"
+        ])
+        self.scenario = "SEAD"
+        self.seeker_locked = True
+        self.target_x = 0.0
+        self.target_y = 0.0
+        # Initialize heading pointing toward origin (0, 0)
+        self.heading = (self.bearing + 180) % 360
+
+    def identify_target(self):
+        self.type_name = self.true_type
+        self.status = "HOSTILE"
+        self.id_code = f"ARM-{self.track_number}"
+
+    def calculate_threat_score(self):
+        return 700000 + int(3000 / max(1, self.distance_km))
+
+    def move(self, cmd=None, *args, **kwargs):
+        self.prev_x_km = self.x_km
+        self.prev_y_km = self.y_km
+        speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC
+
+        # 1. EMCON and Decoy check via cmd if provided
+        if cmd is not None:
+            emcon = getattr(cmd, 'emcon_mode', 'ACTIVE')
+            if emcon == "SILENT":
+                if self.seeker_locked:
+                    self.seeker_locked = False
+                    cmd.add_log(f"\033[93;1m[TACTICAL WARNING] ARM {self.id_code} lost radar emitter lock (EMCON SILENT)! Unguided ballistic drift.\033[0m")
+
+            if self.seeker_locked:
+                active_decoys = getattr(cmd, 'active_decoys', [])
+                if active_decoys:
+                    # Home on the closest active decoy
+                    target_decoy = min(active_decoys, key=lambda d: math.hypot(self.x_km - d['x'], self.y_km - d['y']))
+                    self.target_x = target_decoy['x']
+                    self.target_y = target_decoy['y']
+                else:
+                    self.target_x = 0.0
+                    self.target_y = 0.0
+        else:
+            if self.seeker_locked:
+                self.target_x = 0.0
+                self.target_y = 0.0
+
+        if self.seeker_locked:
+            dx = self.target_x - self.x_km
+            dy = self.target_y - self.y_km
+            dist_to_tgt = math.hypot(dx, dy)
+
+            if dist_to_tgt <= speed_per_tick:
+                self.x_km = self.target_x
+                self.y_km = self.target_y
+                self.distance_km = math.hypot(self.x_km, self.y_km)
+                # If seduced by active decoy
+                if cmd and getattr(cmd, 'active_decoys', None) and (abs(self.target_x) > 0.1 or abs(self.target_y) > 0.1):
+                    self.active = False
+                    self.status = "CLEARED"
+                    cmd.add_log(f"\033[92;1m[COUNTERMEASURES] ARM {self.id_code} IMPACTED RF DECOY AT ({self.target_x:.1f}, {self.target_y:.1f})! Radar unharmed.\033[0m")
+                    if hasattr(cmd, 'record_kill'):
+                        cmd.record_kill(self, "RF_DECOY")
+                    if hasattr(cmd, 'emit_event'):
+                        cmd.emit_event("INTERCEPT_KILL", target_id=self.id_code, target_type=self.type_name, weapon="RF_DECOY", distance_km=self.distance_km)
+                    return
+            else:
+                self.heading = (math.degrees(math.atan2(dx, dy)) + 360) % 360
+                self.x_km += speed_per_tick * math.sin(math.radians(self.heading))
+                self.y_km += speed_per_tick * math.cos(math.radians(self.heading))
+                self.distance_km = math.hypot(self.x_km, self.y_km)
+                self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
+        else:
+            # Unguided ballistic drift: continue on fixed heading
+            self.x_km += speed_per_tick * math.sin(math.radians(self.heading))
+            self.y_km += speed_per_tick * math.cos(math.radians(self.heading))
+            self.distance_km = math.hypot(self.x_km, self.y_km)
+            self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
+            if self.distance_km > 1200:
+                self.active = False
+
+
+class CruiseMissile(AirContact):
+    def __init__(self, track_number, distance_km=None):
+        if distance_km is None:
+            distance_km = random.randint(300, 700)
+        super().__init__(track_number, distance_km)
+        self.speed_mach = 0.85
+        self.altitude_ft = 200 # 200 ft AGL nap-of-the-earth
+        self.rcs = 0.01  # Low-RCS
+        self.is_friendly = False
+        self.has_transponder = False
+        self.true_type = random.choice([
+            "Kalibr 3M-54", "Tomahawk Block V", "CJ-10", "Storm Shadow", "BrahMos Block II"
+        ])
+        self.scenario = "CRUISE_MISSILE"
+        self.is_masked = False
+
+    def identify_target(self):
+        self.type_name = self.true_type
+        self.status = "HOSTILE"
+        self.id_code = f"CRUISE-{self.track_number}"
+
+    def calculate_threat_score(self):
+        return 600000 + int(2000 / max(1, self.distance_km))
+
+    def is_terrain_masked(self, peaks=None):
+        return is_line_of_sight_masked(self.x_km, self.y_km, self.altitude_ft, peaks)
+
+    def is_detectable_by_radar(self, radar_alt_ft=150, jamming_factor=1.0):
+        # If ground radar (radar_alt_ft <= 500) and terrain-masked, ground radar cannot detect it
+        if radar_alt_ft <= 500 and self.is_terrain_masked():
+            self.is_masked = True
+            return False
+        self.is_masked = False
+        return super().is_detectable_by_radar(radar_alt_ft, jamming_factor)
+
+    def move(self, *args, **kwargs):
+        super().move(*args, **kwargs)
+        self.is_masked = self.is_terrain_masked()
+
+
+class StealthBomber(AirContact):
+    def __init__(self, track_number, distance_km=None):
+        if distance_km is None:
+            distance_km = random.randint(450, 750)
+        super().__init__(track_number, distance_km)
+        self.speed_mach = 0.92
+        self.altitude_ft = 50000
+        self.rcs = 0.001 # Stealth RCS - extremely hard to detect beyond 40km on ground radar
+        self.is_friendly = False
+        self.has_transponder = False
+        self.true_type = random.choice(["H-20 Strategic Stealth Bomber", "B-21 Raider Prototype", "Su-57 Felon Heavy"])
+        self.scenario = "STEALTH_STRIKE"
+        self.standoff_fired = False
+
+    def identify_target(self):
+        self.type_name = self.true_type
+        self.status = "HOSTILE"
+        self.id_code = f"GHOST-{self.track_number}"
+
+    def calculate_threat_score(self):
+        return 750000 + int(3000 / max(1, self.distance_km))
+
+    def move(self, *args, **kwargs):
+        super().move(*args, **kwargs)
+        cmd = kwargs.get('cmd') if kwargs else (args[0] if args else None)
+        if cmd and not self.standoff_fired and self.distance_km <= 90:
+            self.standoff_fired = True
+            cmd.add_log(f"\033[41;97m[ALERT] {self.id_code} REACHED STANDOFF LAUNCH POINT! RELEASING CRUISE MISSILES!\033[0m")
+            cmd.manual_spawn("CRUISE")
+            cmd.manual_spawn("CRUISE")
+
+
+class VIPTransport(Airliner):
+    def __init__(self, track_number=999):
+        super().__init__(track_number)
+        self.id_code = "VIP-ROYAL"
+        self.callsign = "ROYAL-01"
+        self.airline = "Royal Thai Air Force VIP Wing 6"
+        self.status = "FRIENDLY"
+        self.is_friendly = True
+        self.speed_mach = 0.78
+        self.altitude_ft = 28000
+        self.rcs = 40.0
+        self.has_transponder = True
+        self.squawk_code = "7777"
+        self.departure = "VTCC (Chiang Mai)"
+        self.destination = "VTBD (Don Mueang)"
+        # Starts in northern Thailand (Chiang Mai area) and flies south to Don Mueang
+        self.x_km = -80.0
+        self.y_km = 520.0
+        self.prev_x_km = self.x_km
+        self.prev_y_km = self.y_km
+        self.distance_km = math.hypot(self.x_km, self.y_km)
+        self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
+        self.heading = 175.0
+        self.has_arrived = False
+
+    def move(self, *args, **kwargs):
+        self.prev_x_km = self.x_km
+        self.prev_y_km = self.y_km
+        dx = 0.0 - self.x_km
+        dy = 15.0 - self.y_km
+        dist_to_dest = math.hypot(dx, dy)
+        if dist_to_dest <= 12.0:
+            self.has_arrived = True
+            self.active = False
+            cmd = kwargs.get('cmd') if kwargs else (args[0] if args else None)
+            if cmd:
+                cmd.add_log("\033[92m[VIP MISSION] ROYAL-01 TOUCHDOWN DON MUEANG (VTBD) SAFELY. MISSION ACCOMPLISHED!\033[0m")
+                cmd.award_xp(5000, "VIP Safe Touchdown")
+                cmd.emit_event("VIP_SAFE_ARRIVAL")
+            return
+
+        speed_km_s = self.speed_mach * MACH_TO_KM_PER_SEC
+        self.x_km += (dx / dist_to_dest) * speed_km_s
+        self.y_km += (dy / dist_to_dest) * speed_km_s
+        self.distance_km = math.hypot(self.x_km, self.y_km)
+        self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
+        self.heading = (math.degrees(math.atan2(dx, dy)) + 360) % 360

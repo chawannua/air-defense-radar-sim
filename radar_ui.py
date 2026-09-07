@@ -6,7 +6,11 @@ import json
 import os
 import re
 from command_center import CommandCenter
-from targets import AWACS
+from config import GameConfig
+from targets import AWACS, AntiRadiationMissile, CruiseMissile
+from sound_engine import SoundManager
+from visual_effects import VFXManager
+from map_manager import MapManager
 
 # Fix DPI scaling issues on Windows
 try:
@@ -35,106 +39,19 @@ def lerp_color(c1, c2, t):
         int(c1[2] + (c2[2] - c1[2]) * t)
     )
 
-def generate_map_shapes():
-    shapes = []
-    # Thai Border Approximation (very rough polygon)
-    thai_border = [
-        (-200, 400), (-100, 500), (100, 450), (200, 200),
-        (300, 100), (350, -100), (200, -200), (100, -400),
-        (-50, -600), (-150, -300), (-250, 100)
-    ]
-    shapes.append(thai_border)
-    return shapes
-
-def generate_topo_contours(peaks_km):
-    contours = []
-    for px, py, name in peaks_km:
-        height_str = ''.join(filter(str.isdigit, name))
-        height = int(height_str) if height_str else 3000
-        num_rings = max(2, height // 1200)
-        
-        for ring_idx in range(1, num_rings + 1):
-            base_radius = ring_idx * 15 # km
-            ring_points = []
-            num_points = 60
-            seed1 = random.uniform(0, 100)
-            seed2 = random.uniform(0, 100)
-            
-            for i in range(num_points):
-                angle = math.radians(i * (360/num_points))
-                # more organic noise
-                n1 = math.sin(angle * 3 + seed1) * (base_radius * 0.15)
-                n2 = math.cos(angle * 5 + seed2) * (base_radius * 0.05)
-                r = base_radius + n1 + n2
-                
-                cx = px + r * math.cos(angle)
-                cy = py + r * math.sin(angle)
-                ring_points.append((cx, cy))
-            
-            contours.append(ring_points)
-    return contours
+# Real-world high-fidelity map engine
+global_map_manager = MapManager()
 
 def load_real_map():
-    shapes_km = []
-    RADAR_LAT = 13.7563  # Bangkok, Thailand
-    RADAR_LON = 100.5018
-    
-    def latlon_to_km(lon, lat):
-        dx = (lon - RADAR_LON) * 111.32 * math.cos(math.radians(RADAR_LAT))
-        dy = (lat - RADAR_LAT) * 110.574
-        return (dx, dy) 
-    
-    map_files = ["tha.json", "mmr.json", "lao.json", "khm.json", "mys.json", "vnm.json", "chn.json", "idn.json", "phl.json", "twn.json"]
-    for filename in map_files:
-        filepath = filename
-        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-            filepath = os.path.join(sys._MEIPASS, filename)
-            
-        if os.path.exists(filepath):
-            try:
-                with open(filepath, 'r') as f:
-                    poly_list = json.load(f)
-                for ring in poly_list:
-                    ring_km = []
-                    for lon, lat in ring:
-                        x_km, y_km = latlon_to_km(lon, lat)
-                        ring_km.append((x_km, y_km))
-                    shapes_km.append(ring_km)
-            except Exception as e:
-                print("Map load error:", e)
-    
-    if not shapes_km:
-        shapes_km = generate_map_shapes()
-        
-    peaks_data = [
-        (18.588, 98.487, "DOI INTHANON 8415FT"),
-        (8.544, 99.736, "KHAO LUANG 6024FT"),
-        (16.883, 101.783, "PHU KRADUENG 4301FT"),
-        (13.5, 99.3, "TENASSERIM 3500FT"),
-        (14.3, 102.0, "KHAO YAI 4400FT"),
-        (19.9, 99.0, "DOI PHA HOM POK 7500FT")
-    ]
-    peaks_km = []
-    for lat, lon, name in peaks_data:
-        x_km, y_km = latlon_to_km(lon, lat)
-        peaks_km.append((x_km, y_km, name))
-        
-    airbases_data = [
-        (14.933, 102.083, "WING 1 (KORAT)"),
-        (15.266, 100.333, "WING 4 (TAKHLI)"),
-        (9.133, 99.133, "WING 7 (SURAT THANI)"),
-        (15.250, 104.866, "WING 21 (UBON)"),
-        (17.383, 102.783, "WING 23 (UDON)")
-    ]
-    airbases_km = []
-    for lat, lon, name in airbases_data:
-        x_km, y_km = latlon_to_km(lon, lat)
-        airbases_km.append((x_km, y_km, name))
-        
-    return shapes_km, peaks_km, airbases_km
+    shapes = []
+    for rings in global_map_manager.country_polys.values():
+        shapes.extend(rings)
+    peaks = [(x, y, name) for x, y, name in global_map_manager.peaks_km]
+    airbases = [(x, y, name) for x, y, name, btype, col in global_map_manager.airbases]
+    return shapes, peaks, airbases
 
 MAP_SHAPES_KM, MAP_PEAKS_KM, MAP_AIRBASES_KM = load_real_map()
-MAP_CONTOURS_KM = generate_topo_contours(MAP_PEAKS_KM)
+MAP_CONTOURS_KM = global_map_manager.contours_km
 
 def start_radar():
     pygame.init()
@@ -146,7 +63,7 @@ def start_radar():
     WIDTH, HEIGHT = int(MONITOR_W * 0.9), int(MONITOR_H * 0.9)
     is_fullscreen = False
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE) 
-    pygame.display.set_caption("AEGIS Tactical Air Defense Radar")
+    pygame.display.set_caption(f"AEGIS Tactical Air Defense Radar v{GameConfig.VERSION}")
 
     BG_COLOR = (0, 0, 0) # Pitch black like real radar
     GRID_COLOR = (0, 40, 0) # Very faint green for grid
@@ -168,16 +85,71 @@ def start_radar():
     font_lg = pygame.font.SysFont('consolas', 22, bold=True)
 
     cmd = CommandCenter()
+    sound_mgr = SoundManager()
+    vfx_mgr = VFXManager()
+    map_mgr = global_map_manager
     sweep_angle = 0.0
     sweep_speed = 2.8
     clock = pygame.time.Clock()
     LAST_TICK_TIME = pygame.time.get_ticks()
 
     selected_contact = None  
+    CX = WIDTH // 2
+    CY = HEIGHT // 2
+    show_upgrades = False
 
     running = True
     while running:
+        dt = clock.tick(60) / 1000.0
         current_time = pygame.time.get_ticks()
+
+        # Update Visual FX
+        vfx_mgr.update(dt)
+
+        # ---------------------------------------------------
+        # Process Event Bus from Simulation Core
+        # ---------------------------------------------------
+        while cmd.event_bus:
+            ev = cmd.event_bus.pop(0)
+            etype = ev.get("type")
+            if etype == "INTERCEPT_KILL":
+                tx = ev.get("x", 0)
+                ty = ev.get("y", 0)
+                spx = CX + km_to_px(tx)
+                spy = CY - km_to_px(ty)
+                ttype = ev.get("threat_type", "")
+                is_heavy = ttype in ["ICBM", "TacticalBM", "CruiseMissile"]
+                vfx_mgr.create_explosion(spx, spy, is_heavy=is_heavy)
+                sound_mgr.play_explosion(heavy=is_heavy)
+                vfx_mgr.add_trauma(0.35 if is_heavy else 0.15)
+                sound_mgr.radio_callout("Splash one bandit!")
+            elif etype == "BASE_DAMAGE":
+                sound_mgr.play_explosion(heavy=True)
+                vfx_mgr.add_trauma(0.7)
+                vfx_mgr.create_explosion(CX, CY, is_heavy=True)
+                sound_mgr.radio_callout("Warning! Command base hit!")
+            elif etype == "MISSILE_LAUNCH":
+                sound_mgr.play_launch()
+                tx = ev.get("target_x", 0)
+                ty = ev.get("target_y", 0)
+                vfx_mgr.add_missile_tracer((CX, CY), (CX + km_to_px(tx), CY - km_to_px(ty)), duration_ticks=35)
+                sound_mgr.radio_callout("Fox Two away!")
+            elif etype == "CIWS_FIRE":
+                sound_mgr.play_ciws()
+                vfx_mgr.add_trauma(0.06)
+            elif etype == "DEFCON_CHANGE":
+                d = ev.get("defcon", 5)
+                if d == 1:
+                    sound_mgr.start_alarm()
+                    sound_mgr.radio_callout("Vampire! Vampire inbound!")
+                elif d > 2:
+                    sound_mgr.stop_alarm()
+            elif etype == "PROMOTION":
+                r = ev.get("rank", "Officer")
+                sound_mgr.radio_callout(f"Attention on deck! Promoted to {r}!")
+            elif etype == "COURT_MARTIAL":
+                sound_mgr.start_alarm()
+                sound_mgr.radio_callout("Cease fire! Civilian flight splashed!")
 
         # ---------------------------------------------------
         # Game Tick Update
@@ -230,6 +202,50 @@ def start_radar():
                 if event.key == pygame.K_BACKSPACE and selected_contact:
                     cmd.manual_override_abort(selected_contact)
 
+                # Tactical Systems Controls
+                if event.key == pygame.K_e:
+                    cmd.toggle_emcon()
+                elif event.key == pygame.K_s:
+                    cmd.toggle_salvo()
+                elif event.key == pygame.K_d:
+                    cmd.deploy_decoy()
+                elif event.key == pygame.K_u:
+                    is_muted = sound_mgr.toggle_mute()
+                    cmd.add_log(f"\033[93m[AUDIO] Audio muted: {is_muted}\033[0m")
+                elif event.key == pygame.K_TAB:
+                    show_upgrades = not show_upgrades
+                elif event.key == pygame.K_F1:
+                    m = cmd.mission_mgr.cycle_mission(cmd)
+                    selected_contact = None
+                    sound_mgr.radio_callout("New operational orders received.")
+                    cmd.add_log(f"\033[93m[CAMPAIGN] ACTIVATED: {m.name}\033[0m")
+                elif event.key == pygame.K_F2:
+                    mode, mode_name = map_mgr.cycle_mode()
+                    sound_mgr.radio_callout("Map layer toggled.")
+                    cmd.add_log(f"\033[96m[MAP] DISPLAY MODE: {mode_name}\033[0m")
+                elif event.key == pygame.K_r:
+                    cmd = CommandCenter()
+                    selected_contact = None
+                    sound_mgr.stop_alarm()
+                    cmd.add_log("\033[92m[SYS] SORTIE RE-INITIALIZED. COMMAND CENTER ONLINE.\033[0m")
+
+                # Tech Upgrades Purchasing (when Upgrades panel is open)
+                if show_upgrades:
+                    upgrade_map = {
+                        pygame.K_1: "AESA_RANGE",
+                        pygame.K_2: "DOPPLER_FILTER",
+                        pygame.K_3: "DECOY_PACK",
+                        pygame.K_4: "RAPID_CIWS",
+                        pygame.K_5: "AESA_SEEKERS"
+                    }
+                    if event.key in upgrade_map:
+                        uid = upgrade_map[event.key]
+                        ok, reason = cmd.unlock_upgrade(uid)
+                        if ok:
+                            sound_mgr.radio_callout("Systems upgraded.")
+                        else:
+                            cmd.add_log(f"\033[91m[UPGRADE] {reason}\033[0m")
+
                 # dev: manual threat spawn
                 if not selected_contact:
                     if event.key == pygame.K_5: cmd.manual_spawn("ICBM")
@@ -238,7 +254,15 @@ def start_radar():
                     elif event.key == pygame.K_8: cmd.manual_spawn("AIRLINER")
                     elif event.key == pygame.K_9: cmd.manual_spawn("EW")
                     elif event.key == pygame.K_0: cmd.manual_spawn("AWACS")
+                    elif event.key == pygame.K_m: cmd.manual_spawn("ARM")
+                    elif event.key == pygame.K_c: cmd.manual_spawn("CRUISE")
                     elif event.key == pygame.K_w: cmd.manual_spawn("WAVE")
+                    elif event.key == pygame.K_p:
+                        cmd.tick_count = 360
+                        cmd.detect_airspace()
+                        cmd.add_log("\033[41;97m[COMMAND] PHASE 3 (WARTIME) ENGAGED. AIRSPACE CLOSED. DEFCON 1.\033[0m")
+                        sound_mgr.start_alarm()
+                        sound_mgr.radio_callout("Vampire! Vampire inbound!")
                 # Toggle fullscreen mode
                 if event.key == pygame.K_F11:
                     is_fullscreen = not is_fullscreen
@@ -323,8 +347,9 @@ def start_radar():
             camera_x += mouse_dx
             camera_y += mouse_dy
 
-        CX = (WIDTH // 2) + int(camera_x)
-        CY = (HEIGHT // 2) + int(camera_y)
+        shake_x, shake_y = vfx_mgr.get_camera_offset()
+        CX = (WIDTH // 2) + int(camera_x + shake_x)
+        CY = (HEIGHT // 2) + int(camera_y + shake_y)
 
         screen.fill(BG_COLOR)
 
@@ -335,41 +360,8 @@ def start_radar():
         pygame.draw.circle(screen, (80, 50, 0), (CX, CY), int(km_to_px(80)), 1)  # SAM Anti-Aircraft Range
         pygame.draw.circle(screen, (80, 0, 0), (CX, CY), int(km_to_px(20)), 1)   # CIWS Range
 
-        # Draw map shapes
-        for shape_km in MAP_SHAPES_KM:
-            pixel_points = []
-            for (x_km, y_km) in shape_km:
-                px_x = CX + km_to_px(x_km)
-                px_y = CY - km_to_px(y_km) # Minus because Pygame Y is flipped relative to North
-                pixel_points.append((px_x, px_y))
-            if len(pixel_points) > 2:
-                # Beautiful Anti-Aliased Map Rendering
-                pygame.draw.aalines(screen, (0, 140, 40), True, pixel_points) # Sharp inner anti-aliased line
-
-        # Draw Topographical Contours
-        for ring_points_km in MAP_CONTOURS_KM:
-            points_px = []
-            for rx_km, ry_km in ring_points_km:
-                px = CX + km_to_px(rx_km)
-                py = CY - km_to_px(ry_km)
-                points_px.append((px, py))
-            if len(points_px) >= 2:
-                pygame.draw.aalines(screen, (30, 45, 20), True, points_px) # Faint green-brown for contours
-
-        # Draw Mountain Peaks (Elevation)
-        for x_km, y_km, p_name in MAP_PEAKS_KM:
-            px = CX + km_to_px(x_km)
-            py = CY - km_to_px(y_km)
-            pygame.draw.polygon(screen, (80, 100, 40), [(px, py - 4), (px - 4, py + 4), (px + 4, py + 4)], 1)
-            screen.blit(font_xs.render(p_name, True, (80, 100, 40)), (px + 6, py - 3))
-
-        # Draw Military Airbases
-        for x_km, y_km, b_name in MAP_AIRBASES_KM:
-            px = CX + km_to_px(x_km)
-            py = CY - km_to_px(y_km)
-            pygame.draw.circle(screen, (0, 150, 255), (px, py), 3, 1)
-            pygame.draw.rect(screen, (0, 150, 255), (px - 5, py - 5, 10, 10), 1)
-            screen.blit(font_xs.render(b_name, True, (0, 150, 255)), (px + 8, py - 4))
+        # Draw Real-World Tactical Map (Thailand, Neighbors, Coastlines, ADIZ, Bases)
+        map_mgr.render(screen, CX, CY, zoom_level, WIDTH, HEIGHT, font_xs, font_sm, font_md)
 
         r_max = km_to_px(RADAR_MAX_KM)
 
@@ -383,6 +375,8 @@ def start_radar():
             
         old_sweep_angle = sweep_angle
         sweep_angle = (sweep_angle + sweep_speed) % 360
+        if old_sweep_angle > sweep_angle and not ew_active:
+            sound_mgr.play_ping()
 
         # AESA Field of View (FOV) - e.g., +/- 60 degrees from mechanical boresight
         AESA_FOV = 60.0
@@ -599,8 +593,12 @@ def start_radar():
             screen.blit(font_xs.render(f"{c.speed_mach:.1f}M FL{alt_k:02d}", True, text_color), (x + 10, y + 2))
 
             if selected_contact == c:
-                pygame.draw.rect(screen, (255, 255, 255), (x-12, y-12, 24, 24), 1)
-                pygame.draw.circle(screen, (255, 255, 255), (int(x), int(y)), 20, 1)
+                heading = getattr(c, 'heading', (bearing + 180) % 360)
+                lead_dist = c.speed_mach * 0.3403 * 3.0
+                lead_x_km = c.x_km + lead_dist * math.sin(math.radians(heading))
+                lead_y_km = c.y_km + lead_dist * math.cos(math.radians(heading))
+                lead_px = (CX + km_to_px(lead_x_km), CY - km_to_px(lead_y_km))
+                vfx_mgr.draw_lead_reticle(screen, (x, y), lead_px, c.id_code)
 
         for eng in cmd.active_engagements:
             target = getattr(eng, 'target', None)
@@ -620,6 +618,21 @@ def start_radar():
             pygame.draw.line(screen, MISSILE_COLOR, (mx-4, my-4), (mx+4, my+4), 2)
             pygame.draw.line(screen, MISSILE_COLOR, (mx-4, my+4), (mx+4, my-4), 2)
             screen.blit(font_sm.render(wpn_name, True, MISSILE_COLOR), (mx + 8, my - 5))
+
+        # --- Active RF Decoys ---
+        for decoy in getattr(cmd, 'active_decoys', []):
+            if decoy.get('active', False):
+                dx_px = CX + km_to_px(decoy['x'])
+                dy_px = CY - km_to_px(decoy['y'])
+                pygame.draw.circle(screen, (255, 220, 0), (int(dx_px), int(dy_px)), 8, 2)
+                pygame.draw.circle(screen, (255, 255, 100), (int(dx_px), int(dy_px)), 3)
+                screen.blit(font_xs.render(f"RF-DECOY ({decoy['timer']}s)", True, (255, 220, 50)), (dx_px + 10, dy_px - 8))
+
+        # --- Visual FX Layers (Shockwaves, Flak, Contrails, Embers) ---
+        vfx_mgr.draw(screen, CX, CY)
+
+        # --- Emergency Red Edge Vignette on Base Damage ---
+        vfx_mgr.draw_damage_vignette(screen, cmd.base_hp)
 
 
 
@@ -663,7 +676,7 @@ def start_radar():
         # --- 4. HUD Overlays ---
         
         # 4.1 Top Center Status Bar
-        top_bar_w = 600
+        top_bar_w = 780
         top_bar_x = (WIDTH - top_bar_w) // 2
         top_bar_y = 10
         
@@ -674,12 +687,11 @@ def start_radar():
             if val_text:
                 screen.blit(font_sm.render(val_text, True, val_color), (x + w - max(30, len(val_text)*8), y + 4))
                 
-        # Top Row: DEFCON, HP, PHASE
+        # Top Row: DEFCON, HP, PHASE, RANK/XP
         hp_color = RADAR_COLOR if cmd.base_hp > 50 else (255, 50, 50)
-        draw_status_box(top_bar_x, top_bar_y, 180, 22, "DEFCON STATUS", (255,255,255), str(cmd.calculate_defcon()), (255,200,0))
-        draw_status_box(top_bar_x + 190, top_bar_y, 220, 22, "BASE INTEGRITY", (255,255,255), f"{cmd.base_hp}%", hp_color)
+        draw_status_box(top_bar_x, top_bar_y, 160, 22, "DEFCON", (255,255,255), str(cmd.calculate_defcon()), (255,200,0))
+        draw_status_box(top_bar_x + 165, top_bar_y, 190, 22, "BASE INTEGRITY", (255,255,255), f"{cmd.base_hp}%", hp_color)
         
-        # show escalation phase
         t = cmd.tick_count
         if t < 120:
             phase_str, phase_color = "PEACETIME", (100, 200, 100)
@@ -687,16 +699,49 @@ def start_radar():
             phase_str, phase_color = "TENSIONS", (255, 200, 50)
         else:
             phase_str, phase_color = "WARTIME", (255, 60, 60)
-        draw_status_box(top_bar_x + 420, top_bar_y, 180, 22, phase_str, phase_color, f"T+{t}s", (150,150,150))
+        draw_status_box(top_bar_x + 360, top_bar_y, 170, 22, phase_str, phase_color, f"T+{t}s", (150,150,150))
+        draw_status_box(top_bar_x + 535, top_bar_y, 245, 22, f"RTAF {cmd.rank.upper()}", (100,220,255), f"{cmd.xp} XP", (255,220,0))
         
-        # Second Row: Armory (Small buttons)
+        # Second Row: Armory + Tactical Controls (EMCON, SALVO, DECOYS)
         armory_x = top_bar_x
         for i, (wpn, amount) in enumerate(cmd.ammo.items()):
-            draw_status_box(armory_x + (i*100), top_bar_y + 25, 95, 20, wpn[:4], (150,150,150), str(amount), RADAR_COLOR)
-            
+            draw_status_box(armory_x + (i*85), top_bar_y + 25, 80, 20, wpn[:4], (150,150,150), str(amount), RADAR_COLOR)
+
+        emcon_color = (80, 255, 80) if cmd.emcon_mode == "ACTIVE" else ((255, 200, 50) if cmd.emcon_mode == "SECTOR" else (255, 60, 60))
+        draw_status_box(armory_x + 345, top_bar_y + 25, 140, 20, "[E] EMCON", (150,150,150), cmd.emcon_mode, emcon_color)
+        
+        salvo_color = (100, 200, 255) if cmd.salvo_mode == "SINGLE" else ((255, 200, 50) if cmd.salvo_mode == "RIPPLE" else (255, 60, 60))
+        draw_status_box(armory_x + 490, top_bar_y + 25, 140, 20, "[S] SALVO", (150,150,150), cmd.salvo_mode, salvo_color)
+        
+        decoy_color = (255, 220, 50) if cmd.decoys_remaining > 0 else (120, 120, 120)
+        draw_status_box(armory_x + 635, top_bar_y + 25, 145, 20, "[D] DECOY", (150,150,150), f"{cmd.decoys_remaining}/3", decoy_color)
+
+        # Third Row: Active Mission Campaign
+        draw_status_box(top_bar_x, top_bar_y + 48, 780, 20, f"[F1] MISSION: {cmd.mission_mgr.current.name.upper()}", (255, 220, 100), f"STATUS: {cmd.mission_mgr.current.state}", (100, 255, 100) if cmd.mission_mgr.current.state == 'IN_PROGRESS' else (255, 80, 80))
+
         # Spawn controls instruction
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else "SPAWN: 5:ICBM 6:Jet 7:Drone 8:CIV 9:EW 0:AWACS W:Wave"
-        screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 50))
+        map_tag = ["FULL", "SOVEREIGN", "MINIMAL", "OFF"][map_mgr.map_mode]
+        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else f"TACTICAL: [E] EMCON | [S] Salvo | [D] Decoy | [TAB] Upgrades | [F1] Mission | [F2] Map:{map_tag} | [P] Phase 3"
+        screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 72))
+
+        # Tactical Upgrades Overlay (Toggle with TAB)
+        if show_upgrades:
+            up_w, up_h = 580, 280
+            up_x, up_y = CX - (up_w // 2), CY - (up_h // 2)
+            pygame.draw.rect(screen, (5, 12, 10), (up_x, up_y, up_w, up_h))
+            pygame.draw.rect(screen, (80, 220, 120), (up_x, up_y, up_w, up_h), 2)
+            screen.blit(font_lg.render("TACTICAL ARMORY & TECH UPGRADES", True, (100, 255, 150)), (up_x + 20, up_y + 15))
+            screen.blit(font_sm.render(f"COMMAND BALANCE: {cmd.xp:,} XP AVAILABLE  |  PRESS [TAB] TO CLOSE", True, (255, 220, 50)), (up_x + 20, up_y + 45))
+            
+            for idx, (uid, uinfo) in enumerate(cmd.UPGRADE_CATALOG.items()):
+                row_y = up_y + 75 + idx * 36
+                is_unlocked = uid in cmd.unlocked_upgrades
+                status_txt = "[UNLOCKED]" if is_unlocked else f"[{uinfo['key']}] BUY: {uinfo['cost']:,} XP"
+                status_color = (100, 255, 100) if is_unlocked else ((255, 220, 0) if cmd.xp >= uinfo['cost'] else (140, 140, 140))
+                
+                screen.blit(font_md.render(f"{uinfo['name']}", True, (220, 220, 220)), (up_x + 20, row_y))
+                screen.blit(font_xs.render(f"{uinfo['desc']}", True, (150, 180, 150)), (up_x + 20, row_y + 16))
+                screen.blit(font_md.render(status_txt, True, status_color), (up_x + up_w - 200, row_y + 4))
             
         # 4.2 Left Side: Active Operations (Track List)
         list_w, list_h = 360, 480
@@ -728,15 +773,30 @@ def start_radar():
             screen.blit(font_xs.render(clean_str, True, get_log_color(log)), (log_x, log_y + (i * 16)))
 
         if cmd.base_hp <= 0:
-            pygame.draw.rect(screen, (100, 0, 0), (CX - 220, CY - 40, 440, 80))
-            pygame.draw.rect(screen, (255, 0, 0), (CX - 220, CY - 40, 440, 80), 3)
-            screen.blit(font_lg.render("BASE DESTROYED! ALL SYSTEMS OFFLINE", True, (255, 255, 255)), (CX - 200, CY - 20))
+            aar = cmd.get_after_action_report()
+            aar_w, aar_h = 620, 260
+            aar_x, aar_y = CX - (aar_w // 2), CY - (aar_h // 2)
+            pygame.draw.rect(screen, (15, 8, 8), (aar_x, aar_y, aar_w, aar_h))
+            pygame.draw.rect(screen, (220, 40, 40), (aar_x, aar_y, aar_w, aar_h), 2)
             
-            # Text to indicate restart option
-            restart_text = font_md.render("Press [R] to Restart Simulation", True, (255, 200, 200))
-            screen.blit(restart_text, (CX - (restart_text.get_width() // 2), CY + 10))
+            status_title = "COURT-MARTIAL: CIVILIAN CASUALTIES" if getattr(cmd, 'is_court_martialed', False) else "BASE COMPROMISED: ALL SYSTEMS OFFLINE"
+            screen.blit(font_lg.render(status_title, True, (255, 80, 80)), (aar_x + 20, aar_y + 15))
+            
+            medals_str = ", ".join(aar.get("medals", [])) if aar.get("medals") else "None Awarded"
+            lines_data = [
+                f"RTAF Rank: {aar.get('rank', 'Airman').upper()}  |  Final XP: {aar.get('xp', 0):,}  |  Kills: {aar.get('kills', 0)}",
+                f"Sortie Duration: {aar.get('survival_time_sec', 0)}s  |  Airliners Safe: {aar.get('airliners_safe', 0)}",
+                f"Medals: {medals_str}",
+                f"Performance Grade: {aar.get('grade', 'D')}"
+            ]
+            for idx, txt in enumerate(lines_data):
+                color = (255, 220, 50) if idx == 0 else ((100, 255, 100) if idx == 2 else (220, 220, 220))
+                screen.blit(font_md.render(txt, True, color), (aar_x + 20, aar_y + 60 + idx * 32))
+                
+            restart_hint = font_md.render("Press [R] to Re-Scramble Sortie  |  [ESC] to Stand Down", True, (120, 200, 255))
+            screen.blit(restart_hint, (aar_x + 20, aar_y + 215))
 
-        screen.blit(font_sm.render("Press [ESC] to Quit | [CLICK] Select | [1-4] Fire | [BACKSPACE] Abort | [F11] Fullscreen | [R] Restart (On Death)", True, (80, 80, 80)), (10, HEIGHT - 25))
+        screen.blit(font_sm.render("Press [ESC] Quit | [CLICK] Select | [1-4] Fire | [E] EMCON | [S] Salvo | [D] Decoy | [P] Phase 3 Wartime | [U] Mute | [R] Restart", True, (120, 150, 120)), (10, HEIGHT - 25))
 
         pygame.display.flip()
         clock.tick(60)
