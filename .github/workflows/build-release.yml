@@ -1,39 +1,42 @@
-name: Build & Release AEGIS Radar Simulator
+﻿name: Build & Release AEGIS Radar Simulator
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
           pip install pygame pyinstaller
-      
+
       - name: Build executable with PyInstaller
         run: |
           pyinstaller --onefile --windowed --name AEGIS_Radar main.py
-      
-      - name: Upload to GitHub Release
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/AEGIS_Radar.exe
+          generate_release_notes: true
           body: |
             ## AEGIS Air Defense Radar Simulator ${{ github.ref_name }}
-            
-            Real-time tactical air defense simulation with AESA sweep physics, RCS tracking, and electronic warfare modeling.
-            
-            ### Installation
-            Download `AEGIS_Radar.exe` and run directly — no Python required.
+
+            Real-time tactical air defense simulation with AESA sweep physics,
+            RCS tracking, and electronic warfare modeling.
+
+            ### Quick Start
+            Download `AEGIS_Radar.exe` and run -- no Python installation required.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
