@@ -33,6 +33,7 @@ def get_log_color(log_str):
     return (200, 200, 200)
 
 def lerp_color(c1, c2, t):
+    t = max(0.0, min(1.0, float(t)))
     return (
         int(c1[0] + (c2[0] - c1[0]) * t),
         int(c1[1] + (c2[1] - c1[1]) * t),
@@ -102,6 +103,10 @@ def start_radar():
     while running:
         dt = clock.tick(60) / 1000.0
         current_time = pygame.time.get_ticks()
+        interp_alpha = min(1.0, max(0.0, (current_time - LAST_TICK_TIME) / 1000.0))
+
+        if selected_contact and (not selected_contact.active or selected_contact not in cmd.contacts):
+            selected_contact = None
 
         # Update Visual FX
         vfx_mgr.update(dt)
@@ -187,6 +192,24 @@ def start_radar():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE: running = False; sys.exit()
                 
+                # Tech Upgrades Purchasing (when Upgrades panel is open)
+                if show_upgrades:
+                    upgrade_map = {
+                        pygame.K_1: "AESA_RANGE",
+                        pygame.K_2: "DOPPLER_FILTER",
+                        pygame.K_3: "DECOY_PACK",
+                        pygame.K_4: "RAPID_CIWS",
+                        pygame.K_5: "AESA_SEEKERS"
+                    }
+                    if event.key in upgrade_map:
+                        uid = upgrade_map[event.key]
+                        ok, reason = cmd.unlock_upgrade(uid)
+                        if ok:
+                            sound_mgr.radio_callout("Systems upgraded.")
+                        else:
+                            cmd.add_log(f"\033[91m[UPGRADE] {reason}\033[0m")
+                        continue
+
                 # Fire weapon at selected target
                 if selected_contact:
                     wpn = None
@@ -229,25 +252,8 @@ def start_radar():
                     sound_mgr.stop_alarm()
                     cmd.add_log("\033[92m[SYS] SORTIE RE-INITIALIZED. COMMAND CENTER ONLINE.\033[0m")
 
-                # Tech Upgrades Purchasing (when Upgrades panel is open)
-                if show_upgrades:
-                    upgrade_map = {
-                        pygame.K_1: "AESA_RANGE",
-                        pygame.K_2: "DOPPLER_FILTER",
-                        pygame.K_3: "DECOY_PACK",
-                        pygame.K_4: "RAPID_CIWS",
-                        pygame.K_5: "AESA_SEEKERS"
-                    }
-                    if event.key in upgrade_map:
-                        uid = upgrade_map[event.key]
-                        ok, reason = cmd.unlock_upgrade(uid)
-                        if ok:
-                            sound_mgr.radio_callout("Systems upgraded.")
-                        else:
-                            cmd.add_log(f"\033[91m[UPGRADE] {reason}\033[0m")
-
                 # dev: manual threat spawn
-                if not selected_contact:
+                if not selected_contact and not show_upgrades:
                     if event.key == pygame.K_5: cmd.manual_spawn("ICBM")
                     elif event.key == pygame.K_6: cmd.manual_spawn("FIGHTER")
                     elif event.key == pygame.K_7: cmd.manual_spawn("DRONE")
@@ -315,7 +321,7 @@ def start_radar():
                 list_x, list_y = 20, HEIGHT - list_h - 20
                 if not panel_clicked and list_x <= mx <= list_x + list_w and list_y <= my <= list_y + list_h:
                     sorted_contacts = sorted(cmd.contacts, key=lambda c: c.calculate_threat_score(), reverse=True)
-                    click_idx = (my - (list_y + 30)) // 22 # Updated row height
+                    click_idx = (my - (list_y + 30)) // 18 # Harmonized 18px row height
                     if 0 <= click_idx < len(sorted_contacts[:20]):
                         selected_contact = sorted_contacts[click_idx]
                         panel_clicked = True
@@ -334,13 +340,13 @@ def start_radar():
                             closest_c = c
                     selected_contact = closest_c
 
-        # Smooth panning with WASD, Arrows, or Mouse Drag
+        # Smooth panning with Arrows or Mouse Drag
         keys = pygame.key.get_pressed()
         pan_speed = 10
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]: camera_x += pan_speed
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: camera_x -= pan_speed
-        if keys[pygame.K_UP] or keys[pygame.K_w]: camera_y += pan_speed
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]: camera_y -= pan_speed
+        if keys[pygame.K_LEFT]: camera_x += pan_speed
+        if keys[pygame.K_RIGHT]: camera_x -= pan_speed
+        if keys[pygame.K_UP]: camera_y += pan_speed
+        if keys[pygame.K_DOWN]: camera_y -= pan_speed
 
         mouse_dx, mouse_dy = pygame.mouse.get_rel()
         if pygame.mouse.get_pressed()[1] or pygame.mouse.get_pressed()[2]: # Middle or Right Click
@@ -410,27 +416,23 @@ def start_radar():
             if not hasattr(eng, 'total_time'): eng.total_time = max(1, getattr(eng, 'time_to_impact', 1))
             
             # 60 FPS Visual Physics Interpolation for Missiles
-            smooth_time = max(0, getattr(eng, 'time_to_impact', 0) - alpha)
+            smooth_time = max(0, getattr(eng, 'time_to_impact', 0) - interp_alpha)
             progress = 1.0 - (smooth_time / max(1, eng.total_time))
             bearing = getattr(target, 'bearing', getattr(target, 'heading', 0))
             
-            if angle_diff(bearing, sweep_angle) <= AESA_FOV:
-                ox = getattr(eng, 'origin_x_km', 0.0)
-                oy = getattr(eng, 'origin_y_km', 0.0)
-                
-                target_x = getattr(target, 'prev_x_km', target.x_km) + (target.x_km - getattr(target, 'prev_x_km', target.x_km)) * alpha
-                target_y = getattr(target, 'prev_y_km', target.y_km) + (target.y_km - getattr(target, 'prev_y_km', target.y_km)) * alpha
-                
-                eng.x_km = ox + (target_x - ox) * progress
-                eng.y_km = oy + (target_y - oy) * progress
-                eng.brightness = 1.0
-                if not hasattr(eng, 'trail'): eng.trail = []
-                if random.random() < 0.1:
-                    eng.trail.append((eng.x_km, eng.y_km))
-                    if len(eng.trail) > 8: eng.trail.pop(0)
-            else:
-                if hasattr(eng, 'brightness') and eng.brightness > 0:
-                    eng.brightness = max(0.0, eng.brightness - 0.005)
+            ox = getattr(eng, 'origin_x_km', 0.0)
+            oy = getattr(eng, 'origin_y_km', 0.0)
+            
+            target_x = getattr(target, 'prev_x_km', target.x_km) + (target.x_km - getattr(target, 'prev_x_km', target.x_km)) * interp_alpha
+            target_y = getattr(target, 'prev_y_km', target.y_km) + (target.y_km - getattr(target, 'prev_y_km', target.y_km)) * interp_alpha
+            
+            eng.x_km = ox + (target_x - ox) * progress
+            eng.y_km = oy + (target_y - oy) * progress
+            eng.brightness = 1.0
+            if not hasattr(eng, 'trail'): eng.trail = []
+            if random.random() < 0.15:
+                eng.trail.append((eng.x_km, eng.y_km))
+                if len(eng.trail) > 8: eng.trail.pop(0)
 
         # --- AESA Random Search Beams (Electronic steering within FOV) ---
         for _ in range(12): 
@@ -549,8 +551,8 @@ def start_radar():
             # 60 FPS Visual Physics Interpolation
             prev_x = getattr(c, 'prev_x_km', c.x_km)
             prev_y = getattr(c, 'prev_y_km', c.y_km)
-            interp_x_km = prev_x + (c.x_km - prev_x) * alpha
-            interp_y_km = prev_y + (c.y_km - prev_y) * alpha
+            interp_x_km = prev_x + (c.x_km - prev_x) * interp_alpha
+            interp_y_km = prev_y + (c.y_km - prev_y) * interp_alpha
             
             x = CX + km_to_px(interp_x_km) + glitch_x
             y = CY - km_to_px(interp_y_km) + glitch_y
@@ -570,8 +572,8 @@ def start_radar():
                     tr_px = km_to_px(tr_dist)
                     tx = CX + tr_px * math.sin(math.radians(tr_bear))
                     ty = CY - tr_px * math.cos(math.radians(tr_bear))
-                    alpha = (i + 1) / len(c.trail) * c.brightness
-                    pygame.draw.circle(screen, lerp_color(BG_COLOR, base_color, alpha * 0.5), (int(tx), int(ty)), 1)
+                    trail_alpha = (i + 1) / len(c.trail) * c.brightness
+                    pygame.draw.circle(screen, lerp_color(BG_COLOR, base_color, trail_alpha * 0.5), (int(tx), int(ty)), 1)
 
             if render_status in ["HOSTILE", "ENGAGING"]:
                 pygame.draw.polygon(screen, color, [(x, y-8), (x+8, y), (x, y+8), (x-8, y)], 2)
@@ -629,7 +631,7 @@ def start_radar():
                 screen.blit(font_xs.render(f"RF-DECOY ({decoy['timer']}s)", True, (255, 220, 50)), (dx_px + 10, dy_px - 8))
 
         # --- Visual FX Layers (Shockwaves, Flak, Contrails, Embers) ---
-        vfx_mgr.draw(screen, CX, CY)
+        vfx_mgr.draw(screen, 0, 0)
 
         # --- Emergency Red Edge Vignette on Base Damage ---
         vfx_mgr.draw_damage_vignette(screen, cmd.base_hp)
@@ -717,7 +719,7 @@ def start_radar():
         draw_status_box(armory_x + 635, top_bar_y + 25, 145, 20, "[D] DECOY", (150,150,150), f"{cmd.decoys_remaining}/3", decoy_color)
 
         # Third Row: Active Mission Campaign
-        draw_status_box(top_bar_x, top_bar_y + 48, 780, 20, f"[F1] MISSION: {cmd.mission_mgr.current.name.upper()}", (255, 220, 100), f"STATUS: {cmd.mission_mgr.current.state}", (100, 255, 100) if cmd.mission_mgr.current.state == 'IN_PROGRESS' else (255, 80, 80))
+        draw_status_box(top_bar_x, top_bar_y + 48, 780, 20, f"[F1] MISSION: {cmd.mission_mgr.current.name.upper()}", (255, 220, 100), f"STATUS: {cmd.mission_mgr.current.state}", (100, 255, 100) if cmd.mission_mgr.current.state in ['IN_PROGRESS', 'VICTORY'] else (255, 80, 80))
 
         # Spawn controls instruction
         map_tag = ["FULL", "SOVEREIGN", "MINIMAL", "OFF"][map_mgr.map_mode]
@@ -727,7 +729,7 @@ def start_radar():
         # Tactical Upgrades Overlay (Toggle with TAB)
         if show_upgrades:
             up_w, up_h = 580, 280
-            up_x, up_y = CX - (up_w // 2), CY - (up_h // 2)
+            up_x, up_y = (WIDTH - up_w) // 2, (HEIGHT - up_h) // 2
             pygame.draw.rect(screen, (5, 12, 10), (up_x, up_y, up_w, up_h))
             pygame.draw.rect(screen, (80, 220, 120), (up_x, up_y, up_w, up_h), 2)
             screen.blit(font_lg.render("TACTICAL ARMORY & TECH UPGRADES", True, (100, 255, 150)), (up_x + 20, up_y + 15))
@@ -775,7 +777,7 @@ def start_radar():
         if cmd.base_hp <= 0:
             aar = cmd.get_after_action_report()
             aar_w, aar_h = 620, 260
-            aar_x, aar_y = CX - (aar_w // 2), CY - (aar_h // 2)
+            aar_x, aar_y = (WIDTH - aar_w) // 2, (HEIGHT - aar_h) // 2
             pygame.draw.rect(screen, (15, 8, 8), (aar_x, aar_y, aar_w, aar_h))
             pygame.draw.rect(screen, (220, 40, 40), (aar_x, aar_y, aar_w, aar_h), 2)
             
@@ -799,7 +801,6 @@ def start_radar():
         screen.blit(font_sm.render("Press [ESC] Quit | [CLICK] Select | [1-4] Fire | [E] EMCON | [S] Salvo | [D] Decoy | [P] Phase 3 Wartime | [U] Mute | [R] Restart", True, (120, 150, 120)), (10, HEIGHT - 25))
 
         pygame.display.flip()
-        clock.tick(60)
 
 if __name__ == "__main__":
     start_radar()

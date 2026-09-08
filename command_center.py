@@ -5,7 +5,7 @@ import os
 from config import GameConfig
 from targets import (ICBM, TacticalBM, Drone, Helicopter, Aircraft,
                      GhostTrack, EWGhostTrack, Airliner, AWACS, CAPFighter,
-                     AntiRadiationMissile, CruiseMissile)
+                     AntiRadiationMissile, CruiseMissile, VIPTransport)
 from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement, get_closest_airbase, get_wing_aircraft
 from missions import MissionManager
 import math
@@ -63,6 +63,7 @@ class CommandCenter:
 
         # --- Event Bus ---
         self.event_bus = []
+        self.historical_events = []
 
         # --- RTAF Career Rank & XP Progression ---
         self.xp = 0
@@ -123,6 +124,7 @@ class CommandCenter:
             **kwargs
         }
         self.event_bus.append(evt)
+        self.historical_events.append(evt)
         return evt
 
     def award_xp(self, amount, reason=""):
@@ -140,11 +142,11 @@ class CommandCenter:
             self.emit_event("PROMOTION", old_rank=old_rank, new_rank=new_rank, xp=self.xp)
 
     def record_kill(self, contact, weapon):
-        if isinstance(contact, Airliner):
+        if getattr(contact, 'is_friendly', False) or isinstance(contact, Airliner):
             self.is_court_martialed = True
             self.base_hp = 0
-            self.add_log(f"\033[41;97m[CRITICAL INCIDENT] YOU SHOT DOWN A COMMERCIAL AIRLINER! COURT-MARTIAL IMMINENT!\033[0m")
-            self.emit_event("COURT_MARTIAL", target_id=contact.id_code, target_type="Airliner", weapon=weapon)
+            self.add_log(f"\033[41;97m[CRITICAL INCIDENT] YOU SHOT DOWN A FRIENDLY / CIVILIAN CRAFT! COURT-MARTIAL IMMINENT!\033[0m")
+            self.emit_event("COURT_MARTIAL", target_id=contact.id_code, target_type=getattr(contact, 'type_name', 'Civilian'), weapon=weapon)
             return
         
         self.kills += 1
@@ -303,7 +305,7 @@ class CommandCenter:
             elif c.status in ["UNIDENTIFIED", "IDENTIFYING"]: current_defcon = min(current_defcon, 4) 
         
         if current_defcon != getattr(self, 'prev_defcon', 5):
-            self.emit_event("DEFCON_CHANGE", from_defcon=self.prev_defcon, to_defcon=current_defcon)
+            self.emit_event("DEFCON_CHANGE", from_defcon=self.prev_defcon, to_defcon=current_defcon, defcon=current_defcon)
             self.prev_defcon = current_defcon
         return current_defcon
 
@@ -316,7 +318,10 @@ class CommandCenter:
             
         # Doppler Clutter Filter upgrade: auto-clean ghost clutter
         if "DOPPLER_FILTER" in self.unlocked_upgrades:
-            self.contacts = [c for c in self.contacts if not isinstance(c, GhostTrack)]
+            for c in self.contacts:
+                if isinstance(c, (GhostTrack, EWGhostTrack)):
+                    c.active = False
+            self.contacts = [c for c in self.contacts if not isinstance(c, (GhostTrack, EWGhostTrack))]
         
         # --- escalation phases ---
         tick = self.tick_count
@@ -628,8 +633,15 @@ class CommandCenter:
                 display_wpn = get_wing_aircraft(bname)
                 
             dist_from_origin = math.hypot(target.x_km - bx, target.y_km - by)
-            weapon_speed = GameConfig.WEAPON_SPEED_F16 if wpn == "FIGHTER" else GameConfig.WEAPON_SPEED_SAM
-            impact_time = max(1, int(dist_from_origin / max(1, target.speed_mach + weapon_speed)))
+            if wpn == "THAAD":
+                weapon_speed = GameConfig.WEAPON_SPEED_THAAD
+            elif wpn == "FIGHTER":
+                weapon_speed = GameConfig.WEAPON_SPEED_F16
+            elif wpn == "CIWS":
+                weapon_speed = getattr(GameConfig, 'WEAPON_SPEED_CIWS', 25.0)
+            else:
+                weapon_speed = GameConfig.WEAPON_SPEED_SAM
+            impact_time = max(1, int(dist_from_origin / max(1.0, weapon_speed)))
             
             eng = Engagement(target, display_wpn, impact_time, bx, by, salvo_count=missiles_to_fire, salvo_mode=self.salvo_mode)
             self.active_engagements.append(eng)
@@ -639,6 +651,8 @@ class CommandCenter:
                 "MISSILE_LAUNCH",
                 weapon=wpn,
                 target_id=target.id_code,
+                target_x=target.x_km,
+                target_y=target.y_km,
                 salvo_mode=self.salvo_mode,
                 salvo_count=missiles_to_fire
             )
@@ -678,8 +692,11 @@ class CommandCenter:
             if getattr(eng, 'target', None) == target:
                 self.active_engagements.remove(eng)
                 aborted = True
+                wpn = getattr(eng, 'weapon_name', '')
+                if wpn in ["F-16", "JAS-39", "FIGHTER"] or "F-16" in wpn or "Gripen" in wpn:
+                    self.ammo["FIGHTER"] = min(self.max_ammo.get("FIGHTER", 15), self.ammo.get("FIGHTER", 0) + 1)
         if aborted:
-            target.status = "HOSTILE"
+            target.status = "FRIENDLY" if getattr(target, 'is_friendly', False) else "SUSPECT"
             self.add_log(f"\033[41m[ABORT]\033[0m Cancelled engagement on {target.id_code}")
 
     def process_engagements(self):
@@ -718,17 +735,17 @@ class CommandCenter:
                         eng.target.status = "CLEARED"
                         eng.target.active = False
                         self.record_kill(eng.target, "THAAD")
-                        self.emit_event("INTERCEPT_KILL", target_id=eng.target.id_code, target_type=eng.target.type_name, weapon="THAAD", distance_km=eng.target.distance_km, salvo_mode=salvo_mode)
+                        self.emit_event("INTERCEPT_KILL", target_id=eng.target.id_code, target_type=eng.target.type_name, weapon="THAAD", distance_km=eng.target.distance_km, x=eng.target.x_km, y=eng.target.y_km, threat_type=eng.target.type_name, salvo_mode=salvo_mode)
                         salvo_tag = f" ({salvo_mode} x{salvo_count})" if salvo_count > 1 else ""
                         self.add_log(f"\033[92m[KILL] DIRECT HIT! {eng.target.id_code} destroyed by THAAD{salvo_tag}!\033[0m")
                     else:
-                        eng.target.status = "HOSTILE"
+                        eng.target.status = "FRIENDLY" if getattr(eng.target, 'is_friendly', False) else "HOSTILE"
                         self.add_log(f"\033[91;1m[MISS] THAAD MISSED {eng.target.id_code}! TARGET STILL INCOMING!\033[0m")
                 
                 elif eng.weapon_name == "SAM":
                     # Chaff Evasion Mechanic
                     if isinstance(eng.target, Aircraft) and random.random() < 0.25:
-                        eng.target.status = "HOSTILE"
+                        eng.target.status = "FRIENDLY" if getattr(eng.target, 'is_friendly', False) else "HOSTILE"
                         self.add_log(f"\033[93m[EW] {eng.target.id_code} DEPLOYED CHAFF! SAM DECOYED!\033[0m")
                         continue
                         
@@ -755,7 +772,7 @@ class CommandCenter:
                         eng.target.status = "CLEARED"
                         eng.target.active = False
                         self.record_kill(eng.target, "SAM")
-                        self.emit_event("INTERCEPT_KILL", target_id=eng.target.id_code, target_type=eng.target.type_name, weapon="SAM", distance_km=eng.target.distance_km, salvo_mode=salvo_mode)
+                        self.emit_event("INTERCEPT_KILL", target_id=eng.target.id_code, target_type=eng.target.type_name, weapon="SAM", distance_km=eng.target.distance_km, x=eng.target.x_km, y=eng.target.y_km, threat_type=eng.target.type_name, salvo_mode=salvo_mode)
                         salvo_tag = f" ({salvo_mode} x{salvo_count})" if salvo_count > 1 else ""
                         if isinstance(eng.target, Airliner):
                             self.base_hp = 0
@@ -763,10 +780,24 @@ class CommandCenter:
                         else:
                             self.add_log(f"\033[92m[KILL] SPLASH! {eng.target.id_code} destroyed by SAM{salvo_tag}!\033[0m")
                     else:
-                        eng.target.status = "HOSTILE"
+                        eng.target.status = "FRIENDLY" if getattr(eng.target, 'is_friendly', False) else "HOSTILE"
                         self.add_log(f"\033[91;1m[MISS] SAM MISSED {eng.target.id_code}!\033[0m")
+
+                elif eng.weapon_name == "CIWS":
+                    base_hit = GameConfig.HIT_CHANCE_CIWS
+                    if "RAPID_CIWS" in self.unlocked_upgrades:
+                        base_hit = min(0.98, base_hit + 0.10)
+                    if random.random() <= base_hit:
+                        eng.target.status = "CLEARED"
+                        eng.target.active = False
+                        self.record_kill(eng.target, "CIWS")
+                        self.emit_event("INTERCEPT_KILL", target_id=eng.target.id_code, target_type=eng.target.type_name, weapon="CIWS", distance_km=eng.target.distance_km, x=eng.target.x_km, y=eng.target.y_km, threat_type=eng.target.type_name)
+                        self.add_log(f"\033[92m[KILL] BRRRRRT! {eng.target.id_code} shredded by Phalanx CIWS!\033[0m")
+                    else:
+                        eng.target.status = "FRIENDLY" if getattr(eng.target, 'is_friendly', False) else "HOSTILE"
+                        self.add_log(f"\033[91;1m[MISS] CIWS BURST MISSED {eng.target.id_code}!\033[0m")
                 
-                elif eng.weapon_name not in ["THAAD", "SAM", "CIWS"]: # Fighter Intercept
+                else: # Fighter Intercept
                     self.returning_fighters.append(GameConfig.F16_RTB_TIME_KILL) 
                     
                     scen = getattr(eng.target, 'scenario', None)
@@ -787,14 +818,14 @@ class CommandCenter:
                             eng.target.status = "CLEARED"
                             eng.target.active = False
                             self.record_kill(eng.target, eng.weapon_name)
-                            self.emit_event("INTERCEPT_KILL", target_id=eng.target.id_code, target_type=eng.target.type_name, weapon=eng.weapon_name, distance_km=eng.target.distance_km)
+                            self.emit_event("INTERCEPT_KILL", target_id=eng.target.id_code, target_type=eng.target.type_name, weapon=eng.weapon_name, distance_km=eng.target.distance_km, x=eng.target.x_km, y=eng.target.y_km, threat_type=eng.target.type_name)
                             if isinstance(eng.target, Airliner):
                                 self.base_hp = 0
                                 self.add_log(f"\033[41;97m[CRITICAL INCIDENT] YOU SHOT DOWN A COMMERCIAL AIRLINER! COURT-MARTIAL IMMINENT!\033[0m")
                             else:
                                 self.add_log(f"\033[92m[KILL]\033[0m FOX-3! {eng.target.id_code} splashed by {eng.weapon_name}! {eng.weapon_name} is RTB.\033[0m")
                         else:
-                            eng.target.status = "HOSTILE"
+                            eng.target.status = "FRIENDLY" if getattr(eng.target, 'is_friendly', False) else "HOSTILE"
                             self.add_log(f"\033[91;1m[MISS]\033[0m {eng.target.id_code} survived {eng.weapon_name} attack! {eng.weapon_name} is RTB.\033[0m")
             else:
                 surviving_engagements.append(eng)
@@ -917,7 +948,7 @@ class CommandCenter:
                 if not self.is_contact_visible(c):
                     c.brightness = 0.0
                 
-                if c.status == "FRIENDLY" and not isinstance(c, (AWACS, CAPFighter)) and random.random() < 0.03:
+                if c.status == "FRIENDLY" and not isinstance(c, (AWACS, CAPFighter, VIPTransport)) and not getattr(c, 'is_vip', False) and random.random() < 0.03:
                     c.active = False
                     if isinstance(c, Airliner):
                         self.airliners_safe += 1
@@ -929,12 +960,12 @@ class CommandCenter:
                     c.active = False
                     if isinstance(c, EWGhostTrack):
                         continue  # False target, no damage
-                    if c.status == "FRIENDLY": 
+                    if c.status == "FRIENDLY" or getattr(c, 'is_friendly', False) or isinstance(c, Airliner): 
                         if isinstance(c, Airliner):
                             self.airliners_safe += 1
                             self.award_xp(50, "Airliner safe passage")
                         self.add_log(f"\033[94m[TRAFFIC] {c.id_code} safely passed through airspace.\033[0m")
-                    elif c.status in ["HOSTILE", "ENGAGING", "UNIDENTIFIED", "IDENTIFYING", "SUSPECT", "INTERCEPTING"]:
+                    else:
                         if isinstance(c, ICBM):
                             damage = GameConfig.DAMAGE_ICBM
                         elif isinstance(c, TacticalBM):
@@ -960,14 +991,39 @@ class CommandCenter:
                                         self.ammo[wpn] -= loss; lost_ammo_msgs.append(f"{wpn} -{loss}")
                             if lost_ammo_msgs: self.add_log(f"\033[43;30m[DAMAGE] Ammo cache hit by explosion! Lost: {', '.join(lost_ammo_msgs)}\033[0m")
 
+        # Recover landed AWACS and CAP before purging inactive contacts
+        for c in self.contacts:
+            if not c.active and getattr(c, 'state', None) == "RTB":
+                if isinstance(c, AWACS):
+                    self.awacs_pool += 1
+                    self.add_log(f"\033[94m[AIRBASE] {c.id_code} landed safely at Wing 7 and refueling.\033[0m")
+                elif isinstance(c, CAPFighter):
+                    self.cap_pool += 1
+                    self.add_log(f"\033[94m[AIRBASE] {c.id_code} landed safely and refueling.\033[0m")
+
         self.contacts = [c for c in self.contacts if c.active]
 
     def get_after_action_report(self):
         outcome = "VICTORY" if self.base_hp > 0 else ("COURT-MARTIAL" if self.is_court_martialed else "DEFEAT (BASE DESTROYED)")
-        lr_kills = sum(1 for e in self.event_bus if e.get("type") == "INTERCEPT_KILL" and e.get("distance_km", 0) > 400)
+        lr_kills = sum(1 for e in self.historical_events if e.get("type") == "INTERCEPT_KILL" and e.get("distance_km", 0) > 400)
         
+        medals = []
+        if self.kills >= 20: medals.append("Air Defense Cross")
+        elif self.kills >= 10: medals.append("Distinguished Service Ribbon")
+        elif self.kills >= 5: medals.append("Combat Action Ribbon")
+        if self.airliners_safe >= 8: medals.append("Civil Air Safety Citation")
+        if not medals: medals = ["None Awarded"]
+
+        if self.is_court_martialed: grade = "F (COURT-MARTIAL)"
+        elif self.kills >= 20 and self.base_hp >= 80: grade = "A+"
+        elif self.kills >= 15 and self.base_hp >= 50: grade = "A"
+        elif self.kills >= 10: grade = "B"
+        elif self.kills >= 5: grade = "C"
+        else: grade = "D"
+
         report = {
             "duration_ticks": self.tick_count,
+            "survival_time_sec": self.tick_count,
             "outcome": outcome,
             "rank": self.rank,
             "xp": self.xp,
@@ -981,7 +1037,9 @@ class CommandCenter:
             "emcon_mode": self.emcon_mode,
             "salvo_mode": self.salvo_mode,
             "decoys_remaining": self.decoys_remaining,
-            "total_events": len(self.event_bus),
+            "total_events": len(self.historical_events),
+            "medals": medals,
+            "grade": grade,
         }
         
         banner = "=" * 62
@@ -999,7 +1057,7 @@ class CommandCenter:
             f" FINAL EMCON POSTURE       : {self.emcon_mode}",
             f" FINAL SALVO DOCTRINE      : {self.salvo_mode}",
             f" ACTIVE RF DECOYS REMAINING: {self.decoys_remaining}/3",
-            f" RECORDED TACTICAL EVENTS  : {len(self.event_bus)}",
+            f" RECORDED TACTICAL EVENTS  : {len(self.historical_events)}",
             "-" * 62,
             " KILLS BY THREAT TYPE:"
         ]

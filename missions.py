@@ -73,6 +73,7 @@ class VIPEscortMission(Mission):
             if not self.vip_contact.active and not getattr(self.vip_contact, 'has_arrived', False):
                 self.state = 'DEFEAT'
                 cmd.base_hp = 0
+                cmd.is_court_martialed = True
                 cmd.add_log('[MISSION FAILED] ROYAL-01 DESTROYED! COURT-MARTIAL CONVENED.')
                 return 'DEFEAT'
 
@@ -101,6 +102,7 @@ class IronSwarmMission(Mission):
 
     def on_start(self, cmd):
         self.mission_ticks = 0
+        self.wave_count = 0
         cmd.tick_count = 360
         cmd.add_log('[DEFCON 1] MASS ENEMY SATURATION STRIKE IMMINENT. 3 WAVES DETECTED.')
 
@@ -130,9 +132,10 @@ class IronSwarmMission(Mission):
         if self.mission_ticks > 80:
             hostile_count = sum(1 for c in cmd.contacts if c.active and getattr(c, 'status', '') in ['HOSTILE', 'ENGAGING'])
             if hostile_count == 0 and cmd.base_hp > 0:
-                self.state = 'VICTORY'
-                cmd.add_log('[VICTORY] ALL 3 SATURATION WAVES DESTROYED. BANGKOK DEFENSES PRESERVED!')
-                cmd.award_xp(8000, 'Iron Swarm Cleared')
+                if self.state != 'VICTORY':
+                    self.state = 'VICTORY'
+                    cmd.add_log('[VICTORY] ALL 3 SATURATION WAVES DESTROYED. BANGKOK DEFENSES PRESERVED!')
+                    cmd.award_xp(8000, 'Iron Swarm Cleared')
                 return 'VICTORY'
 
         return self.check_outcome(cmd)
@@ -161,9 +164,10 @@ class GhostHunterMission(Mission):
         self.mission_ticks += 1
         
         if self.bombers and all(not b.active for b in self.bombers):
-            self.state = 'VICTORY'
-            cmd.add_log('[VICTORY] BOTH STEALTH BOMBERS SPLASHED BEFORE STANDOFF LAUNCH. AIRSPACE SECURE.')
-            cmd.award_xp(10000, 'Ghost Hunter Cleared')
+            if self.state != 'VICTORY':
+                self.state = 'VICTORY'
+                cmd.add_log('[VICTORY] BOTH STEALTH BOMBERS SPLASHED BEFORE STANDOFF LAUNCH. AIRSPACE SECURE.')
+                cmd.award_xp(10000, 'Ghost Hunter Cleared')
             return 'VICTORY'
 
         return self.check_outcome(cmd)
@@ -187,6 +191,7 @@ class MissionManager:
         if 0 <= idx < len(self.missions):
             self.current_idx = idx
             cmd.contacts.clear()
+            cmd.unseen_contacts.clear()
             cmd.active_engagements.clear()
             cmd.threat_queue = type(cmd.threat_queue)()
             self.current.state = 'IN_PROGRESS'

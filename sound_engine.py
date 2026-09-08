@@ -136,17 +136,21 @@ def _to_stereo_sound(audio_array: np.ndarray, sr: int = SAMPLE_RATE) -> Union[py
         if audio_array.ndim == 1:
             stereo = np.column_stack((audio_array, audio_array))
         else:
-            stereo = audio_array
+            stereo = np.copy(audio_array)
 
-        # Peak normalization and soft-limiting
+        # Smooth 3ms attack ramp to eliminate sample 0 DC step discontinuities/clicks
+        ramp_len = min(len(stereo), int(0.003 * SAMPLE_RATE))
+        if ramp_len > 0:
+            ramp = np.linspace(0.0, 1.0, ramp_len)[:, np.newaxis]
+            stereo[:ramp_len] *= ramp
+
+        # Peak normalization and soft-limiting (preserve relative dynamic range)
         peak = np.max(np.abs(stereo))
         if peak > 1.0:
             stereo = np.tanh(stereo)
-        elif peak > 0:
-            stereo = stereo / peak * 0.95
 
-        # Scale to 16-bit signed PCM
-        int16_pcm = np.clip(stereo * 32767.0, -32768, 32767).astype(np.int16)
+        # Scale to 16-bit signed PCM with C-contiguous guarantee
+        int16_pcm = np.ascontiguousarray(np.clip(stereo * 32767.0, -32768, 32767).astype(np.int16))
         return pygame.sndarray.make_sound(int16_pcm)
     except Exception as ex:
         logger.warning(f"Failed to create Sound from sndarray: {ex}")
@@ -737,7 +741,7 @@ class SoundManager:
 
             # 2. Asynchronous voice transmission via Windows SAPI
             spoken = False
-            if self._enable_sapi and not self._muted:
+            if self._enable_sapi and self._audio_available and not self._muted:
                 try:
                     import pythoncom
                     import win32com.client

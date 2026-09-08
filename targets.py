@@ -277,6 +277,7 @@ class AWACS(AirContact):
         self.altitude_ft = 35000
         self.rcs = 60.0
         self.is_friendly = True
+        self.status = "FRIENDLY"
         self.has_transponder = True
         self.true_type = "Saab 340 AEW&C"
         self.scenario = "AWACS"
@@ -358,6 +359,7 @@ class CAPFighter(AirContact):
         self.altitude_ft = 25000
         self.rcs = 3.0
         self.is_friendly = True
+        self.status = "FRIENDLY"
         self.has_transponder = True
         self.true_type = fighter_type
         self.scenario = "CAP"
@@ -514,7 +516,16 @@ def is_line_of_sight_masked(x, y, target_alt_ft, peaks=None):
         return False
 
     for peak in peaks:
-        px, py, peak_alt = peak[0], peak[1], peak[2]
+        px, py = peak[0], peak[1]
+        # Robust peak altitude extraction for either 3-tuple (x, y, name) or 4-tuple (x, y, alt, name)
+        if len(peak) > 3 and isinstance(peak[2], (int, float)):
+            peak_alt = peak[2]
+        elif len(peak) > 3 and isinstance(peak[3], (int, float)):
+            peak_alt = peak[3]
+        elif len(peak) > 2 and isinstance(peak[2], (int, float)):
+            peak_alt = peak[2]
+        else:
+            peak_alt = 5000.0
         if peak_alt > target_alt_ft:
             t = (px * x + py * y) / line_len_sq
             if 0.0 <= t <= 1.0:
@@ -608,12 +619,22 @@ class AntiRadiationMissile(AirContact):
                 self.distance_km = math.hypot(self.x_km, self.y_km)
                 self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
         else:
+            # Check if radar emission resumed and reacquire lock
+            if cmd and getattr(cmd, 'radar_on', True) and getattr(cmd, 'emcon_mode', 'ACTIVE') == 'ACTIVE' and self.distance_km > 15:
+                self.seeker_locked = True
+                if hasattr(cmd, 'add_log'):
+                    cmd.add_log(f"\033[41;1m[WARNING] ARM {self.id_code} REACQUIRED RADAR EMISSIONS!\033[0m")
             # Unguided ballistic drift: continue on fixed heading
             self.x_km += speed_per_tick * math.sin(math.radians(self.heading))
             self.y_km += speed_per_tick * math.cos(math.radians(self.heading))
             self.distance_km = math.hypot(self.x_km, self.y_km)
             self.bearing = (math.degrees(math.atan2(self.x_km, self.y_km)) + 360) % 360
-            if self.distance_km > 1200:
+            if self.distance_km <= 5.0:
+                self.active = False
+                if cmd:
+                    cmd.base_hp = max(0, cmd.base_hp - GameConfig.DAMAGE_ARM)
+                    cmd.add_log(f"\033[41;97m[ALERT] ARM {self.id_code} IMPACTED BASE ON BALLISTIC MOMENTUM!\033[0m")
+            elif self.distance_km > 1200:
                 self.active = False
 
 

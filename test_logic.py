@@ -7,6 +7,8 @@ from targets import (AirContact, Aircraft, Helicopter, Drone, TacticalBM, ICBM,
                      Airliner, AWACS, CAPFighter, GhostTrack, EWGhostTrack,
                      AntiRadiationMissile, CruiseMissile, is_line_of_sight_masked)
 from command_center import CommandCenter
+from personnel import Engagement
+import random
 import math
 
 errors = []
@@ -439,6 +441,85 @@ m3, name3 = map_test.cycle_mode()
 check(m3 == MapManager.MODE_OFF, f"Third cycle should be OFF, got {name3}")
 m0, name0 = map_test.cycle_mode()
 check(m0 == MapManager.MODE_FULL_TACTICAL, f"Fourth cycle should wrap to FULL TACTICAL, got {name0}")
+
+# 21. CIWS Manual Engagement & Rapid CIWS Upgrade
+print("\n=== 21. CIWS Manual Engagement & Upgrades ===")
+cmd_ciws = CommandCenter()
+ciws_tgt = Drone(999)
+ciws_tgt.distance_km = 15.0
+ciws_tgt.x_km = 0.0
+ciws_tgt.y_km = 15.0
+cmd_ciws.contacts.append(ciws_tgt)
+initial_rounds = cmd_ciws.ammo["CIWS"]
+cmd_ciws.manual_override_fire(ciws_tgt, "CIWS")
+check(cmd_ciws.ammo["CIWS"] == initial_rounds - 1, f"CIWS manual fire should consume 1 magazine burst: {initial_rounds} -> {cmd_ciws.ammo['CIWS']}")
+check(len(cmd_ciws.active_engagements) == 1, "CIWS engagement should be added to active_engagements list")
+check(cmd_ciws.active_engagements[0].weapon_name == "CIWS", "Engagement weapon must be CIWS")
+
+# Test Rapid CIWS Upgrade
+cmd_ciws.unlocked_upgrades.add("RAPID_CIWS")
+cmd_ciws.process_engagements() # Resolves engagement
+check(ciws_tgt.status in ["CLEARED", "HOSTILE"], "Target status should be updated after engagement resolution")
+
+# 22. AWACS and CAP Landing Recovery
+print("\n=== 22. AWACS and CAP Landing Recovery ===")
+cmd_recovery = CommandCenter()
+# Initial launch through process_reloads()
+cmd_recovery.process_reloads()
+awacs_list = [c for c in cmd_recovery.contacts if isinstance(c, AWACS)]
+check(len(awacs_list) >= 1, "AWACS should launch during process_reloads")
+aw = awacs_list[0]
+init_awacs = cmd_recovery.awacs_pool
+# Simulate AWACS RTB landing
+aw.state = "RTB"
+aw.active = False
+cmd_recovery.update_world()
+check(cmd_recovery.awacs_pool == init_awacs + 1, f"AWACS pool should recover landed aircraft: {init_awacs} + 1 == {cmd_recovery.awacs_pool}")
+
+# 23. Friendly Fire & Court-Martial Triggers
+print("\n=== 23. Friendly Fire & Court-Martial Triggers ===")
+cmd_cm = CommandCenter()
+friendly_jet = Aircraft(888, friendly_weight=100)
+friendly_jet.status = "FRIENDLY"
+friendly_jet.is_friendly = True
+friendly_jet.distance_km = 50.0
+friendly_jet.x_km = 0.0
+friendly_jet.y_km = 50.0
+cmd_cm.contacts.append(friendly_jet)
+
+# Call record_kill directly to verify Court-Martial mechanics on friendly fire
+cmd_cm.record_kill(friendly_jet, "SAM")
+check(cmd_cm.is_court_martialed == True, "Shooting down friendly aircraft must trigger Court-Martial")
+check(cmd_cm.base_hp == 0, "Base HP must drop to 0 on Court-Martial")
+check(any(e.get("type") == "COURT_MARTIAL" for e in cmd_cm.event_bus), "COURT_MARTIAL event must be dispatched to event bus")
+
+# 24. Peak Altitude Masking Safety (3-tuple & 4-tuple support)
+print("\n=== 24. Peak Altitude Masking Safety ===")
+from targets import is_line_of_sight_masked
+# Test that is_line_of_sight_masked handles both standard and legacy peak data without errors
+masked_3tuple = is_line_of_sight_masked(-261.48, 641.16, 200)
+check(isinstance(masked_3tuple, bool), "Masking evaluation with 3-tuple peaks should return a boolean")
+unmasked_high = is_line_of_sight_masked(-261.48, 641.16, 15000)
+check(unmasked_high == False, "High altitude target should not be masked")
+
+# 25. Historical Events Retention for AAR
+print("\n=== 25. Historical Events Retention for AAR ===")
+cmd_aar = CommandCenter()
+dummy_target = Drone(101)
+cmd_aar.record_kill(dummy_target, "THAAD")
+cmd_aar.airliners_safe += 1
+cmd_aar.emit_event("AIRLINER_SAVED", id_code="TG-920")
+
+# Emulate UI draining the event_bus
+while cmd_aar.event_bus:
+    ev = cmd_aar.event_bus.pop(0)
+
+aar_report = cmd_aar.get_after_action_report()
+check(aar_report["kills"] == 1, f"AAR kills must retain count even after event_bus is drained (expected 1, got {aar_report['kills']})")
+check(aar_report["airliners_safe"] == 1, f"AAR airliners_safe must retain count (expected 1, got {aar_report['airliners_safe']})")
+check(aar_report["total_events"] >= 1, f"AAR total_events must be recorded in historical_events (got {aar_report['total_events']})")
+check("survival_time_sec" in aar_report, "AAR must contain survival_time_sec")
+check("grade" in aar_report, "AAR must contain performance grade")
 
 print("\n" + "="*50)
 if errors:

@@ -39,12 +39,13 @@ def draw_dashed_polygon(surface, color, points, dash_len=8, space_len=6, width=1
         dx = (p2[0] - p1[0]) / dist
         dy = (p2[1] - p1[1]) / dist
         curr = 0.0
+        step = max(1.0, float(dash_len + space_len))
         while curr < dist:
             seg_end = min(curr + dash_len, dist)
             sp = (p1[0] + dx * curr, p1[1] + dy * curr)
             ep = (p1[0] + dx * seg_end, p1[1] + dy * seg_end)
             pygame.draw.line(surface, color, sp, ep, width)
-            curr += dash_len + space_len
+            curr += step
 
 class MapManager:
     # Map display modes
@@ -427,7 +428,12 @@ class MapManager:
                 # Military Base Icon (Circle + Inset Square)
                 pygame.draw.circle(surf, bcol, (int(sx), int(sy)), 4, 1)
                 pygame.draw.rect(surf, bcol, (int(sx - 3), int(sy - 3), 7, 7), 1)
-                surf.blit(font_xs.render(bname, True, bcol), (sx + 8, sy - 4))
+            elif btype == "CIVIL":
+                # Commercial Airport Hub (Circle + Cross)
+                pygame.draw.circle(surf, bcol, (int(sx), int(sy)), 3, 1)
+                pygame.draw.line(surf, bcol, (sx - 4, sy), (sx + 4, sy), 1)
+                pygame.draw.line(surf, bcol, (sx, sy - 4), (sx, sy + 4), 1)
+                surf.blit(font_xs.render(bname, True, bcol), (sx + 6, sy - 4))
             elif btype == "NEIGHBOR" and self.map_mode == self.MODE_FULL_TACTICAL:
                 # Neighboring Strategic Hub (Small Diamond)
                 pygame.draw.polygon(surf, bcol, [(sx, sy - 3), (sx + 3, sy), (sx, sy + 3), (sx - 3, sy)], 1)

@@ -2,13 +2,15 @@
 class GameConfig:
     VERSION = "1.1.0"
 
-    # Real-world RTAF airbase positions in relative km from Bangkok (center of map)
+    # Real-world RTAF airbase positions in relative km from Bangkok (harmonized with geodata)
     AIRBASES = [
-        (150, 100, "Wing 1 (Korat)"),
-        (0, 150, "Wing 4 (Takhli)"),
-        (20, -350, "Wing 7 (Surat Thani)"),
-        (250, 180, "Wing 21 (Ubon)"),
-        (180, 280, "Wing 23 (Udon)")
+        (148.2, 107.5, "Wing 1 (Korat)"),
+        (24.3, 178.6, "Wing 4 (Takhli)"),
+        (-149.7, -511.4, "Wing 7 (Surat Thani)"),
+        (412.5, 175.4, "Wing 21 (Ubon)"),
+        (218.6, 403.2, "Wing 23 (Udon)"),
+        (-217.9, 534.3, "Wing 41 (Chiang Mai)"),
+        (-164.2, -738.9, "Wing 56 (Hat Yai)")
     ]
 
     # aircraft assigned to each wing (real RTAF inventory)
@@ -18,6 +20,8 @@ class GameConfig:
         "Wing 7 (Surat Thani)":  ["JAS-39C Gripen", "JAS-39D Gripen"],
         "Wing 21 (Ubon)":        ["F-16A Block 15 OCU", "F-16B Block 15 OCU"],
         "Wing 23 (Udon)":        ["Alpha Jet", "T-50TH Golden Eagle"],
+        "Wing 41 (Chiang Mai)":  ["F-5TH Super Tigris", "T-50TH Golden Eagle"],
+        "Wing 56 (Hat Yai)":     ["Gripen C/D Detachment", "F-16A ADF"]
     }
 
     # Hit probabilities - tuned so enemies occasionally punch through
@@ -26,16 +30,17 @@ class GameConfig:
     HIT_CHANCE_SAM_TBM = 0.15
     HIT_CHANCE_SAM_NORMAL = 0.40
     HIT_CHANCE_F16 = 0.45
-    HIT_CHANCE_CIWS = 0.30
+    HIT_CHANCE_CIWS = 0.85  # Point-defense burst lethality
 
     # Weapon speeds (km/tick)
     WEAPON_SPEED_THAAD = 30.0
     WEAPON_SPEED_SAM = 12.0
     WEAPON_SPEED_F16 = 3.5
+    WEAPON_SPEED_CIWS = 25.0
 
     # Inventory and reload times
     MAX_AMMO = {"THAAD": 8, "FIGHTER": 15, "SAM": 50, "CIWS": 150}
-    RELOAD_TIMES = {"THAAD": 60, "SAM": 25, "CIWS": 10}
+    RELOAD_TIMES = {"THAAD": 60, "SAM": 25, "CIWS": 10, "FIGHTER": 45}
 
     # Weapon preparation times (ticks)
     PREP_TIME_THAAD = 20
