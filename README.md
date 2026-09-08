@@ -16,7 +16,7 @@
 
 *Featuring 1:10m real-world Natural Earth geospatial geometry across Southeast Asia, 100% procedural NumPy audio synthesis (0 MB external sound files), electronic warfare & anti-radiation missile dynamics, salvo firing doctrines, and scenario campaign operations.*
 
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.1.0 → v1.1.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (25/25)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.1.0 → v1.1.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (26/26)](test_logic.py)
 
 </div>
 
@@ -34,7 +34,7 @@
 8. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 9. [Complete Tactical Keybindings](#complete-tactical-keybindings)
 10. [System Architecture & OOP Design](#system-architecture--oop-design)
-11. [Automated Testing (25/25 Test Suite)](#automated-testing-2525-test-suite)
+11. [Automated Testing (26/26 Test Suite)](#automated-testing-2626-test-suite)
 12. [Release History & Version Bump (v1.0.0 → v1.1.1)](#release-history--version-bump-v100--v111)
 13. [Installation & Build Guide](#installation--build-guide)
 14. [Dependencies](#dependencies)
@@ -266,19 +266,51 @@ Cycle operational scenarios at any time by pressing **`[F1]`**. Each scenario in
 
 Pressing **`[TAB]`** opens the tactical upgrades overlay. Upgrades are purchased in real time using XP earned from verified intercepts, long-range kills, and protected airliners.
 
+### Two-Tier Armory Progression Architecture
+The armory features an expandable, two-tier developmental tree:
+1. **Tier 1 (Conventional Systems)**: Standard operational enhancements available immediately.
+2. **Tier 2 (Black Ops Experimental Arsenal)**: Classified advanced weapon and sensor prototypes unlocked **only after mastering all 5 Tier 1 upgrades**.
+
+Inside the Armory overlay, press **`[T]`** to switch between **Tier 1: Conventional** and **Tier 2: Black Ops** tabs.
+
 ```
-+-----------------------------------------------------------------------------------------------+
-|                            TACTICAL TECHNOLOGY UPGRADE TREE [TAB]                             |
-+-----+-------------------+------+----------------------------------------------+---------------+
-| Key | Upgrade Node      | Cost | Tactical Enhancement                         | Status        |
-+-----+-------------------+------+----------------------------------------------+---------------+
-| [1] | AESA_RANGE        | 1200 | AESA Radar Overclock: +25% Range (800->1000km) | BUY / ACTIVE  |
-| [2] | DOPPLER_FILTER    |  800 | Doppler Clutter Filter: Auto-clears clutter  | BUY / ACTIVE  |
-| [3] | DECOY_PACK        | 1000 | Decoy Resupply: Grants +3 Active RF Decoys   | BUY / ACTIVE  |
-| [4] | RAPID_CIWS        | 1500 | Phalanx Rapid Feed: +100 CIWS rounds & reload| BUY / ACTIVE  |
-| [5] | AESA_SEEKERS      | 2500 | Active AESA Seekers: +15% Base P_k (SAM/THAAD)| BUY / ACTIVE  |
-+-----+-------------------+------+----------------------------------------------+---------------+
++----------------------------------------------------------------------------------------------------------------+
+|                                    TACTICAL ARMORY & UPGRADE SYSTEM [TAB]                                      |
++----------------------------------------------------------------------------------------------------------------+
+|  [T] TAB 1: TIER 1 CONVENTIONAL                                  [T] TAB 2: TIER 2 BLACK OPS (CLASSIFIED)      |
+|  - AESA Radar Overclock [1] (1,200 XP)                           - Quantum Space Radar [1 / 6] (3,500 XP)      |
+|  - Doppler Clutter Filter [2] (800 XP)                           - Meteor Ramjet Scrambles [2 / 7] (4,000 XP)  |
+|  - RF Decoy Resupply Pack [3] (1,000 XP)                         - Helios Laser CIWS [3 / 8] (5,000 XP)        |
+|  - Phalanx Rapid Ammo Feed [4] (1,500 XP)                        - Tactical EMP Generator [4 / 9] (4,500 XP)   |
+|  - Active AESA Seekers [5] (2,500 XP)                            - Nanotech Aegis Shield [5 / 0] (6,000 XP)    |
+|                                                                                                                |
+|  Status: [5/5 Unlocked] ──► AUTHORIZES ─────────────────────────► Status: [CLASSIFIED LAB UNLOCKED]            |
++----------------------------------------------------------------------------------------------------------------+
 ```
+
+### Tier 1: Conventional Upgrades
+
+| Key | Upgrade Node | Cost | Tactical Enhancement | Operational Effect |
+|---|---|---|---|---|
+| **`[1]`** | `AESA_RANGE` | 1,200 XP | AESA Radar Overclock | Increases maximum radar instrumented range by +25% (800 km $\to$ 1,000 km). |
+| **`[2]`** | `DOPPLER_FILTER` | 800 XP | Doppler Clutter Filter | High-velocity MTI filtering automatically purging weather clutter and bird flock false tracks. |
+| **`[3]`** | `DECOY_PACK` | 1,000 XP | Decoy Resupply | Instantly adds +3 pneumatic Active RF Decoys to the command bunker inventory. |
+| **`[4]`** | `RAPID_CIWS` | 1,500 XP | Phalanx Rapid Feed | Expands CIWS magazine capacity by +100 rounds (150 $\to$ 250) and triggers an instant reload. |
+| **`[5]`** | `AESA_SEEKERS` | 2,500 XP | Active AESA Seekers | High-precision gallium-nitride missile guidance providing +15% hit probability ($P_k$) across SAM and THAAD batteries. |
+
+*Unlock Condition for Tier 2: Master and purchase all 5 Tier 1 upgrades (Total: 7,000 XP).*
+
+### Tier 2: Black Ops Experimental Arsenal (Classified)
+
+High Command unlocks experimental Skunkworks / Black Ops prototypes once the conventional armory is completely mastered:
+
+| Key | Upgrade Node | Cost | Tactical Enhancement | Operational Effect |
+|---|---|---|---|---|
+| **`[1]`** / **`[6]`** | `QUANTUM_SPACE_RADAR` | 3,500 XP | Orbital Quantum Sensor Constellation | Deploys entangled-photon space-based radar looking down from orbit. **Completely bypasses terrain and mountain peak line-of-sight masking**, detecting low-altitude cruise missiles instantly. |
+| **`[2]`** / **`[7]`** | `METEOR_HYPERSONIC` | 4,000 XP | Ramjet Hypersonic BVR Scrambles | Equips RTAF fighter wings with MBDA Meteor solid-fuel ramjet missiles. Expands fighter scramble sortie pool by **+10 sorties** (15 $\to$ 25 max) and provides an immediate full restock. |
+| **`[3]`** / **`[8]`** | `IRON_BEAM_DIRECTED_ENERGY` | 5,000 XP | Helios 100kW Directed Energy Laser | Upgrades close-in defense to speed-of-light directed energy. Extends auto-engagement envelope from 5.0 km to **30.0 km** with guaranteed **$\ge 95\%$ lethal kill rate** against supersonic threats. |
+| **`[4]`** / **`[9]`** | `TACTICAL_EMP_BURST` | 4,500 XP | High-Power Microwave (HPM) Generator | Installs an omnidirectional tactical EMP capacitor bank. Press **`[B]`** during combat to discharge: **immediately vaporizes all EW ghost tracks/jamming** and **fries incoming Anti-Radiation Missile seeker locks**, sending ARMs into blind ballistic drift. |
+| **`[5]`** / **`[0]`** | `NANOTECH_AEGIS_SHIELD` | 6,000 XP | Nanotech Force Field & Hull Regeneration | Fortifies Command Bunker structural integrity to **150 Max HP** (restoring HP to 150 immediately) and provides passive 50% damage reduction against heavy ballistic impacts. |
 
 ### RTAF Career Rank & XP Progression
 
@@ -374,8 +406,11 @@ A dedicated game-feel engine translates kinetic impacts into visceral tactical f
 | **`[E]`** | Global | Toggle **EMCON Mode**: `ACTIVE` (360°) $\to$ `SECTOR` (120°) $\to$ `SILENT` (Dark) |
 | **`[S]`** | Global | Toggle **Salvo Doctrine**: `SINGLE` (1x) $\to$ `RIPPLE` (2x) $\to$ `SALVO` (3x, $P_k \ge 90\%$) |
 | **`[D]`** | Global | Deploy **Active RF Decoy**: Blooms 15 km away to seduce homing ARMs |
-| **`[TAB]`** | Global | Toggle **Tactical Technology Upgrade Tree** (Spend XP on systems) |
-| **`[1 - 5]`** | Upgrades Open | Purchase tech upgrade nodes (AESA Range, Doppler, Decoys, CIWS, Seekers) |
+| **`[B]`** | Global | Discharge **Tactical EMP Shockwave**: Vaporizes EW ghost tracks & fries ARM seekers (requires Tier 2 EMP) |
+| **`[TAB]`** | Global | Toggle **Tactical Armory & Upgrade Tree** (Tier 1 Conventional & Tier 2 Black Ops) |
+| **`[T]`** | Armory Open | Toggle **Armory Tab**: `Tier 1: Conventional` $\longleftrightarrow$ `Tier 2: Black Ops (Classified)` |
+| **`[1 - 5]`** | Armory Open | Purchase tech upgrade nodes for current active tab (Tier 1 or Tier 2) |
+| **`[6 - 0]`** | Armory Open | Direct-key purchase for Tier 2 Black Ops nodes (`6`=Quantum, `7`=Meteor, `8`=Laser, `9`=EMP, `0`=Nanotech) |
 | **`[F1]`** | Global | Cycle **Campaign Scenario**: `OP-DEFENSE` $\to$ `OP-GUARDIAN` $\to$ `OP-IRONSWARM` $\to$ `OP-GHOST` |
 | **`[F2]`** | Global | Cycle **Map Overlay**: `FULL TACTICAL` $\to$ `SOVEREIGN FOCUS` $\to$ `MINIMAL` $\to$ `DARK` |
 | **`[U]`** | Global | Toggle **Audio Mute** (Procedural synthesizer silence) |
@@ -425,9 +460,9 @@ The project is structured according to strict Object-Oriented Programming (OOP) 
 
 ---
 
-## Automated Testing (20/20 Test Suite)
+## Automated Testing (26/26 Test Suite)
 
-AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 25 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
+AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 26 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
 ```bash
 $ python test_logic.py
@@ -461,9 +496,10 @@ $ python test_logic.py
 [PASS] 23. Friendly Fire Prevention & Universal Civilian Shootdown Court-Martial
 [PASS] 24. Multi-Format Geodata Mountain Peak Masking Tuple Unpacking Safety
 [PASS] 25. Historical Event Bus Retention for After-Action Report (AAR) Analytics
+[PASS] 26. Tier 2 Black Ops Experimental Arsenal Gating, Purchases & Mechanics
 
 ==================================================
-ALL 25 TEST MODULES PASSED (100% SUCCESS RATE)
+ALL 26 TEST MODULES PASSED (100% SUCCESS RATE)
 ```
 
 ---

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-09
+
+### Added
+- **Tier 2 Black Ops Experimental Arsenal (`command_center.py`)**:
+  - Implemented progression gate: mastering all 5 Tier 1 upgrades automatically unlocks classified Tier 2 Black Ops developmental projects.
+  - Added 5 prototype combat & sensor upgrades:
+    1. `QUANTUM_SPACE_RADAR` (3,500 XP): Entangled photon orbital sensor constellation completely bypassing terrain/mountain line-of-sight masking for cruise missiles.
+    2. `METEOR_HYPERSONIC` (4,000 XP): Equips RTAF fighter wings with ramjet BVR missiles (+10 max fighter sortie pool, instant reload).
+    3. `IRON_BEAM_DIRECTED_ENERGY` (5,000 XP): Helios 100kW laser point-defense extending CIWS auto-engage range to 30.0 km with guaranteed $\ge 95\%$ lethal kill rate.
+    4. `TACTICAL_EMP_BURST` (4,500 XP): High-power microwave burst deployed via combat hotkey `[B]` vaporizing all EW ghost tracks and frying inbound ARM seeker locks.
+    5. `NANOTECH_AEGIS_SHIELD` (6,000 XP): Fortifies Command Base HP to 150 Max (instant heal) with 50% passive damage mitigation.
+  - Added `trigger_emp_burst()` system to neutralize electronic warfare jamming and break homing missile guidance.
+- **Tabbed Armory UI & Interactive Controls (`radar_ui.py`)**:
+  - Expanded armory overlay from 580x280 to 680x360 with dual-tab support (`[T]` to toggle between Tier 1 Conventional and Tier 2 Black Ops).
+  - Added classified access security restriction modal explaining Tier 1 mastery prerequisite.
+  - Added hotkey bindings `[1]-[5]` (tab-aware) and direct global purchase keys `[6]-[0]`.
+  - Added combat key `[B]` for instantaneous tactical EMP shockwave discharge.
+- **Automated Verification Suite (`test_logic.py`)**:
+  - Added Section 26 testing suite covering gating conditions, XP deductions, duplicate rejections, and mechanics for all 5 Tier 2 items.
+  - All 26 test sections passing (100% green).
+
 ## [1.1.1] - 2026-09-08
 
 ### Fixed
@@ -96,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AWACS orbit patrol and Combat Air Patrol (CAP) lifecycle management.
 - 3-phase escalation model: Peacetime (0–2m), Tensions (2–6m), Wartime (6m+).
 
+[1.2.0]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/chawannua/air-defense-radar-sim/releases/tag/v1.0.0

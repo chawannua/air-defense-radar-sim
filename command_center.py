@@ -76,39 +76,89 @@ class CommandCenter:
         self.prev_defcon = 5
         self.mission_mgr = MissionManager()
         self.radar_max_km = 800.0
+        self.max_base_hp = 100
+        self.ciws_engage_range = 5.0
         self.unlocked_upgrades = set()
+        self.UPGRADE_TIER_1_KEYS = ["AESA_RANGE", "DOPPLER_FILTER", "DECOY_PACK", "RAPID_CIWS", "AESA_SEEKERS"]
         self.UPGRADE_CATALOG = {
             "AESA_RANGE": {
                 "name": "AESA Radar Overclock",
                 "cost": 1200,
                 "desc": "+25% Max Radar Range (800km -> 1000km)",
-                "key": "1"
+                "key": "1",
+                "tier": 1
             },
             "DOPPLER_FILTER": {
                 "name": "Doppler Clutter Filter",
                 "cost": 800,
                 "desc": "Auto-clears weather & bird clutter",
-                "key": "2"
+                "key": "2",
+                "tier": 1
             },
             "DECOY_PACK": {
                 "name": "RF Decoy Resupply Pack",
                 "cost": 1000,
                 "desc": "+3 Active RF Decoys",
-                "key": "3"
+                "key": "3",
+                "tier": 1
             },
             "RAPID_CIWS": {
                 "name": "Phalanx Rapid Feed System",
                 "cost": 1500,
                 "desc": "+100 CIWS 20mm Ammo & Instant Reload",
-                "key": "4"
+                "key": "4",
+                "tier": 1
             },
             "AESA_SEEKERS": {
                 "name": "AESA Active Missile Seekers",
                 "cost": 2500,
                 "desc": "+15% Base P_k for SAMs & THAAD",
-                "key": "5"
+                "key": "5",
+                "tier": 1
             }
         }
+        self.UPGRADE_TIER_2 = {
+            "QUANTUM_SPACE_RADAR": {
+                "name": "Space-Based Quantum Radar",
+                "cost": 3500,
+                "desc": "Orbital recon: paints all stealth & bypasses terrain masking",
+                "key": "6",
+                "tier": 2
+            },
+            "METEOR_HYPERSONIC": {
+                "name": "Meteor Ramjet BVR Scramble",
+                "cost": 4000,
+                "desc": "+10 Max Fighter Ammo, Instant Restock & Mach 4.5 Intercept",
+                "key": "7",
+                "tier": 2
+            },
+            "IRON_BEAM_DIRECTED_ENERGY": {
+                "name": "Helios 100kW Directed Energy Laser",
+                "cost": 5000,
+                "desc": "CIWS laser point-defense: 30km range & lightspeed intercept",
+                "key": "8",
+                "tier": 2
+            },
+            "TACTICAL_EMP_BURST": {
+                "name": "High-Power EMP Shockwave Generator",
+                "cost": 4500,
+                "desc": "Emergency EMP: Wipes EW ghost tracks & fries ARM missile seekers",
+                "key": "9",
+                "tier": 2
+            },
+            "NANOTECH_AEGIS_SHIELD": {
+                "name": "Nanotech Force Field & Hull Regeneration",
+                "cost": 6000,
+                "desc": "Fortifies Base HP to 150 Max & 50% damage reduction",
+                "key": "0",
+                "tier": 2
+            }
+        }
+        self.UPGRADE_CATALOG.update(self.UPGRADE_TIER_2)
+
+    @property
+    def is_tier_1_complete(self):
+        return all(k in self.unlocked_upgrades for k in self.UPGRADE_TIER_1_KEYS)
 
     @property
     def rank(self):
@@ -248,6 +298,8 @@ class CommandCenter:
         """Returns True if contact is detectable/visible under current EMCON mode."""
         if not c.active:
             return False
+        if "QUANTUM_SPACE_RADAR" in self.unlocked_upgrades:
+            return True
         if isinstance(c, (AWACS, CAPFighter)):
             return True
         if getattr(c, 'detected_by', '') == 'SPACE-COM':
@@ -264,6 +316,8 @@ class CommandCenter:
     def unlock_upgrade(self, upgrade_id):
         if upgrade_id in self.unlocked_upgrades:
             return False, "Already Unlocked"
+        if upgrade_id in self.UPGRADE_TIER_2 and not self.is_tier_1_complete:
+            return False, "Locked: Complete Tier 1 First"
         if upgrade_id not in self.UPGRADE_CATALOG:
             return False, "Unknown Upgrade"
         info = self.UPGRADE_CATALOG[upgrade_id]
@@ -282,10 +336,50 @@ class CommandCenter:
             self.max_ammo["CIWS"] += 100
             self.ammo["CIWS"] += 100
             self.reload_timers["CIWS"] = 0
+        elif upgrade_id == "QUANTUM_SPACE_RADAR":
+            self.add_log("\033[96;1m[SPACE-COM] QUANTUM SATELLITE CONSTELLATION ONLINE. TERRAIN MASKING BYPASSED.\033[0m")
+        elif upgrade_id == "METEOR_HYPERSONIC":
+            self.max_ammo["FIGHTER"] += 10
+            self.ammo["FIGHTER"] = self.max_ammo["FIGHTER"]
+            self.reload_timers["FIGHTER"] = 0
+            self.add_log("\033[92;1m[RTAF] SQUADRONS EQUIPPED WITH METEOR BVR RAMJET MISSILES!\033[0m")
+        elif upgrade_id == "IRON_BEAM_DIRECTED_ENERGY":
+            self.ciws_engage_range = 30.0
+            self.add_log("\033[93;1m[HELIOS] 100kW DIRECTED ENERGY LASER POINT DEFENSE ARMED (30km RANGE)!\033[0m")
+        elif upgrade_id == "TACTICAL_EMP_BURST":
+            self.add_log("\033[95;1m[SYS] HIGH-POWER MICROWAVE / EMP SHOCKWAVE GENERATOR READY! PRESS [B] TO DISCHARGE.\033[0m")
+        elif upgrade_id == "NANOTECH_AEGIS_SHIELD":
+            self.max_base_hp = 150
+            self.base_hp = 150
+            self.add_log("\033[94;1m[AEGIS] NANOTECH DEFENSE MATRIX ONLINE. BASE HP FORTIFIED TO 150!\033[0m")
             
         self.add_log(f"\033[92m[TECH UPGRADE] UNLOCKED: {info['name']} (-{info['cost']} XP)\033[0m")
-        self.emit_event("UPGRADE_UNLOCKED", upgrade_id=upgrade_id, name=info["name"])
+        self.emit_event("UPGRADE_UNLOCKED", upgrade_id=upgrade_id, name=info["name"], tier=info.get("tier", 1))
+        
+        if self.is_tier_1_complete and len(self.unlocked_upgrades & set(self.UPGRADE_TIER_1_KEYS)) == 5:
+            self.emit_event("TIER_2_UNLOCKED")
+            self.add_log("\033[95;1m[CLASSIFIED] ALL TIER 1 UPGRADES MASTERED! TIER 2 BLACK OPS LAB UNLOCKED!\033[0m")
+            
         return True, "Success"
+
+    def trigger_emp_burst(self):
+        if "TACTICAL_EMP_BURST" not in self.unlocked_upgrades:
+            return False, "EMP Generator Not Unlocked"
+            
+        # 1. Disable ARM seeker locks
+        for c in self.contacts:
+            if isinstance(c, AntiRadiationMissile) or getattr(c, 'scenario', '') == 'SEAD' or hasattr(c, 'seeker_locked'):
+                c.seeker_locked = False
+
+        # 2. Clear all EW ghost tracks and clutter
+        for c in list(self.contacts):
+            if isinstance(c, (GhostTrack, EWGhostTrack)) or getattr(c, 'is_ghost', False) or getattr(c, 'true_type', '') in ['BIRD_FLOCK/WEATHER', 'ELECTRONIC_DECEPTION']:
+                c.active = False
+        self.contacts = [c for c in self.contacts if c.active]
+                    
+        self.emit_event("EMP_BURST_TRIGGERED")
+        self.add_log("\033[95;1m[EMP] TACTICAL EMP SHOCKWAVE DISCHARGED! EW JAMMING & ARM SEEKERS NEUTRALIZED!\033[0m")
+        return True, "EMP shockwave discharged."
 
     def add_log(self, msg):
         ts = datetime.now().strftime("%H:%M:%S")
@@ -322,6 +416,16 @@ class CommandCenter:
                 if isinstance(c, (GhostTrack, EWGhostTrack)):
                     c.active = False
             self.contacts = [c for c in self.contacts if not isinstance(c, (GhostTrack, EWGhostTrack))]
+        
+        # Quantum Space Radar upgrade: bypass terrain masking & detect unseen contacts immediately
+        if "QUANTUM_SPACE_RADAR" in self.unlocked_upgrades:
+            for c in list(self.unseen_contacts):
+                if c.active:
+                    c.is_masked = False
+                    c.detected_by = "QUANTUM-SPACE"
+                    c.brightness = 1.0
+                    self.contacts.append(c)
+            self.unseen_contacts = [c for c in self.unseen_contacts if c not in self.contacts]
         
         # --- escalation phases ---
         tick = self.tick_count
@@ -835,7 +939,8 @@ class CommandCenter:
     def process_auto_ciws(self):
         # Auto-CIWS with dynamic engagement range
         for c in self.contacts:
-            engage_range = max(5.0, c.speed_mach * 1.5) 
+            base_engage_range = getattr(self, 'ciws_engage_range', 30.0 if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades else 5.0)
+            engage_range = max(base_engage_range, c.speed_mach * 1.5) 
             
             if c.active and c.distance_km <= engage_range and c.status not in ["FRIENDLY", "CLEARED"]:
                 if self.ammo["CIWS"] > 0:
@@ -847,11 +952,14 @@ class CommandCenter:
                     hit_multiplier = 1.0 + (ammo_used * 0.10) 
                     speed_penalty = max(0.0, (c.speed_mach - 0.5) * 0.15) # CIWS struggles with Mach 2+ targets
                     final_hit_chance = max(0.05, min(0.95, GameConfig.HIT_CHANCE_CIWS * hit_multiplier - speed_penalty))
+                    if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades:
+                        final_hit_chance = max(0.95, final_hit_chance)
                     
                     hit = (random.random() <= final_hit_chance)
                     self.emit_event("CIWS_FIRE", target_id=c.id_code, ammo_used=ammo_used, hit=hit)
                     if hit:
-                        self.add_log(f"\033[91;1m[AUTO-CIWS] BRRRRRRT! (Spread x{ammo_used}) {c.id_code} SHREDDED! (Ammo: {self.ammo['CIWS']})\033[0m")
+                        weapon_label = "Helios Laser" if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades else "Phalanx CIWS"
+                        self.add_log(f"\033[91;1m[AUTO-CIWS] BRRRRRRT! (Spread x{ammo_used}) {c.id_code} SHREDDED by {weapon_label}! (Ammo: {self.ammo['CIWS']})\033[0m")
                         c.status = "CLEARED"
                         c.active = False
                         self.record_kill(c, "CIWS")
@@ -900,9 +1008,14 @@ class CommandCenter:
                 # If SILENT: ground radar is blind (contacts only visible if within AWACS or CAP visual/radar range)
                 in_sensor = self.is_in_sensor_coverage(c)
                 is_space = (getattr(c, 'detected_by', '') == 'SPACE-COM')
+                is_quantum = ("QUANTUM_SPACE_RADAR" in self.unlocked_upgrades)
 
                 can_detect = False
-                if is_space:
+                if is_quantum:
+                    can_detect = True
+                    c.is_masked = False
+                    c.detected_by = "QUANTUM-SPACE"
+                elif is_space:
                     can_detect = True
                 elif in_sensor:
                     can_detect = True

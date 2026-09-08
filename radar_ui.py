@@ -98,6 +98,7 @@ def start_radar():
     CX = WIDTH // 2
     CY = HEIGHT // 2
     show_upgrades = False
+    upgrades_tab = 1
 
     running = True
     while running:
@@ -194,12 +195,21 @@ def start_radar():
                 
                 # Tech Upgrades Purchasing (when Upgrades panel is open)
                 if show_upgrades:
+                    if event.key == pygame.K_t:
+                        upgrades_tab = 2 if upgrades_tab == 1 else 1
+                        sound_mgr.radio_callout("Armory tier toggled.")
+                        continue
                     upgrade_map = {
-                        pygame.K_1: "AESA_RANGE",
-                        pygame.K_2: "DOPPLER_FILTER",
-                        pygame.K_3: "DECOY_PACK",
-                        pygame.K_4: "RAPID_CIWS",
-                        pygame.K_5: "AESA_SEEKERS"
+                        pygame.K_1: "AESA_RANGE" if upgrades_tab == 1 else "QUANTUM_SPACE_RADAR",
+                        pygame.K_2: "DOPPLER_FILTER" if upgrades_tab == 1 else "METEOR_HYPERSONIC",
+                        pygame.K_3: "DECOY_PACK" if upgrades_tab == 1 else "IRON_BEAM_DIRECTED_ENERGY",
+                        pygame.K_4: "RAPID_CIWS" if upgrades_tab == 1 else "TACTICAL_EMP_BURST",
+                        pygame.K_5: "AESA_SEEKERS" if upgrades_tab == 1 else "NANOTECH_AEGIS_SHIELD",
+                        pygame.K_6: "QUANTUM_SPACE_RADAR",
+                        pygame.K_7: "METEOR_HYPERSONIC",
+                        pygame.K_8: "IRON_BEAM_DIRECTED_ENERGY",
+                        pygame.K_9: "TACTICAL_EMP_BURST",
+                        pygame.K_0: "NANOTECH_AEGIS_SHIELD"
                     }
                     if event.key in upgrade_map:
                         uid = upgrade_map[event.key]
@@ -232,6 +242,14 @@ def start_radar():
                     cmd.toggle_salvo()
                 elif event.key == pygame.K_d:
                     cmd.deploy_decoy()
+                elif event.key == pygame.K_b:
+                    if "TACTICAL_EMP_BURST" in cmd.unlocked_upgrades:
+                        ok, msg = cmd.trigger_emp_burst()
+                        if ok:
+                            sound_mgr.radio_callout("EMP shockwave discharged.")
+                            vfx_mgr.add_shockwave(CX, CY, max_radius=km_to_px(600), color=(180, 80, 255))
+                    else:
+                        cmd.add_log("\033[93m[EMP] EMP Generator offline. Unlock in Black Ops Lab [TAB].\033[0m")
                 elif event.key == pygame.K_u:
                     is_muted = sound_mgr.toggle_mute()
                     cmd.add_log(f"\033[93m[AUDIO] Audio muted: {is_muted}\033[0m")
@@ -723,27 +741,83 @@ def start_radar():
 
         # Spawn controls instruction
         map_tag = ["FULL", "SOVEREIGN", "MINIMAL", "OFF"][map_mgr.map_mode]
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else f"TACTICAL: [E] EMCON | [S] Salvo | [D] Decoy | [TAB] Upgrades | [F1] Mission | [F2] Map:{map_tag} | [P] Phase 3"
+        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else f"TACTICAL: [E] EMCON | [S] Salvo | [D] Decoy | [B] EMP | [TAB] Upgrades | [F1] Mission | [F2] Map:{map_tag} | [P] Phase 3"
         screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 72))
 
         # Tactical Upgrades Overlay (Toggle with TAB)
         if show_upgrades:
-            up_w, up_h = 580, 280
+            up_w, up_h = 680, 360
             up_x, up_y = (WIDTH - up_w) // 2, (HEIGHT - up_h) // 2
             pygame.draw.rect(screen, (5, 12, 10), (up_x, up_y, up_w, up_h))
-            pygame.draw.rect(screen, (80, 220, 120), (up_x, up_y, up_w, up_h), 2)
-            screen.blit(font_lg.render("TACTICAL ARMORY & TECH UPGRADES", True, (100, 255, 150)), (up_x + 20, up_y + 15))
-            screen.blit(font_sm.render(f"COMMAND BALANCE: {cmd.xp:,} XP AVAILABLE  |  PRESS [TAB] TO CLOSE", True, (255, 220, 50)), (up_x + 20, up_y + 45))
+            border_color = (180, 80, 255) if (upgrades_tab == 2 and cmd.is_tier_1_complete) else (80, 220, 120)
+            pygame.draw.rect(screen, border_color, (up_x, up_y, up_w, up_h), 2)
             
-            for idx, (uid, uinfo) in enumerate(cmd.UPGRADE_CATALOG.items()):
-                row_y = up_y + 75 + idx * 36
-                is_unlocked = uid in cmd.unlocked_upgrades
-                status_txt = "[UNLOCKED]" if is_unlocked else f"[{uinfo['key']}] BUY: {uinfo['cost']:,} XP"
-                status_color = (100, 255, 100) if is_unlocked else ((255, 220, 0) if cmd.xp >= uinfo['cost'] else (140, 140, 140))
+            title_text = "TACTICAL ARMORY & TECH UPGRADES" if upgrades_tab == 1 else "BLACK OPS EXPERIMENTAL LAB (TIER 2)"
+            title_col = (100, 255, 150) if upgrades_tab == 1 else (220, 140, 255)
+            screen.blit(font_lg.render(title_text, True, title_col), (up_x + 20, up_y + 12))
+            
+            # Tab indicators
+            t1_col = (100, 255, 100) if cmd.is_tier_1_complete else (200, 200, 200)
+            t2_col = (220, 140, 255) if cmd.is_tier_1_complete else (120, 120, 120)
+            tab_hint = "[T] SWITCH TO TIER 2" if upgrades_tab == 1 else "[T] SWITCH TO TIER 1"
+            screen.blit(font_xs.render(f"BALANCE: {cmd.xp:,} XP  |  [TAB] CLOSE  |  {tab_hint}", True, (255, 220, 50)), (up_x + 20, up_y + 38))
+            
+            # Draw tab buttons
+            tab1_bg = (20, 45, 25) if upgrades_tab == 1 else (10, 20, 12)
+            tab2_bg = (40, 20, 55) if upgrades_tab == 2 else (15, 10, 20)
+            pygame.draw.rect(screen, tab1_bg, (up_x + 20, up_y + 54, 260, 22))
+            pygame.draw.rect(screen, (80, 220, 120) if upgrades_tab == 1 else (50, 80, 60), (up_x + 20, up_y + 54, 260, 22), 1)
+            t1_status = "[COMPLETED]" if cmd.is_tier_1_complete else f"[{len(cmd.unlocked_upgrades & set(cmd.UPGRADE_TIER_1_KEYS))}/5]"
+            screen.blit(font_xs.render(f"TIER 1: CONVENTIONAL {t1_status}", True, t1_col), (up_x + 28, up_y + 58))
+
+            pygame.draw.rect(screen, tab2_bg, (up_x + 290, up_y + 54, 280, 22))
+            pygame.draw.rect(screen, (180, 80, 255) if upgrades_tab == 2 else (80, 50, 90), (up_x + 290, up_y + 54, 280, 22), 1)
+            t2_status = "[UNLOCKED]" if cmd.is_tier_1_complete else "[LOCKED]"
+            screen.blit(font_xs.render(f"TIER 2: BLACK OPS {t2_status}", True, t2_col), (up_x + 298, up_y + 58))
+
+            # Display items according to active tab
+            if upgrades_tab == 1:
+                items_to_show = [(k, cmd.UPGRADE_CATALOG[k]) for k in cmd.UPGRADE_TIER_1_KEYS]
+                for idx, (uid, uinfo) in enumerate(items_to_show):
+                    row_y = up_y + 86 + idx * 46
+                    is_unlocked = uid in cmd.unlocked_upgrades
+                    status_txt = "[UNLOCKED]" if is_unlocked else f"[{uinfo['key']}] BUY: {uinfo['cost']:,} XP"
+                    status_color = (100, 255, 100) if is_unlocked else ((255, 220, 0) if cmd.xp >= uinfo['cost'] else (140, 140, 140))
+                    
+                    screen.blit(font_md.render(f"{uinfo['name']}", True, (220, 220, 220)), (up_x + 20, row_y))
+                    screen.blit(font_xs.render(f"{uinfo['desc']}", True, (150, 180, 150)), (up_x + 20, row_y + 18))
+                    screen.blit(font_md.render(status_txt, True, status_color), (up_x + up_w - 220, row_y + 4))
                 
-                screen.blit(font_md.render(f"{uinfo['name']}", True, (220, 220, 220)), (up_x + 20, row_y))
-                screen.blit(font_xs.render(f"{uinfo['desc']}", True, (150, 180, 150)), (up_x + 20, row_y + 16))
-                screen.blit(font_md.render(status_txt, True, status_color), (up_x + up_w - 200, row_y + 4))
+                # Bottom banner
+                if cmd.is_tier_1_complete:
+                    screen.blit(font_xs.render(">> ALL TIER 1 UNLOCKED! PRESS [T] TO ACCESS TIER 2 BLACK OPS LAB <<", True, (220, 140, 255)), (up_x + 20, up_y + up_h - 22))
+                else:
+                    needed = 5 - len(cmd.unlocked_upgrades & set(cmd.UPGRADE_TIER_1_KEYS))
+                    screen.blit(font_xs.render(f"Unlock remaining {needed} Tier 1 item(s) to grant access to Tier 2 Black Ops Lab.", True, (150, 150, 120)), (up_x + 20, up_y + up_h - 22))
+            else:
+                if not cmd.is_tier_1_complete:
+                    lock_box_y = up_y + 110
+                    pygame.draw.rect(screen, (20, 8, 8), (up_x + 30, lock_box_y, up_w - 60, 150))
+                    pygame.draw.rect(screen, (200, 50, 50), (up_x + 30, lock_box_y, up_w - 60, 150), 1)
+                    screen.blit(font_lg.render("CLASSIFIED ACCESS RESTRICTED", True, (255, 80, 80)), (up_x + 50, lock_box_y + 20))
+                    screen.blit(font_sm.render("You must master and purchase all 5 Tier 1 upgrades before high command", True, (200, 200, 200)), (up_x + 50, lock_box_y + 55))
+                    screen.blit(font_sm.render("will authorize access to the Tier 2 Black Ops Experimental Arsenal.", True, (200, 200, 200)), (up_x + 50, lock_box_y + 75))
+                    prog_str = f"Current Progress: {len(cmd.unlocked_upgrades & set(cmd.UPGRADE_TIER_1_KEYS))}/5 Upgrades Unlocked"
+                    screen.blit(font_xs.render(prog_str, True, (255, 220, 50)), (up_x + 50, lock_box_y + 105))
+                else:
+                    items_to_show = [(k, cmd.UPGRADE_TIER_2[k]) for k in cmd.UPGRADE_TIER_2]
+                    for idx, (uid, uinfo) in enumerate(items_to_show):
+                        row_y = up_y + 86 + idx * 46
+                        is_unlocked = uid in cmd.unlocked_upgrades
+                        alt_key = idx + 1
+                        status_txt = "[UNLOCKED]" if is_unlocked else f"[{alt_key} or {uinfo['key']}] BUY: {uinfo['cost']:,} XP"
+                        status_color = (100, 255, 100) if is_unlocked else ((255, 220, 0) if cmd.xp >= uinfo['cost'] else (140, 140, 140))
+                        
+                        screen.blit(font_md.render(f"{uinfo['name']}", True, (230, 210, 255)), (up_x + 20, row_y))
+                        screen.blit(font_xs.render(f"{uinfo['desc']}", True, (190, 160, 220)), (up_x + 20, row_y + 18))
+                        screen.blit(font_md.render(status_txt, True, status_color), (up_x + up_w - 250, row_y + 4))
+
+                    screen.blit(font_xs.render("EXPERIMENTAL: Quantum Radar bypasses masking | EMP burst on [B] | 30km Laser CIWS", True, (220, 160, 255)), (up_x + 20, up_y + up_h - 22))
             
         # 4.2 Left Side: Active Operations (Track List)
         list_w, list_h = 360, 480
@@ -798,7 +872,7 @@ def start_radar():
             restart_hint = font_md.render("Press [R] to Re-Scramble Sortie  |  [ESC] to Stand Down", True, (120, 200, 255))
             screen.blit(restart_hint, (aar_x + 20, aar_y + 215))
 
-        screen.blit(font_sm.render("Press [ESC] Quit | [CLICK] Select | [1-4] Fire | [E] EMCON | [S] Salvo | [D] Decoy | [P] Phase 3 Wartime | [U] Mute | [R] Restart", True, (120, 150, 120)), (10, HEIGHT - 25))
+        screen.blit(font_sm.render("Press [ESC] Quit | [CLICK] Select | [1-4] Fire | [E] EMCON | [S] Salvo | [D] Decoy | [B] EMP | [TAB] Armory | [U] Mute | [R] Restart", True, (120, 150, 120)), (10, HEIGHT - 25))
 
         pygame.display.flip()
 

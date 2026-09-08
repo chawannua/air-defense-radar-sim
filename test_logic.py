@@ -521,6 +521,180 @@ check(aar_report["total_events"] >= 1, f"AAR total_events must be recorded in hi
 check("survival_time_sec" in aar_report, "AAR must contain survival_time_sec")
 check("grade" in aar_report, "AAR must contain performance grade")
 
+# 26. Tier 2 Black Ops Upgrade Tree
+print("\n=== 26. Tier 2 Black Ops Upgrade Tree ===")
+tier_2_keys = [
+    "QUANTUM_SPACE_RADAR",
+    "METEOR_HYPERSONIC",
+    "IRON_BEAM_DIRECTED_ENERGY",
+    "TACTICAL_EMP_BURST",
+    "NANOTECH_AEGIS_SHIELD"
+]
+
+def get_t2_cost(cmd_obj, up_id):
+    if hasattr(cmd_obj, "UPGRADE_TIER_2") and up_id in cmd_obj.UPGRADE_TIER_2:
+        return cmd_obj.UPGRADE_TIER_2[up_id].get("cost", 0)
+    if hasattr(cmd_obj, "UPGRADE_CATALOG") and up_id in cmd_obj.UPGRADE_CATALOG:
+        return cmd_obj.UPGRADE_CATALOG[up_id].get("cost", 0)
+    return 0
+
+# --- 1. Incomplete Tier 1 gates Tier 2 ---
+cmd_t2 = CommandCenter()
+cmd_t2.xp = 50000
+
+# 0 Tier 1 upgrades unlocked
+check(hasattr(cmd_t2, "is_tier_1_complete") and cmd_t2.is_tier_1_complete is False,
+      "is_tier_1_complete should be False with 0 upgrades unlocked")
+
+# Unlock partial Tier 1 upgrades (2 of 5)
+cmd_t2.unlock_upgrade("AESA_RANGE")
+cmd_t2.unlock_upgrade("DOPPLER_FILTER")
+check(hasattr(cmd_t2, "is_tier_1_complete") and cmd_t2.is_tier_1_complete is False,
+      "is_tier_1_complete should be False when only 2/5 Tier 1 upgrades unlocked")
+
+# Unlock 4 of 5
+cmd_t2.unlock_upgrade("DECOY_PACK")
+cmd_t2.unlock_upgrade("RAPID_CIWS")
+check(hasattr(cmd_t2, "is_tier_1_complete") and cmd_t2.is_tier_1_complete is False,
+      "is_tier_1_complete should be False when 4/5 Tier 1 upgrades unlocked")
+
+# Attempt to purchase all Tier 2 upgrades while Tier 1 is incomplete
+for t2_id in tier_2_keys:
+    ok_lock, msg_lock = cmd_t2.unlock_upgrade(t2_id)
+    check(not ok_lock, f"Attempting to buy {t2_id} when Tier 1 is incomplete must fail")
+    check(msg_lock == "Locked: Complete Tier 1 First",
+          f"Attempting to buy {t2_id} when Tier 1 incomplete must return 'Locked: Complete Tier 1 First' (got '{msg_lock}')")
+
+# --- 2. Complete Tier 1 unlocks Tier 2 purchasability & catalog ---
+cmd_t2.unlock_upgrade("AESA_SEEKERS")
+check(hasattr(cmd_t2, "is_tier_1_complete") and cmd_t2.is_tier_1_complete is True,
+      "is_tier_1_complete becomes True when all 5 Tier 1 upgrades are unlocked")
+
+has_t2_catalog = hasattr(cmd_t2, "UPGRADE_TIER_2")
+check(has_t2_catalog, "CommandCenter should have UPGRADE_TIER_2 catalog attribute")
+if has_t2_catalog:
+    check(all(k in cmd_t2.UPGRADE_TIER_2 for k in tier_2_keys),
+          "UPGRADE_TIER_2 must contain all 5 Black Ops upgrades")
+else:
+    check(False, "UPGRADE_TIER_2 must contain all 5 Black Ops upgrades")
+
+check(all(k in cmd_t2.UPGRADE_CATALOG for k in tier_2_keys),
+      "UPGRADE_CATALOG must contain all 5 Tier 2 upgrades")
+
+# --- 3. Purchase each Tier 2 upgrade with sufficient XP ---
+cmd_t2.xp = 50000
+
+# 3a. QUANTUM_SPACE_RADAR
+cost_q = get_t2_cost(cmd_t2, "QUANTUM_SPACE_RADAR")
+xp_before_q = cmd_t2.xp
+ok_q, msg_q = cmd_t2.unlock_upgrade("QUANTUM_SPACE_RADAR")
+check(ok_q is True and "QUANTUM_SPACE_RADAR" in cmd_t2.unlocked_upgrades,
+      "QUANTUM_SPACE_RADAR should unlock successfully")
+check(cost_q > 0 and cmd_t2.xp == xp_before_q - cost_q,
+      f"QUANTUM_SPACE_RADAR should deduct {cost_q} XP (got xp={cmd_t2.xp}, expected {xp_before_q - cost_q})")
+
+# Terrain masking bypass test
+masked_cm = CruiseMissile(991)
+masked_cm.x_km = -261.48
+masked_cm.y_km = 641.16
+masked_cm.distance_km = math.hypot(-261.48, 641.16)
+masked_cm.altitude_ft = 200
+cmd_t2.contacts = []
+cmd_t2.unseen_contacts = [masked_cm]
+cmd_t2.emcon_mode = "ACTIVE"
+cmd_t2.detect_airspace()
+check(masked_cm in cmd_t2.contacts,
+      "QUANTUM_SPACE_RADAR enables quantum detection bypassing terrain masking into contacts")
+
+# 3b. METEOR_HYPERSONIC
+cmd_t2.max_ammo["FIGHTER"] = 15
+cmd_t2.ammo["FIGHTER"] = 5  # Depleted
+cost_m = get_t2_cost(cmd_t2, "METEOR_HYPERSONIC")
+xp_before_m = cmd_t2.xp
+ok_m, msg_m = cmd_t2.unlock_upgrade("METEOR_HYPERSONIC")
+check(ok_m is True and "METEOR_HYPERSONIC" in cmd_t2.unlocked_upgrades,
+      "METEOR_HYPERSONIC should unlock successfully")
+check(cost_m > 0 and cmd_t2.xp == xp_before_m - cost_m,
+      f"METEOR_HYPERSONIC should deduct {cost_m} XP (got xp={cmd_t2.xp}, expected {xp_before_m - cost_m})")
+check(cmd_t2.max_ammo["FIGHTER"] == 25,
+      f"METEOR_HYPERSONIC should increase fighter max ammo by +10 (expected 25, got {cmd_t2.max_ammo['FIGHTER']})")
+check(cmd_t2.ammo["FIGHTER"] == 25,
+      f"METEOR_HYPERSONIC should restore fighter ammo to max 25 (got {cmd_t2.ammo['FIGHTER']})")
+
+# 3c. IRON_BEAM_DIRECTED_ENERGY
+cost_ib = get_t2_cost(cmd_t2, "IRON_BEAM_DIRECTED_ENERGY")
+xp_before_ib = cmd_t2.xp
+ok_ib, msg_ib = cmd_t2.unlock_upgrade("IRON_BEAM_DIRECTED_ENERGY")
+check(ok_ib is True and "IRON_BEAM_DIRECTED_ENERGY" in cmd_t2.unlocked_upgrades,
+      "IRON_BEAM_DIRECTED_ENERGY should unlock successfully")
+check(cost_ib > 0 and cmd_t2.xp == xp_before_ib - cost_ib,
+      f"IRON_BEAM_DIRECTED_ENERGY should deduct {cost_ib} XP (got xp={cmd_t2.xp}, expected {xp_before_ib - cost_ib})")
+ciws_range = getattr(cmd_t2, 'ciws_engage_range', getattr(cmd_t2, 'ciws_range_km', None))
+check(ciws_range == 30.0,
+      f"IRON_BEAM_DIRECTED_ENERGY should increase CIWS engage range to 30km (got {ciws_range})")
+
+# 3d. TACTICAL_EMP_BURST
+cost_emp = get_t2_cost(cmd_t2, "TACTICAL_EMP_BURST")
+xp_before_emp = cmd_t2.xp
+ok_emp, msg_emp = cmd_t2.unlock_upgrade("TACTICAL_EMP_BURST")
+check(ok_emp is True and "TACTICAL_EMP_BURST" in cmd_t2.unlocked_upgrades,
+      "TACTICAL_EMP_BURST should unlock successfully")
+check(cost_emp > 0 and cmd_t2.xp == xp_before_emp - cost_emp,
+      f"TACTICAL_EMP_BURST should deduct {cost_emp} XP (got xp={cmd_t2.xp}, expected {xp_before_emp - cost_emp})")
+
+has_emp_burst = hasattr(cmd_t2, "trigger_emp_burst")
+check(has_emp_burst, "CommandCenter should provide trigger_emp_burst() method")
+
+emp_ghost1 = EWGhostTrack(993)
+emp_ghost2 = GhostTrack(994)
+emp_arm = AntiRadiationMissile(995)
+emp_arm.seeker_locked = True
+emp_drone = Drone(996)
+emp_drone.status = "HOSTILE"
+cmd_t2.contacts = [emp_ghost1, emp_ghost2, emp_arm, emp_drone]
+
+if has_emp_burst:
+    cmd_t2.trigger_emp_burst()
+
+active_ghosts = [c for c in cmd_t2.contacts if isinstance(c, (GhostTrack, EWGhostTrack)) and c.active]
+check(len(active_ghosts) == 0, "trigger_emp_burst() should clear all EW ghost tracks")
+check(emp_arm.seeker_locked is False, "trigger_emp_burst() should disable ARM seeker locks")
+check(emp_drone in cmd_t2.contacts and emp_drone.active, "trigger_emp_burst() should preserve non-ghost targets")
+
+# 3e. NANOTECH_AEGIS_SHIELD
+cmd_t2.base_hp = 35  # Damaged base
+cost_nano = get_t2_cost(cmd_t2, "NANOTECH_AEGIS_SHIELD")
+xp_before_nano = cmd_t2.xp
+ok_nano, msg_nano = cmd_t2.unlock_upgrade("NANOTECH_AEGIS_SHIELD")
+check(ok_nano is True and "NANOTECH_AEGIS_SHIELD" in cmd_t2.unlocked_upgrades,
+      "NANOTECH_AEGIS_SHIELD should unlock successfully")
+check(cost_nano > 0 and cmd_t2.xp == xp_before_nano - cost_nano,
+      f"NANOTECH_AEGIS_SHIELD should deduct {cost_nano} XP (got xp={cmd_t2.xp}, expected {xp_before_nano - cost_nano})")
+check(cmd_t2.base_hp == 150,
+      f"NANOTECH_AEGIS_SHIELD should restore base_hp to 150 (got {cmd_t2.base_hp})")
+max_base_hp = getattr(cmd_t2, 'max_base_hp', None)
+check(max_base_hp == 150,
+      f"NANOTECH_AEGIS_SHIELD should set max_base_hp to 150 (got {max_base_hp})")
+
+# --- 4. Duplicate purchase of Tier 2 upgrades rejected ---
+ok_dup_t2, msg_dup_t2 = cmd_t2.unlock_upgrade("QUANTUM_SPACE_RADAR")
+check(ok_dup_t2 is False, "Duplicate Tier 2 upgrade purchase should be rejected")
+check(msg_dup_t2 == "Already Unlocked",
+      f"Duplicate Tier 2 purchase should return 'Already Unlocked', got '{msg_dup_t2}'")
+
+# --- 5. Buying Tier 2 with insufficient XP fails ---
+cmd_low_xp = CommandCenter()
+cmd_low_xp.unlocked_upgrades.update([
+    "AESA_RANGE", "DOPPLER_FILTER", "DECOY_PACK", "RAPID_CIWS", "AESA_SEEKERS"
+])
+cmd_low_xp.xp = 10  # Insufficient XP
+ok_low_t2, msg_low_t2 = cmd_low_xp.unlock_upgrade("QUANTUM_SPACE_RADAR")
+check(ok_low_t2 is False, "Buying Tier 2 upgrade with insufficient XP should fail")
+check("Insufficient XP" in msg_low_t2,
+      f"Failure message should indicate insufficient XP (got '{msg_low_t2}')")
+check("QUANTUM_SPACE_RADAR" not in cmd_low_xp.unlocked_upgrades,
+      "Upgrade should not be in unlocked_upgrades when purchase fails due to XP")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")
