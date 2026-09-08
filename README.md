@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/version-1.3.1.1-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/version-1.3.1-blue.svg)](CHANGELOG.md)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Pygame 2.0+](https://img.shields.io/badge/Pygame-2.0%2B-FF6F00?style=for-the-badge&logo=python&logoColor=white)](https://pygame.org)
 [![NumPy](https://img.shields.io/badge/NumPy-1.24%2B-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org)
@@ -10,13 +10,14 @@
 [![RTAF C2](https://img.shields.io/badge/Military_C2-RTAF_SOC-00529B?style=for-the-badge&logo=shield)](https://github.com/chawannua/air-defense-radar-sim)
 [![Windows Executable](https://img.shields.io/badge/Windows_Binary-AEGIS__Radar.exe-success?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/chawannua/air-defense-radar-sim/releases/latest)
 
-### ⚡ Current Release: `v1.3.1.1` (Security Hardening & Stability Patches)
+## 📡 AEGIS Air Defense Radar Simulator
+> A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
-**A high-fidelity, real-time tactical air defense Command & Control (C2) radar simulator modeled after the Royal Thai Air Force (RTAF) Sector Operations Center (SOC).**
+### ⚡ Current Release: `v1.3.1` (Security Hardening & Stability Patches)
+The official patch addressing non-deterministic event bus leaks, un-clamped resolution scaling, race conditions in alarm systems, and synchronization of missile tracers. 
 
-*Featuring 1:10m real-world Natural Earth geospatial geometry across Southeast Asia, 100% procedural NumPy audio synthesis (0 MB external sound files), electronic warfare & anti-radiation missile dynamics, Tier 2 Black Ops experimental arsenal, and 3-pillar anti-jammer Electronic Counter-Countermeasures.*
-
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.3.1.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (30/30)](test_logic.py)
+**Quick Links:**
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.3.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (30/30)](test_logic.py)
 
 </div>
 
