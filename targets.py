@@ -325,6 +325,7 @@ class AWACS(AirContact):
         self.orbit_center_x = 20.0
         self.orbit_center_y = -150.0
         self.orbit_angle = 0
+        self.orbit_radius_km = 50.0
         
         # Start AWACS at Home Base
         self.x_km = self.home_x
@@ -346,6 +347,24 @@ class AWACS(AirContact):
         self.distance_km = math.hypot(x, y)
         self.bearing = (math.degrees(math.atan2(x, y)) + 360) % 360
 
+    def retask_station(self, new_x: float, new_y: float) -> bool:
+        self.orbit_center_x = float(new_x)
+        self.orbit_center_y = float(new_y)
+        self.state = "TRANSIT_TO_STATION"
+        angle = math.atan2(self.orbit_center_x - self.x_km, self.orbit_center_y - self.y_km)
+        self.heading = (math.degrees(angle) + 360) % 360
+        return True
+
+    def set_orbit_radius(self, radius_km: float) -> float:
+        self.orbit_radius_km = max(20.0, min(150.0, float(radius_km)))
+        return self.orbit_radius_km
+
+    def order_rtb(self) -> bool:
+        self.state = "RTB"
+        angle = math.atan2(self.home_x - self.x_km, self.home_y - self.y_km)
+        self.heading = (math.degrees(angle) + 360) % 360
+        return True
+
     def move(self, *args, **kwargs):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
@@ -365,7 +384,7 @@ class AWACS(AirContact):
 
         elif self.state == "ON_STATION":
             self.orbit_angle = (self.orbit_angle + 1) % 360
-            orbit_radius_km = 50
+            orbit_radius_km = getattr(self, 'orbit_radius_km', 50)
             x = self.orbit_center_x + orbit_radius_km * math.cos(math.radians(self.orbit_angle))
             y = self.orbit_center_y + orbit_radius_km * math.sin(math.radians(self.orbit_angle))
             self.fuel -= 0.005 # Deplete fuel slowly (approx 5.5 mins patrol time)

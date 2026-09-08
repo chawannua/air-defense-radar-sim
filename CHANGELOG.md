@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1.1] - 2026-09-09
+
+### Security Hardening & Reliability Updates
+- **Thread-Safety**: Added `threading.RLock()` to `SoundManager` for safe concurrent asynchronous DEFCON alarm handling.
+- **Display Protection**: Clamped `VIDEORESIZE` boundaries to $\ge 640\times480$ preventing zero-surface matrix collapse crashes on window minimize.
+- **Memory Optimization**: Capped `historical_events` ledger at 3,000 entries preventing unbound allocation memory leaks during extended campaigns.
+- **Visual Accuracy**: Augmented `MISSILE_LAUNCH` event telemetry with explicit `target_x` and `target_y` variables for synchronized tracer trajectory alignments.
+
+## [1.3.0] - 2026-09-09
+
+### Added
+- **Interactive AWACS C2 & Sensor Fusion**: Implemented 400 km airborne look-down bubble, right-click station retask, orbit radius tuning ([+/-]), and immediate RTB ([R]).
+- **Audio Subsystem Modernization**: Redesigned synthesized missile launch roar, implemented dynamic brevity callouts, and fixed DEFCON alarm deadlock with a 10s auto-cutoff.
+- **Input & Navigation Disambiguation**: Removed WASD pan ambiguity. Camera panning is now strictly bound to Arrow Keys; [W], [S], and [D] are preserved for AWACS, Salvo, and Decoy tactical actions.
+- **Test Matrix Expansion**: Expanded the 	est_logic.py verification matrix to 30/30 suites passing with zero errors.
+
 ## [1.2.0] - 2026-09-09
 
 ### Added

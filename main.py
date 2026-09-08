@@ -1,5 +1,5 @@
 # main.py
-__version__ = "1.2.0"
+__version__ = "1.3.1.1"
 import sys
 from radar_ui import start_radar
 

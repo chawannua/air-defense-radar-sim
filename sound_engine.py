@@ -230,25 +230,30 @@ def synth_defcon1_alarm(sr: int = SAMPLE_RATE) -> np.ndarray:
 def synth_missile_launch(sr: int = SAMPLE_RATE) -> np.ndarray:
     """
     Synthesizes a missile launch:
-    Rocket ignition transient crack + deep rising thrust rumble (90 Hz -> 240 Hz)
+    Rocket ignition transient crack + deep rising thrust rumble
     with low-pass filtered exhaust noise and combustion turbulence flutter.
     """
     dur = 1.40  # 1.4 seconds
     t = np.linspace(0, dur, int(sr * dur), endpoint=False)
     n_samples = len(t)
 
-    # Component 1: Initial ignition transient crack (first 60ms)
+    # Base noise
     rng = np.random.default_rng(42)
     raw_noise_l = rng.uniform(-1.0, 1.0, n_samples)
     raw_noise_r = rng.uniform(-1.0, 1.0, n_samples)
 
+    # Component 1: Initial ignition transient crack
+    # Smooth 15ms windowed attack on ignition transient crack
+    crack_att_len = int(0.015 * sr)
+    crack_attack = np.linspace(0.0, 1.0, crack_att_len)
     crack_env = np.exp(-t / 0.020)
+    crack_env[:crack_att_len] = crack_attack * np.exp(-t[:crack_att_len] / 0.020)
     ignition_pop = np.sin(2.0 * np.pi * 140.0 * t) * np.exp(-t / 0.035)
     crack_l = (raw_noise_l * crack_env * 0.90 + ignition_pop * 0.70)
     crack_r = (raw_noise_r * crack_env * 0.90 + ignition_pop * 0.70)
 
-    # Component 2: Deep rising thrust rumble (90 Hz -> 240 Hz)
-    f0, f1 = 90.0, 240.0
+    # Component 2: Punchy sub-bass rumble (70-220 Hz)
+    f0, f1 = 70.0, 220.0
     phase_rumble = 2.0 * np.pi * (f0 * t + ((f1 - f0) / (1.8 * (dur ** 0.8))) * (t ** 1.8))
     rumble = (
         np.sin(phase_rumble)
@@ -258,14 +263,24 @@ def synth_missile_launch(sr: int = SAMPLE_RATE) -> np.ndarray:
     )
     rumble = np.tanh(rumble * 1.6)
 
-    # Component 3: Filtered exhaust roar + combustion turbulence flutter
-    flt_l = _gaussian_lowpass(raw_noise_l, 780.0, sr=sr)
-    flt_r = _gaussian_lowpass(raw_noise_r, 780.0, sr=sr)
-    flutter = 0.70 + 0.30 * np.sin(2.0 * np.pi * 23.0 * t) * np.sin(2.0 * np.pi * 37.0 * t)
-    exhaust_l = flt_l * flutter
-    exhaust_r = flt_r * flutter
+    # Component 3: Rich solid-rocket motor combustion roar (180 Hz to 1200 Hz)
+    flt_roar_l = _gaussian_lowpass(raw_noise_l, 1200.0, sr=sr) - _gaussian_lowpass(raw_noise_l, 180.0, sr=sr)
+    flt_roar_r = _gaussian_lowpass(raw_noise_r, 1200.0, sr=sr) - _gaussian_lowpass(raw_noise_r, 180.0, sr=sr)
+    
+    # Resonant jet whistle
+    whistle_freq = 800.0 + 400.0 * (1.0 - np.exp(-t / 0.5))
+    whistle = 0.15 * np.sin(2.0 * np.pi * whistle_freq * t)
 
-    # Thrust envelope: rises behind ignition crack, sustains, then fades as missile flies away
+    # Supersonic expansion whoosh
+    whoosh_env = (t / 0.5) * np.exp(-t / 0.5)
+    whoosh_l = flt_roar_l * whoosh_env * 1.5
+    whoosh_r = flt_roar_r * whoosh_env * 1.5
+
+    flutter = 0.70 + 0.30 * np.sin(2.0 * np.pi * 23.0 * t) * np.sin(2.0 * np.pi * 37.0 * t)
+    exhaust_l = (flt_roar_l + whistle + whoosh_l) * flutter
+    exhaust_r = (flt_roar_r + whistle + whoosh_r) * flutter
+
+    # Thrust envelope
     thrust_env = np.ones_like(t)
     att_idx = int(sr * 0.070)
     thrust_env[:att_idx] = np.linspace(0.1, 1.0, att_idx)
@@ -276,7 +291,11 @@ def synth_missile_launch(sr: int = SAMPLE_RATE) -> np.ndarray:
     mix_l = crack_l + (0.50 * rumble + 0.75 * exhaust_l) * thrust_env
     mix_r = crack_r + (0.50 * rumble + 0.75 * exhaust_r) * thrust_env
 
-    return np.column_stack((np.tanh(mix_l * 1.3) * 0.92, np.tanh(mix_r * 1.3) * 0.92))
+    # Soft clipping to keep absolute amplitude ~0.88
+    final_l = np.tanh(mix_l * 1.1) * 0.88
+    final_r = np.tanh(mix_r * 1.1) * 0.88
+
+    return np.column_stack((final_l, final_r))
 
 
 def synth_explosion_flak(heavy: bool = False, sr: int = SAMPLE_RATE) -> np.ndarray:
@@ -511,6 +530,7 @@ class SoundManager:
         self._enable_sapi: bool = enable_sapi and HAS_SAPI
 
         # Looping alarm tracking
+        self._alarm_lock = threading.RLock()
         self._alarm_playing: bool = False
         self._alarm_channel: Any = MockChannel()
 
@@ -648,27 +668,40 @@ class SoundManager:
         """Plays Phalanx CIWS 3,900 RPM Gatling BRRRRT burst (65 Hz pulse train)."""
         self._play_sound(self._snd_ciws)
 
-    def start_alarm(self) -> None:
+    def start_alarm(self, timeout_sec: Optional[float] = None) -> None:
         """Starts looping DEFCON 1 emergency horn (820 Hz & 640 Hz alternating bursts)."""
-        if self._alarm_playing:
-            return
-        self._alarm_playing = True
-        if self._audio_available and not self._muted:
-            try:
-                self._alarm_channel.play(self._snd_alarm, loops=-1)
-            except Exception as ex:
-                logger.debug(f"Alarm play error: {ex}")
+        with self._alarm_lock:
+            if getattr(self, '_alarm_timer', None):
+                self._alarm_timer.cancel()
+                self._alarm_timer = None
+    
+            if timeout_sec and timeout_sec > 0:
+                self._alarm_timer = threading.Timer(timeout_sec, self.stop_alarm)
+                self._alarm_timer.start()
+    
+            if self._alarm_playing:
+                return
+            self._alarm_playing = True
+            if self._audio_available and not self._muted:
+                try:
+                    self._alarm_channel.play(self._snd_alarm, loops=-1)
+                except Exception as ex:
+                    logger.debug(f"Alarm play error: {ex}")
 
     def stop_alarm(self) -> None:
         """Stops DEFCON 1 emergency horn."""
-        self._alarm_playing = False
-        try:
-            self._alarm_channel.fadeout(120)
-        except Exception:
+        with self._alarm_lock:
+            if getattr(self, '_alarm_timer', None):
+                self._alarm_timer.cancel()
+                self._alarm_timer = None
+            self._alarm_playing = False
             try:
-                self._alarm_channel.stop()
+                self._alarm_channel.fadeout(120)
             except Exception:
-                pass
+                try:
+                    self._alarm_channel.stop()
+                except Exception:
+                    pass
 
     def play_contact_alert(self) -> None:
         """Plays tactical high-pitched warning pip (1200 Hz, 60ms)."""
@@ -682,7 +715,7 @@ class SoundManager:
         """Plays Home-On-Jam passive RF seeker homing tone (1850 Hz warble)."""
         self._play_sound(self._snd_hoj_lock)
 
-    def radio_callout(self, text: str) -> None:
+    def radio_callout(self, text: str, category: Optional[str] = None, debounce_sec: float = 1.5) -> bool:
         """
         Dispatches an asynchronous tactical voice callout:
         Plays radio mic squawk click, calls Windows SAPI voice in a background thread,
@@ -690,7 +723,17 @@ class SoundManager:
         is unavailable.
         """
         if not text:
-            return
+            return False
+
+        if not hasattr(self, '_callout_timestamps'):
+            self._callout_timestamps = {}
+            
+        key = category if category else text
+        if time.time() - self._callout_timestamps.get(key, 0) < debounce_sec:
+            return False
+            
+        self._callout_timestamps[key] = time.time()
+
         try:
             # Don't let queue grow excessively during intense combat
             if self._radio_queue.full():
@@ -698,9 +741,11 @@ class SoundManager:
                     self._radio_queue.get_nowait()
                 except queue.Empty:
                     pass
-            self._radio_queue.put_nowait(text)
+            self._radio_queue.put_nowait(str(text))
+            return True
         except Exception as ex:
             logger.debug(f"Failed to queue radio callout: {ex}")
+            return False
 
     def toggle_mute(self) -> bool:
         """
@@ -730,6 +775,10 @@ class SoundManager:
     # ========================================================================
     # CONVENIENCE / LIFECYCLE METHODS
     # ========================================================================
+
+    @property
+    def is_alarm_active(self) -> bool:
+        return self._alarm_playing
 
     @property
     def is_muted(self) -> bool:

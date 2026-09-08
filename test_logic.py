@@ -9,8 +9,11 @@ from targets import (AirContact, Aircraft, Helicopter, Drone, TacticalBM, ICBM,
 from command_center import CommandCenter
 from personnel import Engagement
 from config import GameConfig
+from sound_engine import SoundManager, synth_missile_launch
 import random
 import math
+import inspect
+import numpy as np
 
 errors = []
 def check(condition, msg):
@@ -938,6 +941,140 @@ check(cmd_sam_range.ammo["SAM"] == 4,
       "SAM ammo should be consumed when firing at 280km with HOJ active")
 check(len(cmd_sam_range.active_engagements) == 1,
       "Active engagement should be created when firing SAM with HOJ active")
+
+print("\n=== 29. Controllable AWACS Operations & Sensor Fusion ===")
+
+# --- 1. Initial State & Configuration ---
+awacs = AWACS(9920)
+check(awacs.state == "TRANSIT_TO_STATION",
+      f"AWACS initial state should be TRANSIT_TO_STATION, got {awacs.state}")
+check(awacs.orbit_center_x == 20.0 and awacs.orbit_center_y == -150.0,
+      f"AWACS default orbit center should be (20.0, -150.0), got ({getattr(awacs, 'orbit_center_x', None)}, {getattr(awacs, 'orbit_center_y', None)})")
+check(getattr(awacs, 'orbit_radius_km', None) == 50,
+      f"AWACS initial orbit_radius_km should be 50, got {getattr(awacs, 'orbit_radius_km', None)}")
+
+# --- 2. Retask Station ---
+check(hasattr(awacs, 'retask_station'), "AWACS should implement retask_station(new_x, new_y)")
+if hasattr(awacs, 'retask_station'):
+    awacs.retask_station(new_x=120.0, new_y=250.0)
+    check(awacs.orbit_center_x == 120.0 and awacs.orbit_center_y == 250.0,
+          f"AWACS retask_station should set orbit center to (120.0, 250.0), got ({awacs.orbit_center_x}, {awacs.orbit_center_y})")
+    check(awacs.state == "TRANSIT_TO_STATION",
+          f"AWACS retask_station should set state to TRANSIT_TO_STATION, got {awacs.state}")
+    expected_heading = (math.degrees(math.atan2(120.0 - awacs.x_km, 250.0 - awacs.y_km)) + 360) % 360
+    check(abs(awacs.heading - expected_heading) < 1.0,
+          f"AWACS heading should point towards new waypoint {expected_heading:.1f}, got {awacs.heading:.1f}")
+else:
+    check(False, "awacs.retask_station missing: cannot verify orbit center (120.0, 250.0)")
+    check(False, "awacs.retask_station missing: cannot verify state TRANSIT_TO_STATION")
+    check(False, "awacs.retask_station missing: cannot verify heading recalculation")
+
+# --- 3. Set Orbit Radius ---
+check(hasattr(awacs, 'set_orbit_radius'), "AWACS should implement set_orbit_radius(radius_km)")
+if hasattr(awacs, 'set_orbit_radius'):
+    awacs.set_orbit_radius(radius_km=75)
+    check(getattr(awacs, 'orbit_radius_km', None) == 75,
+          f"AWACS orbit_radius_km should be 75 after set_orbit_radius(75), got {getattr(awacs, 'orbit_radius_km', None)}")
+else:
+    check(False, "awacs.set_orbit_radius missing: cannot verify orbit_radius_km = 75")
+
+# --- 4. Order RTB ---
+check(hasattr(awacs, 'order_rtb'), "AWACS should implement order_rtb()")
+if hasattr(awacs, 'order_rtb'):
+    awacs.order_rtb()
+    check(awacs.state == "RTB", f"AWACS order_rtb should set state to RTB, got {awacs.state}")
+    expected_rtb_heading = (math.degrees(math.atan2(awacs.home_x - awacs.x_km, awacs.home_y - awacs.y_km)) + 360) % 360
+    check(abs(awacs.heading - expected_rtb_heading) < 1.0,
+          f"AWACS heading should point towards home base {expected_rtb_heading:.1f}, got {awacs.heading:.1f}")
+else:
+    check(False, "awacs.order_rtb missing: cannot verify state RTB")
+    check(False, "awacs.order_rtb missing: cannot verify heading towards home base")
+
+# --- 5. Sensor Coverage with Retasked AWACS in CommandCenter ---
+cmd_coverage = CommandCenter()
+retasked_awacs = AWACS(9921)
+retasked_awacs.set_xy(300.0, 100.0)
+retasked_awacs.active = True
+cmd_coverage.contacts = [retasked_awacs]
+
+low_contact = CruiseMissile(9922, distance_km=370.0)
+low_contact.x_km = 350.0
+low_contact.y_km = 120.0
+low_contact.distance_km = 370.0
+low_contact.altitude_ft = 200
+
+dist_to_awacs = math.hypot(low_contact.x_km - retasked_awacs.x_km, low_contact.y_km - retasked_awacs.y_km)
+check(abs(dist_to_awacs - 53.85) < 0.1,
+      f"Distance between contact and AWACS should be ~53.8 km, got {dist_to_awacs:.1f}")
+check(cmd_coverage.is_in_sensor_coverage(low_contact) is True,
+      "cmd.is_in_sensor_coverage(contact) should return True when contact is ~53.8 km from AWACS (<= 400 km)")
+
+retasked_awacs.set_xy(-200.0, -300.0)
+dist_far = math.hypot(low_contact.x_km - retasked_awacs.x_km, low_contact.y_km - retasked_awacs.y_km)
+check(dist_far > 400.0,
+      f"AWACS repositioned far away: distance should be > 400 km, got {dist_far:.1f}")
+check(cmd_coverage.is_in_sensor_coverage(low_contact) is False,
+      "cmd.is_in_sensor_coverage(contact) should return False when AWACS is > 400 km away")
+
+print("\n=== 30. Tactical Audio Engine & Alarm Cooldown Logic ===")
+
+# --- 1. SoundManager Alarm State & Auto-Cutoff ---
+sound_mgr = SoundManager.get_instance()
+check(hasattr(sound_mgr, 'start_alarm'), "SoundManager should have start_alarm() method")
+check(hasattr(sound_mgr, 'stop_alarm'), "SoundManager should have stop_alarm() method")
+
+sig_alarm = inspect.signature(sound_mgr.start_alarm)
+check('timeout_sec' in sig_alarm.parameters,
+      "SoundManager.start_alarm should accept timeout_sec parameter")
+
+check(hasattr(sound_mgr, 'is_alarm_active'),
+      "SoundManager should have is_alarm_active property")
+
+if hasattr(sound_mgr, 'is_alarm_active') and 'timeout_sec' in sig_alarm.parameters:
+    sound_mgr.start_alarm(timeout_sec=5.0)
+    check(sound_mgr.is_alarm_active is True,
+          "sound_mgr.is_alarm_active should be True when start_alarm(timeout_sec=5.0) is called")
+    sound_mgr.stop_alarm()
+    check(sound_mgr.is_alarm_active is False,
+          "sound_mgr.is_alarm_active should become False when stop_alarm() is called")
+else:
+    check(False, "sound_mgr.start_alarm(timeout_sec=5.0): missing timeout_sec or is_alarm_active")
+    check(False, "sound_mgr.stop_alarm(): cannot verify is_alarm_active becomes False")
+
+# --- 2. Voice Callout Debounce ---
+check(hasattr(sound_mgr, 'radio_callout'), "SoundManager should have radio_callout() method")
+sig_callout = inspect.signature(sound_mgr.radio_callout)
+check('category' in sig_callout.parameters and 'debounce_sec' in sig_callout.parameters,
+      "SoundManager.radio_callout should accept category and debounce_sec parameters")
+
+if 'category' in sig_callout.parameters and 'debounce_sec' in sig_callout.parameters:
+    # Clear worker queue
+    while not sound_mgr._radio_queue.empty():
+        try:
+            sound_mgr._radio_queue.get_nowait()
+        except Exception:
+            break
+
+    res1 = sound_mgr.radio_callout("Vampire! Vampire inbound!", category="VAMPIRE", debounce_sec=1.5)
+    res2 = sound_mgr.radio_callout("Vampire! Vampire inbound!", category="VAMPIRE", debounce_sec=1.5)
+    q_items = sound_mgr._radio_queue.qsize()
+    check(res2 is False or q_items <= 1,
+          f"Duplicate radio_callout within debounce window should be dropped/debounced (res2={res2}, queue size={q_items})")
+else:
+    check(False, "sound_mgr.radio_callout missing category/debounce_sec: duplicate callout debounce not verified")
+
+# --- 3. Synthesized Missile Launch Sound ---
+launch_audio = synth_missile_launch()
+check(isinstance(launch_audio, np.ndarray),
+      "synth_missile_launch should return a numpy ndarray")
+check(launch_audio.ndim == 2 and launch_audio.shape[1] == 2,
+      f"synth_missile_launch shape should be (N, 2), got {launch_audio.shape}")
+max_amplitude = float(np.max(np.abs(launch_audio)))
+check(max_amplitude <= 1.0,
+      f"synth_missile_launch max absolute amplitude should be <= 1.0, got {max_amplitude:.4f}")
+sound_duration = len(launch_audio) / 44100.0
+check(sound_duration > 0.5,
+      f"synth_missile_launch duration should be > 0.5s, got {sound_duration:.2f}s")
 
 print("\n" + "="*50)
 if errors:

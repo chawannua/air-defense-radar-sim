@@ -180,6 +180,8 @@ class CommandCenter:
         }
         self.event_bus.append(evt)
         self.historical_events.append(evt)
+        if len(self.historical_events) > 3000:
+            self.historical_events = self.historical_events[-1500:]
         return evt
 
     def award_xp(self, amount, reason=""):
@@ -296,6 +298,24 @@ class CommandCenter:
         for cap in self.contacts:
             if isinstance(cap, CAPFighter) and cap.active:
                 if math.hypot(target.x_km - cap.x_km, target.y_km - cap.y_km) <= 100.0:
+                    return True
+        return False
+
+    def retask_awacs(self, target_x: float, target_y: float) -> bool:
+        for c in self.contacts:
+            if isinstance(c, AWACS) and c.active:
+                ok = c.retask_station(target_x, target_y)
+                if ok:
+                    self.add_log(f"\033[96;1m[AWACS-C2] {c.id_code} RETASKED TO PATROL STATION ({target_x:.1f}, {target_y:.1f}) km\033[0m")
+                    return True
+        return False
+
+    def order_awacs_rtb(self) -> bool:
+        for c in self.contacts:
+            if isinstance(c, AWACS) and c.active:
+                ok = c.order_rtb()
+                if ok:
+                    self.add_log(f"\033[93m[AWACS-C2] {c.id_code} ORDERED IMMEDIATE RTB TO WING 7\033[0m")
                     return True
         return False
 
@@ -770,6 +790,8 @@ class CommandCenter:
                             "MISSILE_LAUNCH",
                             weapon=engagement.weapon_name,
                             target_id=engagement.target.id_code,
+                            target_x=getattr(engagement.target, 'x_km', 0.0),
+                            target_y=getattr(engagement.target, 'y_km', 0.0),
                             salvo_mode=getattr(engagement, 'salvo_mode', self.salvo_mode),
                             salvo_count=getattr(engagement, 'salvo_count', 1)
                         )
@@ -886,15 +908,23 @@ class CommandCenter:
             self.active_engagements.append(eng)
             target.status = "ENGAGING"
             
-            self.emit_event(
-                "MISSILE_LAUNCH",
-                weapon=wpn,
-                target_id=target.id_code,
-                target_x=target.x_km,
-                target_y=target.y_km,
-                salvo_mode=self.salvo_mode,
-                salvo_count=missiles_to_fire
-            )
+            if wpn == "CIWS":
+                self.emit_event(
+                    "CIWS_FIRE",
+                    target_id=target.id_code,
+                    ammo_used=missiles_to_fire,
+                    hit=True
+                )
+            else:
+                self.emit_event(
+                    "MISSILE_LAUNCH",
+                    weapon=wpn,
+                    target_id=target.id_code,
+                    target_x=target.x_km,
+                    target_y=target.y_km,
+                    salvo_mode=self.salvo_mode,
+                    salvo_count=missiles_to_fire
+                )
             
             salvo_suffix = f" ({self.salvo_mode} x{missiles_to_fire})" if wpn in ["THAAD", "SAM"] else ""
             origin_str = f" from {bname}" if wpn == "FIGHTER" else ""

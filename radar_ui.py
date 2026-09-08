@@ -139,22 +139,26 @@ def start_radar():
                 tx = ev.get("target_x", 0)
                 ty = ev.get("target_y", 0)
                 vfx_mgr.add_missile_tracer((CX, CY), (CX + km_to_px(tx), CY - km_to_px(ty)), duration_ticks=35)
-                sound_mgr.radio_callout("Fox Two away!")
+                wpn = str(ev.get("weapon", ""))
+                if wpn in ["SAM", "THAAD"]:
+                    sound_mgr.radio_callout("Birds away!", category="LAUNCH", debounce_sec=2.0)
+                elif wpn == "FIGHTER" or "Gripen" in wpn or "F-16" in wpn:
+                    sound_mgr.radio_callout("Fox Three away!", category="LAUNCH", debounce_sec=2.0)
             elif etype == "CIWS_FIRE":
                 sound_mgr.play_ciws()
                 vfx_mgr.add_trauma(0.06)
             elif etype == "DEFCON_CHANGE":
                 d = ev.get("defcon", 5)
                 if d == 1:
-                    sound_mgr.start_alarm()
-                    sound_mgr.radio_callout("Vampire! Vampire inbound!")
-                elif d > 2:
+                    sound_mgr.start_alarm(timeout_sec=10.0)
+                    sound_mgr.radio_callout("Vampire! Vampire inbound!", category="DEFCON_1", debounce_sec=5.0)
+                elif d >= 2:
                     sound_mgr.stop_alarm()
             elif etype == "PROMOTION":
                 r = ev.get("rank", "Officer")
                 sound_mgr.radio_callout(f"Attention on deck! Promoted to {r}!")
             elif etype == "COURT_MARTIAL":
-                sound_mgr.start_alarm()
+                sound_mgr.start_alarm(timeout_sec=8.0)
                 sound_mgr.radio_callout("Cease fire! Civilian flight splashed!")
 
         # ---------------------------------------------------
@@ -169,6 +173,9 @@ def start_radar():
                 cmd.process_engagements()
                 cmd.process_auto_ciws()
                 cmd.update_world()
+            else:
+                if sound_mgr.is_alarm_active:
+                    sound_mgr.stop_alarm()
             
             if selected_contact and not selected_contact.active:
                 selected_contact = None
@@ -185,10 +192,11 @@ def start_radar():
             # Window resizing event
             if event.type == pygame.VIDEORESIZE:
                 if not is_fullscreen:
-                    WIDTH, HEIGHT = event.w, event.h
-                    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
-                    RADAR_AREA = WIDTH
-                    RADAR_RADIUS_PX = (HEIGHT // 2) - 20
+                    if event.w >= 640 and event.h >= 480:
+                        WIDTH, HEIGHT = event.w, event.h
+                        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+                        RADAR_AREA = WIDTH
+                        RADAR_RADIUS_PX = (HEIGHT // 2) - 20
             
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE: running = False; sys.exit()
@@ -222,18 +230,35 @@ def start_radar():
 
                 # Fire weapon at selected target
                 if selected_contact:
-                    wpn = None
-                    if event.key == pygame.K_1: wpn = 'THAAD'
-                    elif event.key == pygame.K_2: wpn = 'SAM'
-                    elif event.key == pygame.K_3: wpn = 'CIWS'
-                    elif event.key == pygame.K_4: wpn = 'FIGHTER' 
-                    
-                    if wpn:
-                        cmd.manual_override_fire(selected_contact, wpn)
+                    if isinstance(selected_contact, AWACS):
+                        if event.key == pygame.K_r:
+                            selected_contact.order_rtb()
+                            cmd.add_log(f"\033[93m[AWACS-C2] {selected_contact.id_code} ORDERED IMMEDIATE RTB TO WING 7\033[0m")
+                            sound_mgr.radio_callout("AWACS returning to Wing 7.")
+                        elif event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
+                            selected_contact.set_orbit_radius(getattr(selected_contact, 'orbit_radius_km', 50) + 10)
+                        elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+                            selected_contact.set_orbit_radius(getattr(selected_contact, 'orbit_radius_km', 50) - 10)
+                    else:
+                        wpn = None
+                        if event.key == pygame.K_1: wpn = 'THAAD'
+                        elif event.key == pygame.K_2: wpn = 'SAM'
+                        elif event.key == pygame.K_3: wpn = 'CIWS'
+                        elif event.key == pygame.K_4: wpn = 'FIGHTER' 
+                        
+                        if wpn:
+                            cmd.manual_override_fire(selected_contact, wpn)
 
                 # abort engagement
                 if event.key == pygame.K_BACKSPACE and selected_contact:
                     cmd.manual_override_abort(selected_contact)
+
+                if event.key == pygame.K_w:
+                    for c in cmd.contacts:
+                        if isinstance(c, AWACS) and c.active:
+                            selected_contact = c
+                            sound_mgr.radio_callout("AWACS station selected.", category="AWACS_UI")
+                            break
 
                 # Tactical Systems Controls
                 if event.key == pygame.K_e:
@@ -294,7 +319,6 @@ def start_radar():
                     elif event.key == pygame.K_0: cmd.manual_spawn("AWACS")
                     elif event.key == pygame.K_m: cmd.manual_spawn("ARM")
                     elif event.key == pygame.K_c: cmd.manual_spawn("CRUISE")
-                    elif event.key == pygame.K_w: cmd.manual_spawn("WAVE")
                     elif event.key == pygame.K_p:
                         cmd.tick_count = 360
                         cmd.detect_airspace()
@@ -325,6 +349,16 @@ def start_radar():
             if event.type == pygame.MOUSEWHEEL:
                 zoom_level += event.y * 0.15
                 zoom_level = max(0.2, min(10.0, zoom_level))
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                if selected_contact and isinstance(selected_contact, AWACS):
+                    mx, my = event.pos
+                    def px_to_km(px): return px / zoom_level
+                    wx = px_to_km(mx - CX)
+                    wy = px_to_km(CY - my)
+                    selected_contact.retask_station(wx, wy)
+                    cmd.add_log(f"\033[96m[AWACS] Orbit station updated to ({wx:.1f}, {wy:.1f}) km\033[0m")
+                    sound_mgr.radio_callout(f"AWACS vectoring to new orbit station.", category="AWACS_CMD", debounce_sec=2.0)
 
             # Handle mouse click for selection
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -381,7 +415,8 @@ def start_radar():
         if keys[pygame.K_DOWN]: camera_y -= pan_speed
 
         mouse_dx, mouse_dy = pygame.mouse.get_rel()
-        if pygame.mouse.get_pressed()[1] or pygame.mouse.get_pressed()[2]: # Middle or Right Click
+        awacs_selected = bool(selected_contact and isinstance(selected_contact, AWACS))
+        if pygame.mouse.get_pressed()[1] or (pygame.mouse.get_pressed()[2] and not awacs_selected):
             camera_x += mouse_dx
             camera_y += mouse_dy
 
@@ -629,7 +664,18 @@ def start_radar():
                 pygame.draw.circle(screen, color, (int(x), int(y)), 6, 2)
             else:
                 pygame.draw.rect(screen, color, (x-6, y-6, 12, 12), 2)
-            
+                
+            if isinstance(c, AWACS):
+                # 400 km airborne look-down radar coverage circle
+                pygame.draw.circle(screen, (0, 180, 220), (int(x), int(y)), int(km_to_px(400)), 1)
+                # Link-16 datalink line from Bangkok C2
+                pygame.draw.line(screen, (0, 140, 180), (CX, CY), (int(x), int(y)), 1)
+                if selected_contact == c or c.state == "TRANSIT_TO_STATION":
+                    ox_px = CX + km_to_px(c.orbit_center_x)
+                    oy_px = CY - km_to_px(c.orbit_center_y)
+                    pygame.draw.line(screen, (0, 140, 180), (int(x), int(y)), (int(ox_px), int(oy_px)), 1)
+                    pygame.draw.circle(screen, (0, 140, 180), (int(ox_px), int(oy_px)), 4, 1)
+
             target_heading = getattr(c, 'heading', (bearing + 180) % 360)
             vec_length = max(10, c.speed_mach * 10) 
             vec_end_x = x + vec_length * math.sin(math.radians(target_heading))
@@ -793,7 +839,10 @@ def start_radar():
 
         # Spawn controls instruction
         map_tag = ["FULL", "SOVEREIGN", "MINIMAL", "OFF"][map_mgr.map_mode]
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else f"TACTICAL: [E] EMCON | [S] Salvo | [D] Decoy | [F] ECCM Burn | [H] Home-on-Jam | [B] EMP | [TAB] Upgrades | [F1] Mission | [F2] Map:{map_tag} | [P] Phase 3"
+        if selected_contact and isinstance(selected_contact, AWACS):
+            ovr_text = f"AWACS [{selected_contact.id_code}] CONTROL: [RIGHT-CLICK] Retask Orbit Station | [R] Order RTB | [=/-] Orbit Radius ({int(getattr(selected_contact, 'orbit_radius_km', 50))}km)"
+        else:
+            ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else f"TACTICAL: [W] AWACS | [E] EMCON | [S] Salvo | [D] Decoy | [F] ECCM Burn | [H] Home-on-Jam | [B] EMP | [Arrows] Pan | [TAB] Upgrades | [F1] Mission | [F2] Map:{map_tag} | [P] Phase 3"
         screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 72))
 
         # Tactical Upgrades Overlay (Toggle with TAB)
