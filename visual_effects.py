@@ -485,6 +485,23 @@ class VFXManager:
             FlashBloom(x, y, max_radius=bloom_radius, total_frames=3, color=bloom_color)
         )
 
+    def add_shockwave(self, x: float, y: float, max_radius: float = 45.0,
+                      start_radius: float = 5.0, start_width: float = 3.0,
+                      end_width: float = 1.0, lifetime: float = 0.6,
+                      color: Tuple[int, int, int] = (255, 255, 255)) -> ShockwaveRing:
+        """Adds an independent expanding shockwave ring to the scene."""
+        sw = ShockwaveRing(
+            x=x, y=y,
+            start_radius=start_radius,
+            max_radius=max_radius,
+            start_width=start_width,
+            end_width=end_width,
+            lifetime=lifetime,
+            color=color
+        )
+        self.shockwaves.append(sw)
+        return sw
+
     # --------------------------------------------------------------------------
     # b. Camera Trauma Screen Shake (T^2 Model)
     # --------------------------------------------------------------------------

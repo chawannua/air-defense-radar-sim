@@ -1076,6 +1076,25 @@ sound_duration = len(launch_audio) / 44100.0
 check(sound_duration > 0.5,
       f"synth_missile_launch duration should be > 0.5s, got {sound_duration:.2f}s")
 
+print("\n=== 31. Visual Effects Subsystem & EMP Shockwave Ring ===")
+from visual_effects import VFXManager, ShockwaveRing
+vfx = VFXManager()
+check(hasattr(vfx, 'add_shockwave'), "VFXManager should have add_shockwave method")
+if hasattr(vfx, 'add_shockwave'):
+    sw = vfx.add_shockwave(x=100.0, y=100.0, max_radius=600.0, color=(180, 80, 255))
+    check(isinstance(sw, ShockwaveRing), "add_shockwave should return a ShockwaveRing instance")
+    check(sw.color == (180, 80, 255), f"Shockwave color should be (180, 80, 255), got {sw.color}")
+    check(sw.max_radius == 600.0, f"Shockwave max_radius should be 600.0, got {sw.max_radius}")
+    check(sw in vfx.shockwaves, "Shockwave should be added to vfx.shockwaves")
+    
+    vfx.update(dt=0.2)
+    check(sw.radius > sw.start_radius, "Shockwave radius should increase after update(dt=0.2)")
+    
+    vfx.update(dt=1.0)
+    check(sw not in vfx.shockwaves, "Expired shockwave should be pruned from vfx.shockwaves after update(dt=1.0)")
+else:
+    check(False, "vfx.add_shockwave missing: cannot verify shockwave properties")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")
