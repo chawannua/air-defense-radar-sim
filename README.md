@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/Version-v1.1.1--Phase3-0078D6?style=for-the-badge&logo=git&logoColor=white)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/Version-v1.2.0--Phase3-0078D6?style=for-the-badge&logo=git&logoColor=white)](CHANGELOG.md)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Pygame 2.0+](https://img.shields.io/badge/Pygame-2.0%2B-FF6F00?style=for-the-badge&logo=python&logoColor=white)](https://pygame.org)
 [![NumPy](https://img.shields.io/badge/NumPy-1.24%2B-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org)
@@ -10,13 +10,13 @@
 [![RTAF C2](https://img.shields.io/badge/Military_C2-RTAF_SOC-00529B?style=for-the-badge&logo=shield)](https://github.com/chawannua/air-defense-radar-sim)
 [![Windows Executable](https://img.shields.io/badge/Windows_Binary-AEGIS__Radar.exe-success?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/chawannua/air-defense-radar-sim/releases/latest)
 
-### ⚡ Current Release: `v1.1.1` (Phase 3 Hardened & Real SEA Geodata Engine)
+### ⚡ Current Release: `v1.2.0` (Black Ops Arsenal & Anti-Jammer ECCM Triad)
 
 **A high-fidelity, real-time tactical air defense Command & Control (C2) radar simulator modeled after the Royal Thai Air Force (RTAF) Sector Operations Center (SOC).**
 
-*Featuring 1:10m real-world Natural Earth geospatial geometry across Southeast Asia, 100% procedural NumPy audio synthesis (0 MB external sound files), electronic warfare & anti-radiation missile dynamics, salvo firing doctrines, and scenario campaign operations.*
+*Featuring 1:10m real-world Natural Earth geospatial geometry across Southeast Asia, 100% procedural NumPy audio synthesis (0 MB external sound files), electronic warfare & anti-radiation missile dynamics, Tier 2 Black Ops experimental arsenal, and 3-pillar anti-jammer Electronic Counter-Countermeasures.*
 
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.1.0 → v1.1.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (27/27)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.1.1 → v1.2.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (28/28)](test_logic.py)
 
 </div>
 
@@ -28,17 +28,18 @@
 2. [Key Features](#key-features)
 3. [Real-World Tactical Map Engine (`map_manager.py`)](#real-world-tactical-map-engine-map_managerpy)
 4. [Advanced Combat & Electronic Warfare Systems](#advanced-combat--electronic-warfare-systems)
-5. [Campaign Operations & Missions Engine (`missions.py`)](#campaign-operations--missions-engine-missionspy)
-6. [Tactical Armory & Technology Upgrade Tree (`[TAB]`)](#tactical-armory--technology-upgrade-tree-tab)
-7. [Procedural Audio Engine (`sound_engine.py`)](#procedural-audio-engine-sound_enginepy)
-8. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
-9. [Complete Tactical Keybindings](#complete-tactical-keybindings)
-10. [System Architecture & OOP Design](#system-architecture--oop-design)
-11. [Automated Testing (27/27 Test Suite)](#automated-testing-2727-test-suite)
-12. [Release History & Version Bump (v1.0.0 → v1.1.1)](#release-history--version-bump-v100--v111)
-13. [Installation & Build Guide](#installation--build-guide)
-14. [Dependencies](#dependencies)
-15. [License & Acknowledgments](#license--acknowledgments)
+5. [Anti-Jammer Electronic Counter-Countermeasures (ECCM)](#anti-jammer-electronic-counter-countermeasures-eccm)
+6. [Campaign Operations & Missions Engine (`missions.py`)](#campaign-operations--missions-engine-missionspy)
+7. [Tactical Armory & Technology Upgrade Tree (`[TAB]`)](#tactical-armory--technology-upgrade-tree-tab)
+8. [Procedural Audio Engine (`sound_engine.py`)](#procedural-audio-engine-sound_enginepy)
+9. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
+10. [Complete Tactical Keybindings](#complete-tactical-keybindings)
+11. [System Architecture & OOP Design](#system-architecture--oop-design)
+12. [Automated Testing (28/28 Test Suite)](#automated-testing-2828-test-suite)
+13. [Release History & Version Evolution (v1.0.0 → v1.2.0)](#release-history--version-evolution-v100--v120)
+14. [Installation & Build Guide](#installation--build-guide)
+15. [Dependencies](#dependencies)
+16. [License & Acknowledgments](#license--acknowledgments)
 
 ---
 
@@ -218,6 +219,45 @@ When Anti-Radiation Missiles are detected inbound, the commander can deploy pneu
 | RTAF Interceptors| Closest  | 15 sorties| 60,000 ft| Scrambled from nearest Wing to target vector.      |
 +------------------+----------+---------+----------+----------------------------------------------------+
 ```
+
+---
+
+## Anti-Jammer Electronic Counter-Countermeasures (ECCM)
+
+When hostile standoff electronic warfare aircraft (`EA-18G Growler`, `EC-130H Compass Call`, `J-16D`) project high-power noise strobes into the sector, ground radar detection range is degraded by up to 70% and false ghost tracks appear. AEGIS Radar deploys a three-pillar ECCM doctrine:
+
+```
++---------------------------------------------------------------------------------------------------------+
+|                                    ANTI-JAMMER ECCM TRIAD                                               |
++---------------------------------------------------------------------------------------------------------+
+|                                                                                                         |
+|  1. RADAR BURN-THROUGH [F]           2. HOME-ON-JAM (HOJ) [H]             3. PASSIVE ESM FIX [AWACS]    |
+|  - AESA transmitter overdrive        - Passive RF seeker guidance         - Dual-station cross-bearing  |
+|  - Multiplier: 0.3x -> 1.5x          - SAM Range: 200 km -> 350 km        - Bangkok C2 (0,0) + AWACS    |
+|  - 20s capacitor discharge           - Lethality: P_k >= 85%              - Fixes exact (x, y) coords   |
+|  - Cyan pencil beam overlay          - Bypasses chaff countermeasures     - Amber [ESM-FIX] diamond pip |
+|                                                                                                         |
++---------------------------------------------------------------------------------------------------------+
+```
+
+### 1. Radar Burn-Through Overdrive (`[F]`)
+- **Physics**: Transmitter overdrive focuses maximum AESA RF power into the jamming strobe. In radar physics, burn-through occurs when echo power from the target exceeds the jammer's noise density:
+  $$\text{Jamming Multiplier} = \begin{cases} 1.50 & \text{if Burn-Through Active (ECCM [F])} \\ 0.30 & \text{if Jammed Sector without ECCM} \\ 1.00 & \text{Normal Clear Airspace} \end{cases}$$
+- **Operational Profile**: Toggled via **`[F]`**. Capacitor banks sustain overdrive for 20 seconds.
+- **Visual & Audio**: Draws an illuminated cyan pencil beam slicing through the strobe wedge and plays a procedural 450–2,400 Hz AESA overdrive chirp.
+
+### 2. Home-On-Jam (HOJ) Missile Guidance (`[H]`)
+- **Physics**: When a jammer broadcasts hundreds of kilowatts of noise, missiles disable active monopulse radar and switch to passive angle-on-jam tracking.
+- **Capabilities**:
+  - **SAM Battery Engagement Range**: Extended from 200 km to **350 km** against radiating EW targets.
+  - **High Lethality**: Boosts single-missile $P_k$ to **$\ge 85\%$** against jammers.
+  - **Countermeasure Immunity**: Completely bypasses aircraft chaff decoys.
+- **HUD & Reticle**: Displays an amber `[HOJ-TRACK]` ring around radiating jammers and top bar status `[H] HOJ: ENABLED`.
+
+### 3. Passive ESM Cross-Bearing Triangulation (Saab 340 AEW&C)
+- **Physics**: Dual-station Electronic Support Measures (ESM) cross-bearing triangulation between ground C2 (Bangkok HQ $0, 0$) and the airborne Saab 340 AEW&C loitering over the Gulf of Thailand.
+- **Automation**: Operates autonomously whenever AWACS is active in theater.
+- **Display**: Fixes the exact $(x, y)$ coordinates of standoff jammers with an amber diamond crosshair and `[ESM-FIX]` tag.
 
 ---
 
@@ -472,9 +512,9 @@ The project is structured according to strict Object-Oriented Programming (OOP) 
 
 ---
 
-## Automated Testing (26/26 Test Suite)
+## Automated Testing (28/28 Test Suite)
 
-AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 26 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
+AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 28 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
 ```bash
 $ python test_logic.py
@@ -510,32 +550,34 @@ $ python test_logic.py
 [PASS] 25. Historical Event Bus Retention for After-Action Report (AAR) Analytics
 [PASS] 26. Tier 2 Black Ops Experimental Arsenal Gating, Purchases & Mechanics
 [PASS] 27. AI Interceptor Prioritization & Standoff EW Suppression
+[PASS] 28. Anti-Jammer Electronic Counter-Countermeasures (ECCM Burn-Through [F], HOJ [H] 350km SAM, Passive ESM Triangulation)
 
 ==================================================
-ALL 27 TEST MODULES PASSED (100% SUCCESS RATE)
+ALL 28 TEST MODULES PASSED (100% SUCCESS RATE)
 ```
 
 ---
 
-## Release History & Version Bump (v1.0.0 → v1.1.1)
+## Release History & Version Evolution (v1.0.0 → v1.2.0)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
-- The version increment from **`v1.1.0`** to **`v1.1.1`** delivers critical bug fixes, UI coordinate harmonizations, audio click elimination, and asset recovery safeguards.
+- The version increment from **`v1.1.0`** to **`v1.1.1`** delivered critical bug fixes, UI coordinate harmonizations, audio click elimination, and asset recovery safeguards.
+- The version increment from **`v1.1.1`** to **`v1.2.0`** introduces the Tier 2 Black Ops Experimental Arsenal, AI Interceptor EW Suppression, and the 3-pillar Anti-Jammer Electronic Counter-Countermeasures (ECCM) suite.
 
-| Capability Area | Release `v1.0.0` (Initial Base) | Release `v1.1.0` (Phase 3 & SEA Engine) | Release `v1.1.1` (Phase 3 Hardened) |
-|---|---|---|---|
-| **Geospatial Map Engine** | Synthetic boundary approximation | 1:10m Natural Earth Real Geometry (20 Thai rings, 8 neighbors, ADIZ, airbases) | Fixed dashed ADIZ rendering bug (`dy` NameError) & added Civil Airport Hubs. |
-| **Visual FX & UI Rendering** | Static blit markers | Expanding shockwaves, shrapnel embers, $T^2$ trauma shake | Fixed VFX double offset culling; centered modals to screen viewport; restored 60 FPS. |
-| **Audio Engine** | Basic Pygame sound clips | 100% Procedural NumPy signal synthesis (0 MB) | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. |
-| **Combat & Asset Mechanics** | Basic single missile firing | Salvo doctrine (`SINGLE/RIPPLE/SALVO`), EMCON, Decoys | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. |
-| **Automated Verification** | Headless unit sanity checks | 20/20 Test Suite (`test_logic.py`) | **25/25 Test Suite + 2,000-frame headless fuzz monkey test** passing with 0 errors. |
+| Capability Area | Release `v1.0.0` (Initial Base) | Release `v1.1.0` (Phase 3 & SEA Engine) | Release `v1.1.1` (Phase 3 Hardened) | Release `v1.2.0` (Black Ops & ECCM Suite) |
+|---|---|---|---|---|
+| **Geospatial Map Engine** | Synthetic boundary approximation | 1:10m Natural Earth Real Geometry (20 Thai rings, 8 neighbors, ADIZ, airbases) | Fixed dashed ADIZ rendering bug (`dy` NameError) & added Civil Airport Hubs. | Formally locked and protected via `SYSTEM_BOUNDARIES.md` (100% zero-regression guarantee). |
+| **Visual FX & UI Rendering** | Static blit markers | Expanding shockwaves, shrapnel embers, $T^2$ trauma shake | Fixed VFX double offset culling; centered modals to screen viewport; restored 60 FPS. | Added ECCM cyan overdrive pencil beam, ESM-FIX diamond reticles, and HOJ tracking indicators. |
+| **Audio Engine** | Basic Pygame sound clips | 100% Procedural NumPy signal synthesis (0 MB) | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. | Added procedural synthesizers `synth_eccm_burn()` (AESA chirp) and `synth_hoj_lock()` (1850 Hz warble). |
+| **Combat & Asset Mechanics** | Basic single missile firing | Salvo doctrine (`SINGLE/RIPPLE/SALVO`), EMCON, Decoys | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. | Implemented Tier 2 Black Ops Arsenal (5 upgrades), EMP shockwave `[B]`, Burn-Through `[F]`, HOJ `[H]`, and AWACS ESM cross-fix. |
+| **Automated Verification** | Headless unit sanity checks | 20/20 Test Suite (`test_logic.py`) | 25/25 Test Suite + 2,000-frame headless fuzz monkey test. | **28/28 Automated Test Suite** passing with 0 errors (100% green). |
 
 ---
 
