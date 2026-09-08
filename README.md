@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/Version-v1.1.0--Phase3-0078D6?style=for-the-badge&logo=git&logoColor=white)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/Version-v1.1.1--Phase3-0078D6?style=for-the-badge&logo=git&logoColor=white)](CHANGELOG.md)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Pygame 2.0+](https://img.shields.io/badge/Pygame-2.0%2B-FF6F00?style=for-the-badge&logo=python&logoColor=white)](https://pygame.org)
 [![NumPy](https://img.shields.io/badge/NumPy-1.24%2B-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org)
@@ -10,13 +10,13 @@
 [![RTAF C2](https://img.shields.io/badge/Military_C2-RTAF_SOC-00529B?style=for-the-badge&logo=shield)](https://github.com/chawannua/air-defense-radar-sim)
 [![Windows Executable](https://img.shields.io/badge/Windows_Binary-AEGIS__Radar.exe-success?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/chawannua/air-defense-radar-sim/releases/latest)
 
-### ⚡ Current Release: `v1.1.0` (Phase 3 & Real Southeast Asia Geodata Engine)
+### ⚡ Current Release: `v1.1.1` (Phase 3 Hardened & Real SEA Geodata Engine)
 
 **A high-fidelity, real-time tactical air defense Command & Control (C2) radar simulator modeled after the Royal Thai Air Force (RTAF) Sector Operations Center (SOC).**
 
 *Featuring 1:10m real-world Natural Earth geospatial geometry across Southeast Asia, 100% procedural NumPy audio synthesis (0 MB external sound files), electronic warfare & anti-radiation missile dynamics, salvo firing doctrines, and scenario campaign operations.*
 
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.1.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (20/20)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.1.0 → v1.1.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (25/25)](test_logic.py)
 
 </div>
 
@@ -34,8 +34,8 @@
 8. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 9. [Complete Tactical Keybindings](#complete-tactical-keybindings)
 10. [System Architecture & OOP Design](#system-architecture--oop-design)
-11. [Automated Testing (20/20 Test Suite)](#automated-testing-2020-test-suite)
-12. [Release History & Version Bump (v1.0.0 → v1.1.0)](#release-history--version-bump-v100--v110)
+11. [Automated Testing (25/25 Test Suite)](#automated-testing-2525-test-suite)
+12. [Release History & Version Bump (v1.0.0 → v1.1.1)](#release-history--version-bump-v100--v111)
 13. [Installation & Build Guide](#installation--build-guide)
 14. [Dependencies](#dependencies)
 15. [License & Acknowledgments](#license--acknowledgments)
@@ -427,7 +427,7 @@ The project is structured according to strict Object-Oriented Programming (OOP) 
 
 ## Automated Testing (20/20 Test Suite)
 
-AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 20 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
+AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 25 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
 ```bash
 $ python test_logic.py
@@ -456,36 +456,37 @@ $ python test_logic.py
 [PASS] 18. Tactical Technology Upgrade Tree Unlocking, Deductions & Multipliers
 [PASS] 19. Campaign Mission Cycling (OP-DEFENSE, OP-GUARDIAN, OP-IRONSWARM, OP-GHOST)
 [PASS] 20. Real Tactical Map Geodata Validation (Thailand 20 rings / 1,545 pts, 8 Neighbors, ADIZ)
+[PASS] 21. CIWS Manual Intercept Execution & Rapid CIWS Rate-of-Fire Upgrade
+[PASS] 22. AWACS & CAP RTB Landing Asset Pool Recovery without Leakage
+[PASS] 23. Friendly Fire Prevention & Universal Civilian Shootdown Court-Martial
+[PASS] 24. Multi-Format Geodata Mountain Peak Masking Tuple Unpacking Safety
+[PASS] 25. Historical Event Bus Retention for After-Action Report (AAR) Analytics
 
 ==================================================
-ALL 20 TEST MODULES PASSED (100% SUCCESS RATE)
+ALL 25 TEST MODULES PASSED (100% SUCCESS RATE)
 ```
 
 ---
 
-## Release History & Version Bump (v1.0.0 → v1.1.0)
+## Release History & Version Bump (v1.0.0 → v1.1.1)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
-- The version increment from **`v1.0.0`** to **`v1.1.0`** represents a major **`MINOR`** release, introducing extensive new backwards-compatible tactical capabilities, military combat subsystems, campaign operations, and a completely overhauled geospatial projection engine.
+- The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
+- The version increment from **`v1.1.0`** to **`v1.1.1`** delivers critical bug fixes, UI coordinate harmonizations, audio click elimination, and asset recovery safeguards.
 
-| Capability Area | Release `v1.0.0` (Initial Base) | Release `v1.1.0` (Phase 3 & Real SEA Geodata Engine) |
-|---|---|---|
-| **Geospatial Map Engine** | Simplified synthetic boundary approximation | **1:10m Natural Earth Real Geometry**: 20 Thai rings / 1,545 vertices, 8 regional nations, 8,338 coastline vertices, 31-pt ADIZ, 22 airbases, and mountain peak line-of-sight occlusion. |
-| **Map Display Modes** | Single static map overlay | **Dynamic 4-Layer Surface Cache (`[F2]`)**: `FULL TACTICAL`, `SOVEREIGN FOCUS`, `MINIMAL RADAR`, and `TACTICAL DARK` at 1.3 ms render latency. |
-| **Electronic Warfare & SEAD** | EA-18G noise strobe wedges only | **Anti-Radiation Missiles (Mach 4.5 SEAD)**, 3-tier **EMCON (`[E]`)**, and deployable **Active RF Decoys (`[D]`)**. |
-| **Missile Doctrine & P_k** | Single missile firing per click | **Salvo Firing Doctrine (`[S]`)**: `SINGLE`, `RIPPLE` (2x), and `SALVO` (3x, boosting $P_k \ge 90\%$ against hypersonics). |
-| **Terrain & Stealth Threats** | High-altitude conventional contacts | **Terrain-Masked Cruise Missiles** (200 ft AGL) and **Low-RCS Stealth Bombers** with standoff weapons. |
-| **Campaign Operations** | Endless single-mode defense | **Mission Manager (`[F1]`)**: 4 operational scenarios (`OP-DEFENSE`, `OP-GUARDIAN` VIP escort, `OP-IRONSWARM` DEFCON 1 saturation, `OP-GHOST` stealth hunt). |
-| **Tactical Tech Tree** | Static weapon configuration | **In-Game XP Economy & Tech Tree (`[TAB]`)**: 5 unlockable technology nodes + 11 RTAF career ranks. |
-| **Acoustic Engine** | Basic Pygame sound clips | **100% Procedural NumPy Synthesis (0 MB download)**: mathematical signal synthesis of radar chirps, alarms, rocket motors, 3,900 RPM Gatling BRRRRT, detonations, and async SAPI voice. |
-| **Visual FX ("Juice")** | Standard Pygame blit markers | **Visceral Game-Feel Engine**: Multi-phase shockwaves, thermodynamic shrapnel, $T^2$ camera trauma shake, targeting lead vectors, and CRT damage vignette. |
-| **Automated Verification** | Headless unit sanity checks | **20/20 Test Suite (`test_logic.py`)**: 100% automated test coverage spanning kinematics, geospatial boundaries, EMCON, salvo physics, and mission triggers. |
+| Capability Area | Release `v1.0.0` (Initial Base) | Release `v1.1.0` (Phase 3 & SEA Engine) | Release `v1.1.1` (Phase 3 Hardened) |
+|---|---|---|---|
+| **Geospatial Map Engine** | Synthetic boundary approximation | 1:10m Natural Earth Real Geometry (20 Thai rings, 8 neighbors, ADIZ, airbases) | Fixed dashed ADIZ rendering bug (`dy` NameError) & added Civil Airport Hubs. |
+| **Visual FX & UI Rendering** | Static blit markers | Expanding shockwaves, shrapnel embers, $T^2$ trauma shake | Fixed VFX double offset culling; centered modals to screen viewport; restored 60 FPS. |
+| **Audio Engine** | Basic Pygame sound clips | 100% Procedural NumPy signal synthesis (0 MB) | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. |
+| **Combat & Asset Mechanics** | Basic single missile firing | Salvo doctrine (`SINGLE/RIPPLE/SALVO`), EMCON, Decoys | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. |
+| **Automated Verification** | Headless unit sanity checks | 20/20 Test Suite (`test_logic.py`) | **25/25 Test Suite + 2,000-frame headless fuzz monkey test** passing with 0 errors. |
 
 ---
 

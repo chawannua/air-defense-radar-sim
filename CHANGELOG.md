@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-09-08
+
+### Fixed
+- **UI & Rendering Engine (`radar_ui.py`)**:
+  - Eliminated double screen-offset calculation in `vfx_mgr.draw(screen, 0, 0)`, resolving off-screen culling of all intercept explosions and flak effects.
+  - Centered Upgrades modal and After-Action Report (AAR) debriefing window to viewport center (`(WIDTH - w) // 2`, `(HEIGHT - h) // 2`), preventing camera shake and pan distortion.
+  - Resolved variable collision on `alpha` (interpolation factor vs radar contact trail opacity), fixing spatial jitter and potential `UnboundLocalError`.
+  - Removed duplicate `clock.tick(60)` call that capped UI rendering at 30 FPS, restoring full 60 FPS refresh rate.
+  - Corrected active contact selection hit-test box stride from 22px to 18px.
+  - Fixed status badge color rendering for `VICTORY` state to tactical green.
+- **Simulation Core & Combat Systems (`command_center.py`, `targets.py`, `missions.py`)**:
+  - Implemented CIWS manual engagement execution branch in `process_engagements()`, honoring P_k calculation and Rapid CIWS upgrade bonus.
+  - Fixed `NameError: VIPTransport` in `command_center.py` by importing `VIPTransport` from `targets.py`.
+  - Stored events in `self.historical_events` to preserve After-Action Report metrics after UI event bus consumption.
+  - Restored friendly fire / civilian court-martial triggers to fire across any friendly aircraft or civilian VIP craft.
+  - Fixed AWACS and CAP landing recovery to prevent permanent asset pool exhaustion upon RTB.
+  - Prevented infinite XP gain loops on mission completion in `IronSwarmMission` and `GhostHunterMission`.
+  - Added ballistic momentum impact check to `AntiRadiationMissile` when ground radar goes silent.
+  - Fixed `is_line_of_sight_masked` peak altitude unpacking to safely support both 3-tuple and 4-tuple peak geodata.
+- **Audio & Geospatial Engine (`sound_engine.py`, `map_manager.py`)**:
+  - Added 3ms attack ramp in `_to_stereo_sound` to eliminate sample 0 DC step pops/clicks.
+  - Resolved `NameError: name 'dy' is not defined` in `map_manager.py` dashed polygon rendering.
+  - Added civil airport hub rendering branch for Phuket International Airport (`VTSP`).
+  - Added C-contiguous 16-bit PCM array enforcement before passing audio buffers to `pygame.sndarray.make_sound`.
+- **Quality Assurance**:
+  - Expanded test suite from 20 to 25 automated integration suites in `test_logic.py`, passing with 100% success.
+  - Executed 2,000-frame headless monkey fuzz test with zero exceptions at 115.7 FPS.
+
 ## [1.1.0] - 2026-09-08
 
 ### Added
@@ -68,5 +96,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AWACS orbit patrol and Combat Air Patrol (CAP) lifecycle management.
 - 3-phase escalation model: Peacetime (0–2m), Tensions (2–6m), Wartime (6m+).
 
+[1.1.1]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/chawannua/air-defense-radar-sim/releases/tag/v1.0.0
