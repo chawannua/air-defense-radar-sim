@@ -90,8 +90,18 @@
 - **RTAF Air Wing Distribution**: Scramble interceptors dynamically from authentic installations: Wing 1 (Korat), Wing 4 (Takhli), Wing 7 (Surat Thani), Wing 21 (Ubon), Wing 23 (Udon), Wing 41 (Chiang Mai), Wing 56 (Hat Yai), and RTN Utapao.
 - **Target Tracking & Automatic Intercept Lead**: Real-time vector calculation estimating target future coordinates with animated HUD lead pip reticles and marching dashed interception vectors.
 - **Logistics & Fuel Cycles**: Automated Combat Air Patrol (CAP) rotations and AWACS staggered relief flights over the Gulf of Thailand with Bingo fuel RTB (Return to Base) protocols.
+- **Anti-Jammer ECCM Triad**:
+  - **Radar Burn-Through Mode (`[F]`)**: AESA transmitter overdrive punches through standoff jamming noise, elevating radar range from 30% to 150% in strobe azimuths for 20 seconds.
+  - **Home-On-Jam (HOJ) Missile Guidance (`[H]`)**: Missiles switch from active reflection to passive RF homing, extending SAM battery engagement range from 200 km to **350 km** against radiating jammers with $\ge 85\%$ $P_k$ (bypassing chaff decoys).
+  - **Passive ESM Triangulation**: Real-time cross-bearing triangulation between Bangkok Ground C2 and airborne Saab 340 AEW&C locks exact coordinates of standoff jammers (`[ESM-FIX]`).
 
 ---
+
+## System Boundaries & Modification Governance
+
+> For AI agents and developers, this repository enforces strict boundaries documented in [`SYSTEM_BOUNDARIES.md`](SYSTEM_BOUNDARIES.md) and [`AGENTS.md`](AGENTS.md):
+> - **Strictly Protected (Immutable)**: `map_manager.py` (v1.1.0 Natural Earth map geometry), all GeoJSON maps (`tha.json`, `coastlines.json`, etc.), and `missions.py`.
+> - **Permitted**: `command_center.py`, `targets.py`, `radar_ui.py`, `sound_engine.py`, `test_logic.py`, `README.md`, `CHANGELOG.md`.
 
 ## Real-World Tactical Map Engine (`map_manager.py`)
 
@@ -406,6 +416,8 @@ A dedicated game-feel engine translates kinetic impacts into visceral tactical f
 | **`[E]`** | Global | Toggle **EMCON Mode**: `ACTIVE` (360°) $\to$ `SECTOR` (120°) $\to$ `SILENT` (Dark) |
 | **`[S]`** | Global | Toggle **Salvo Doctrine**: `SINGLE` (1x) $\to$ `RIPPLE` (2x) $\to$ `SALVO` (3x, $P_k \ge 90\%$) |
 | **`[D]`** | Global | Deploy **Active RF Decoy**: Blooms 15 km away to seduce homing ARMs |
+| **`[F]`** | Global | Toggle **Radar Burn-Through Mode (ECCM)**: AESA transmitter overdrive cuts through jammer strobe ($0.3\times \to 1.5\times$ range) |
+| **`[H]`** | Global | Toggle **Home-On-Jam (HOJ) Guidance**: Passive RF seeker doctrine extends SAM range to 350 km against jammers ($P_k \ge 85\%$) |
 | **`[B]`** | Global | Discharge **Tactical EMP Shockwave**: Vaporizes EW ghost tracks & fries ARM seekers (requires Tier 2 EMP) |
 | **`[TAB]`** | Global | Toggle **Tactical Armory & Upgrade Tree** (Tier 1 Conventional & Tier 2 Black Ops) |
 | **`[T]`** | Armory Open | Toggle **Armory Tab**: `Tier 1: Conventional` $\longleftrightarrow$ `Tier 2: Black Ops (Classified)` |

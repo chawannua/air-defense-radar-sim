@@ -805,6 +805,140 @@ if hasattr(cmd_ai, 'active_engagements') and len(cmd_ai.active_engagements) > 0:
     finally:
         GameConfig.HIT_CHANCE_F16 = old_f16_hit
 
+print("\n=== 28. Anti-Jammer Electronic Counter-Countermeasures (ECCM) ===")
+
+cmd_eccm = CommandCenter()
+
+# --- 1. Radar Burn-Through Mode ([F]) ---
+check(hasattr(cmd_eccm, 'burn_through_active'), "CommandCenter should have burn_through_active state")
+check(hasattr(cmd_eccm, 'toggle_burn_through'), "CommandCenter should implement toggle_burn_through()")
+
+if hasattr(cmd_eccm, 'toggle_burn_through'):
+    initial_bt = cmd_eccm.burn_through_active
+    new_state, msg_bt = cmd_eccm.toggle_burn_through()
+    check(new_state != initial_bt, f"toggle_burn_through should toggle state: {initial_bt} -> {new_state}")
+    check(cmd_eccm.burn_through_active is True, "burn_through_active should be True after toggle")
+    
+    # Check jamming factor under burn-through
+    ew_bogey = Aircraft(9910)
+    ew_bogey.is_heavy_ew = True
+    ew_bogey.status = "HOSTILE"
+    ew_bogey.bearing = 90.0
+    
+    target_masked = Aircraft(9911)
+    target_masked.bearing = 92.0 # Inside the 10 degree strobe cone
+    
+    factor_active = cmd_eccm.get_jamming_factor(target_masked, [ew_bogey])
+    check(factor_active >= 1.5, f"Burn-through mode should boost factor to >=1.5 (got {factor_active})")
+    
+    # Toggle off
+    cmd_eccm.toggle_burn_through()
+    factor_normal = cmd_eccm.get_jamming_factor(target_masked, [ew_bogey])
+    check(factor_normal <= 0.31, f"Normal jamming factor should be 0.3 without burn-through (got {factor_normal})")
+
+# --- 2. Home-On-Jam (HOJ) Missile Guidance Doctrine ([H]) ---
+check(hasattr(cmd_eccm, 'hoj_mode'), "CommandCenter should have hoj_mode state")
+check(hasattr(cmd_eccm, 'toggle_hoj_mode'), "CommandCenter should implement toggle_hoj_mode()")
+
+if hasattr(cmd_eccm, 'toggle_hoj_mode'):
+    check(cmd_eccm.hoj_mode is False, "hoj_mode should default to False (STANDBY)")
+    state_hoj, msg_hoj = cmd_eccm.toggle_hoj_mode()
+    check(cmd_eccm.hoj_mode is True, "hoj_mode should be True after toggle")
+    
+    # Test SAM engagement range extension against radiating jammer
+    standoff_jammer = Aircraft(9912)
+    standoff_jammer.is_heavy_ew = True
+    standoff_jammer.status = "HOSTILE"
+    standoff_jammer.distance_km = 300.0 # Standard SAM range is only 200 km!
+    standoff_jammer.altitude_ft = 35000
+    cmd_eccm.contacts = [standoff_jammer]
+    cmd_eccm.ammo["SAM"] = 10
+    
+    # In HOJ mode, SAM can engage radiating jammer out to 350 km
+    check(cmd_eccm.can_engage_with_sam(standoff_jammer) is True,
+          "HOJ mode should permit SAM engagement out to 350 km against radiating jammer")
+    
+    # When HOJ is disabled, SAM cannot engage beyond 200 km
+    cmd_eccm.hoj_mode = False
+    check(cmd_eccm.can_engage_with_sam(standoff_jammer) is False,
+          "Without HOJ, SAM cannot engage target beyond 200 km")
+
+# --- 3. Passive ESM Cross-Bearing Triangulation (Saab 340 AEW&C) ---
+cmd_esm = CommandCenter()
+jam_target = Aircraft(9913)
+jam_target.is_heavy_ew = True
+jam_target.status = "HOSTILE"
+jam_target.x_km = 350.0
+jam_target.y_km = 200.0
+jam_target.bearing = math.degrees(math.atan2(350.0, 200.0))
+cmd_esm.contacts = [jam_target]
+
+# Without AWACS, no triangulation
+check(hasattr(cmd_esm, 'process_esm_triangulation'),
+      "CommandCenter should implement process_esm_triangulation()")
+if hasattr(cmd_esm, 'process_esm_triangulation'):
+    cmd_esm.process_esm_triangulation()
+    check(getattr(jam_target, 'is_esm_triangulated', False) is False,
+          "Without AWACS, jammer should NOT be triangulated")
+    
+    # Deploy active AWACS
+    awacs_bird = AWACS(9914)
+    awacs_bird.active = True
+    awacs_bird.set_xy(100.0, -250.0) # Loitering over Gulf of Thailand
+    cmd_esm.contacts.append(awacs_bird)
+    
+    cmd_esm.process_esm_triangulation()
+    check(getattr(jam_target, 'is_esm_triangulated', False) is True,
+          "With active AWACS, jammer should be marked as triangulated (is_esm_triangulated=True)")
+    check(hasattr(jam_target, 'esm_fix_coord') and jam_target.esm_fix_coord == (350.0, 200.0),
+          "Triangulated jammer should record exact esm_fix_coord (350, 200)")
+
+    # Non-radiating contacts (civilian airliner) should NOT be ESM-triangulated
+    airliner = Airliner(9915)
+    airliner.active = True
+    cmd_esm.contacts.append(airliner)
+    cmd_esm.process_esm_triangulation()
+    check(getattr(airliner, 'is_esm_triangulated', False) is False,
+          "Civilian airliner should NOT be marked as ESM triangulated")
+
+# --- 4. Burn-Through Timer Countdown & Auto-Expiration in update_world ---
+cmd_timer = CommandCenter()
+cmd_timer.toggle_burn_through()
+check(cmd_timer.burn_through_active is True and cmd_timer.burn_through_timer == 20,
+      "Burn-through timer should initialize to 20 seconds")
+cmd_timer.burn_through_timer = 1
+cmd_timer.update_world()
+check(cmd_timer.burn_through_active is False,
+      "Burn-through should automatically deactivate when timer reaches 0")
+
+# --- 5. Manual SAM Override Range Enforcement with HOJ ---
+cmd_sam_range = CommandCenter()
+long_range_jammer = Aircraft(9916)
+long_range_jammer.is_heavy_ew = True
+long_range_jammer.status = "HOSTILE"
+long_range_jammer.x_km = 280.0
+long_range_jammer.y_km = 0.0
+long_range_jammer.distance_km = 280.0
+long_range_jammer.altitude_ft = 30000
+cmd_sam_range.contacts = [long_range_jammer]
+cmd_sam_range.ammo["SAM"] = 5
+
+# Without HOJ, firing SAM at 280km must be rejected
+cmd_sam_range.hoj_mode = False
+cmd_sam_range.manual_override_fire(long_range_jammer, "SAM")
+check(cmd_sam_range.ammo["SAM"] == 5,
+      "SAM ammo should NOT be consumed when target is out of range without HOJ")
+check(len(cmd_sam_range.active_engagements) == 0,
+      "No engagement should be created when SAM is fired out of range without HOJ")
+
+# With HOJ enabled, firing SAM at 280km must succeed
+cmd_sam_range.toggle_hoj_mode()
+cmd_sam_range.manual_override_fire(long_range_jammer, "SAM")
+check(cmd_sam_range.ammo["SAM"] == 4,
+      "SAM ammo should be consumed when firing at 280km with HOJ active")
+check(len(cmd_sam_range.active_engagements) == 1,
+      "Active engagement should be created when firing SAM with HOJ active")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")

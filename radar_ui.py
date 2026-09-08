@@ -242,6 +242,20 @@ def start_radar():
                     cmd.toggle_salvo()
                 elif event.key == pygame.K_d:
                     cmd.deploy_decoy()
+                elif event.key == pygame.K_f:
+                    active, msg = cmd.toggle_burn_through()
+                    if active:
+                        sound_mgr.play_eccm_burn()
+                        sound_mgr.radio_callout("Burn-through overdrive engaged.")
+                    else:
+                        sound_mgr.radio_callout("Burn-through standby.")
+                elif event.key == pygame.K_h:
+                    active, msg = cmd.toggle_hoj_mode()
+                    if active:
+                        sound_mgr.play_hoj_lock()
+                        sound_mgr.radio_callout("Home-on-jam guidance active.")
+                    else:
+                        sound_mgr.radio_callout("Home-on-jam guidance standby.")
                 elif event.key == pygame.K_b:
                     if "TACTICAL_EMP_BURST" in cmd.unlocked_upgrades:
                         ok, msg = cmd.trigger_emp_burst()
@@ -514,8 +528,9 @@ def start_radar():
 
         # full-screen green particle noise when any EW is active (like movie radar jamming)
         if ew_active:
-            # scatter green dots everywhere across the entire radar area
-            for _ in range(600):
+            # When burn-through is active, transmitter overdrive suppresses noise particles
+            noise_particles = 180 if cmd.burn_through_active else 600
+            for _ in range(noise_particles):
                 nx = random.randint(int(CX - r_max), int(CX + r_max))
                 ny = random.randint(int(CY - r_max), int(CY + r_max))
                 # only draw inside the radar circle
@@ -526,9 +541,10 @@ def start_radar():
                     pygame.draw.circle(screen, g, (nx, ny), sz)
 
             # bright horizontal scan lines for that CRT glitch look
-            for _ in range(random.randint(3, 8)):
+            scanline_count = 2 if cmd.burn_through_active else random.randint(3, 8)
+            for _ in range(scanline_count):
                 sy = random.randint(int(CY - r_max), int(CY + r_max))
-                line_alpha = random.randint(20, 80)
+                line_alpha = random.randint(15, 40) if cmd.burn_through_active else random.randint(20, 80)
                 pygame.draw.line(screen, (0, line_alpha, 0),
                                  (int(CX - r_max), sy), (int(CX + r_max), sy), 1)
 
@@ -537,8 +553,9 @@ def start_radar():
             ew_bearing = getattr(ew, 'bearing', getattr(ew, 'heading', 0))
             jam_width = 20.0 if getattr(ew, 'is_heavy_ew', False) else 10.0
 
-            # dense noise particles in the jammer's sector
-            particle_count = 400 if getattr(ew, 'is_heavy_ew', False) else 120
+            # dense noise particles in the jammer's sector (cut in half when burn-through active)
+            base_p_count = 400 if getattr(ew, 'is_heavy_ew', False) else 120
+            particle_count = int(base_p_count * 0.35) if cmd.burn_through_active else base_p_count
             for _ in range(particle_count):
                 r_dist = random.uniform(10, r_max * 1.3)
                 j_angle = ew_bearing + random.uniform(-jam_width, jam_width)
@@ -552,6 +569,19 @@ def start_radar():
                 sx = CX + r_max * math.sin(math.radians(ew_bearing + offset))
                 sy = CY - r_max * math.cos(math.radians(ew_bearing + offset))
                 pygame.draw.line(screen, (0, 120, 40), (CX, CY), (sx, sy), 1)
+
+            # Radar Burn-Through (ECCM) Overdrive Pencil Beam Overlay
+            if cmd.burn_through_active:
+                beam_w = 4.0
+                bx1 = CX + r_max * math.sin(math.radians(ew_bearing - beam_w))
+                by1 = CY - r_max * math.cos(math.radians(ew_bearing - beam_w))
+                bx2 = CX + r_max * math.sin(math.radians(ew_bearing + beam_w))
+                by2 = CY - r_max * math.cos(math.radians(ew_bearing + beam_w))
+                pygame.draw.polygon(screen, (0, 60, 80), [(CX, CY), (bx1, by1), (bx2, by2)])
+                pygame.draw.line(screen, (0, 255, 255), (CX, CY), (CX + r_max * math.sin(math.radians(ew_bearing)), CY - r_max * math.cos(math.radians(ew_bearing))), 2)
+                mid_x = CX + (r_max * 0.55) * math.sin(math.radians(ew_bearing))
+                mid_y = CY - (r_max * 0.55) * math.cos(math.radians(ew_bearing))
+                screen.blit(font_xs.render("[ECCM-OVERDRIVE]", True, (0, 255, 255)), (mid_x + 8, mid_y - 6))
 
         for c in cmd.contacts:
             if not c.active or not hasattr(c, 'visible_dist'): continue
@@ -611,6 +641,20 @@ def start_radar():
             screen.blit(font_sm.render(c.id_code, True, text_color), (x + 10, y - 10))
             alt_k = c.altitude_ft // 1000
             screen.blit(font_xs.render(f"{c.speed_mach:.1f}M FL{alt_k:02d}", True, text_color), (x + 10, y + 2))
+
+            # Passive ESM Cross-Bearing Triangulation Fix Reticle
+            if getattr(c, 'is_esm_triangulated', False):
+                esm_color = (255, 190, 0)
+                pygame.draw.polygon(screen, esm_color, [(x, y-14), (x+14, y), (x, y+14), (x-14, y)], 1)
+                pygame.draw.line(screen, esm_color, (x-18, y), (x+18, y), 1)
+                pygame.draw.line(screen, esm_color, (x, y-18), (x, y+18), 1)
+                screen.blit(font_xs.render("[ESM-FIX]", True, (255, 220, 50)), (x + 10, y - 22))
+
+            # Home-On-Jam Passive Seeker Tracking Indicator
+            is_radiating_ew = getattr(c, 'is_heavy_ew', False) or "EW" in getattr(c, 'type_name', '') or getattr(c, 'scenario', '') == 'EW'
+            if cmd.hoj_mode and is_radiating_ew and c.status != "FRIENDLY":
+                pygame.draw.circle(screen, (255, 160, 0), (int(x), int(y)), 16, 1)
+                screen.blit(font_xs.render("[HOJ-TRACK]", True, (255, 180, 0)), (x + 10, y + 14))
 
             if selected_contact == c:
                 heading = getattr(c, 'heading', (bearing + 180) % 360)
@@ -736,12 +780,20 @@ def start_radar():
         decoy_color = (255, 220, 50) if cmd.decoys_remaining > 0 else (120, 120, 120)
         draw_status_box(armory_x + 635, top_bar_y + 25, 145, 20, "[D] DECOY", (150,150,150), f"{cmd.decoys_remaining}/3", decoy_color)
 
-        # Third Row: Active Mission Campaign
-        draw_status_box(top_bar_x, top_bar_y + 48, 780, 20, f"[F1] MISSION: {cmd.mission_mgr.current.name.upper()}", (255, 220, 100), f"STATUS: {cmd.mission_mgr.current.state}", (100, 255, 100) if cmd.mission_mgr.current.state in ['IN_PROGRESS', 'VICTORY'] else (255, 80, 80))
+        # Third Row: Active Mission Campaign + ECCM & HOJ Badges
+        draw_status_box(top_bar_x, top_bar_y + 48, 480, 20, f"[F1] {cmd.mission_mgr.current.name.upper()}", (255, 220, 100), f"STATUS: {cmd.mission_mgr.current.state}", (100, 255, 100) if cmd.mission_mgr.current.state in ['IN_PROGRESS', 'VICTORY'] else (255, 80, 80))
+
+        eccm_val = f"ACTIVE {cmd.burn_through_timer}s" if cmd.burn_through_active else "STANDBY"
+        eccm_col = (0, 255, 255) if cmd.burn_through_active else (120, 120, 120)
+        draw_status_box(top_bar_x + 485, top_bar_y + 48, 145, 20, "[F] ECCM", (0, 255, 255) if cmd.burn_through_active else (150, 150, 150), eccm_val, eccm_col)
+
+        hoj_val = "ENABLED" if cmd.hoj_mode else "OFF"
+        hoj_col = (255, 200, 50) if cmd.hoj_mode else (120, 120, 120)
+        draw_status_box(top_bar_x + 635, top_bar_y + 48, 145, 20, "[H] HOJ", (255, 180, 0) if cmd.hoj_mode else (150, 150, 150), hoj_val, hoj_col)
 
         # Spawn controls instruction
         map_tag = ["FULL", "SOVEREIGN", "MINIMAL", "OFF"][map_mgr.map_mode]
-        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else f"TACTICAL: [E] EMCON | [S] Salvo | [D] Decoy | [B] EMP | [TAB] Upgrades | [F1] Mission | [F2] Map:{map_tag} | [P] Phase 3"
+        ovr_text = f"LOCKED: {selected_contact.id_code} (PRESS 1:THAAD 2:SAM 3:CIWS 4:SCRAMBLE)" if selected_contact else f"TACTICAL: [E] EMCON | [S] Salvo | [D] Decoy | [F] ECCM Burn | [H] Home-on-Jam | [B] EMP | [TAB] Upgrades | [F1] Mission | [F2] Map:{map_tag} | [P] Phase 3"
         screen.blit(font_xs.render(ovr_text, True, (150, 150, 150)), (top_bar_x, top_bar_y + 72))
 
         # Tactical Upgrades Overlay (Toggle with TAB)

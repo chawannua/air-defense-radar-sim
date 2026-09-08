@@ -61,6 +61,11 @@ class CommandCenter:
         self.decoys_remaining = 3
         self.active_decoys = []
 
+        # --- Electronic Counter-Countermeasures (ECCM) ---
+        self.burn_through_active = False
+        self.burn_through_timer = 0
+        self.hoj_mode = False
+
         # --- Event Bus ---
         self.event_bus = []
         self.historical_events = []
@@ -380,6 +385,75 @@ class CommandCenter:
         self.emit_event("EMP_BURST_TRIGGERED")
         self.add_log("\033[95;1m[EMP] TACTICAL EMP SHOCKWAVE DISCHARGED! EW JAMMING & ARM SEEKERS NEUTRALIZED!\033[0m")
         return True, "EMP shockwave discharged."
+
+    def toggle_burn_through(self):
+        self.burn_through_active = not self.burn_through_active
+        if self.burn_through_active:
+            self.burn_through_timer = 20  # 20 seconds duration
+            self.emit_event("ECCM_BURN_THROUGH", active=True)
+            self.add_log("\033[96;1m[ECCM] TRANSMITTER OVERDRIVE ACTIVE: AESA burn-through penetrating jamming sectors!\033[0m")
+            return True, "Burn-Through Overdrive Online"
+        else:
+            self.burn_through_timer = 0
+            self.emit_event("ECCM_BURN_THROUGH", active=False)
+            self.add_log("\033[90m[ECCM] Radar burn-through returned to normal scan power.\033[0m")
+            return False, "Burn-Through Standby"
+
+    def get_jamming_factor(self, target, ew_aircrafts):
+        """Calculates radar detection range multiplier taking into account EW jamming and ECCM burn-through."""
+        is_jammed = False
+        for ew in ew_aircrafts:
+            if ew != target:
+                angle_diff = abs((target.bearing - ew.bearing + 180) % 360 - 180)
+                if angle_diff <= 10.0:
+                    is_jammed = True
+                    break
+        if not is_jammed:
+            return 1.0
+        if self.burn_through_active:
+            return 1.5  # 150% burn-through range
+        return 0.3  # Standard 30% range in jamming sector
+
+    def toggle_hoj_mode(self):
+        self.hoj_mode = not self.hoj_mode
+        status_str = "ENABLED" if self.hoj_mode else "STANDBY"
+        color_code = "\033[93;1m" if self.hoj_mode else "\033[90m"
+        self.emit_event("HOJ_MODE_CHANGE", enabled=self.hoj_mode)
+        self.add_log(f"{color_code}[HOJ DOCTRINE] HOME-ON-JAM PASSIVE SEEKER GUIDANCE {status_str}!\033[0m")
+        return self.hoj_mode, f"HOJ Guidance {status_str}"
+
+    def can_engage_with_sam(self, target):
+        """Checks if SAM battery can engage target under current parameters, including HOJ mode."""
+        if not target or not target.active:
+            return False
+        max_range = 200.0
+        is_radiating_ew = getattr(target, 'is_heavy_ew', False) or "EW" in getattr(target, 'type_name', '') or getattr(target, 'scenario', '') == 'EW'
+        if self.hoj_mode and is_radiating_ew:
+            max_range = 350.0  # Extended HOJ range riding jamming emissions
+        return target.distance_km <= max_range
+
+    def process_esm_triangulation(self):
+        """
+        Passive ESM Cross-Bearing Triangulation:
+        When Saab 340 AEW&C is airborne, cross-fixes bearing from Bangkok HQ with
+        bearing from the AWACS, calculating exact (x, y) coordinates of standoff jammers.
+        """
+        active_awacs = [c for c in self.contacts if isinstance(c, AWACS) and c.active]
+        if not active_awacs:
+            for c in self.contacts:
+                if hasattr(c, 'is_esm_triangulated'):
+                    c.is_esm_triangulated = False
+            return
+
+        awacs = active_awacs[0]
+        for c in self.contacts:
+            if not c.active:
+                continue
+            is_ew = getattr(c, 'is_heavy_ew', False) or "EW" in getattr(c, 'type_name', '') or getattr(c, 'scenario', '') == 'EW'
+            if is_ew and c.status != "FRIENDLY":
+                c.is_esm_triangulated = True
+                c.esm_fix_coord = (c.x_km, c.y_km)
+                c.detected_by = "ESM-TRIANGULATED"
 
     def add_log(self, msg):
         ts = datetime.now().strftime("%H:%M:%S")
@@ -774,6 +848,11 @@ class CommandCenter:
         if wpn == "FIGHTER" and alt > 60000:
             self.add_log(f"\033[91;1m[ERROR] FIGHTER CANNOT REACH {alt} FT!\033[0m")
             return
+
+        # Range Check for Surface-to-Air Missiles
+        if wpn == "SAM" and not self.can_engage_with_sam(target):
+            self.add_log(f"\033[91;1m[ERROR] SAM OUT OF RANGE ({target.distance_km:.1f}km > 200km)! HOJ guidance required.\033[0m")
+            return
             
         salvo_count = 1
         if wpn in ["THAAD", "SAM"]:
@@ -903,8 +982,12 @@ class CommandCenter:
                         self.add_log(f"\033[91;1m[MISS] THAAD MISSED {eng.target.id_code}! TARGET STILL INCOMING!\033[0m")
                 
                 elif eng.weapon_name == "SAM":
-                    # Chaff Evasion Mechanic
-                    if isinstance(eng.target, Aircraft) and random.random() < 0.25:
+                    is_radiating_ew = getattr(eng.target, 'is_heavy_ew', False) or "EW" in getattr(eng.target, 'type_name', '') or getattr(eng.target, 'scenario', '') == 'EW'
+
+                    # Chaff Evasion Mechanic (bypassed if HOJ passive homing is active against radiating jammer)
+                    if self.hoj_mode and is_radiating_ew:
+                        self.add_log(f"\033[93;1m[HOJ] HOME-ON-JAM ACTIVE: Passive seeker riding {eng.target.id_code} RF strobe (chaff decoy bypassed)!\033[0m")
+                    elif isinstance(eng.target, Aircraft) and random.random() < 0.25:
                         eng.target.status = "FRIENDLY" if getattr(eng.target, 'is_friendly', False) else "HOSTILE"
                         self.add_log(f"\033[93m[EW] {eng.target.id_code} DEPLOYED CHAFF! SAM DECOYED!\033[0m")
                         continue
@@ -927,6 +1010,10 @@ class CommandCenter:
                             final_hit_chance = max(final_hit_chance, 0.85)
                     else:
                         final_hit_chance = single_hit_chance
+                    
+                    # Home-On-Jam high lethality boost (>= 85% P_k against radiating jammers)
+                    if self.hoj_mode and is_radiating_ew:
+                        final_hit_chance = max(0.85, final_hit_chance)
                     
                     if random.random() <= final_hit_chance: 
                         eng.target.status = "CLEARED"
@@ -1038,6 +1125,17 @@ class CommandCenter:
                 updated_decoys.append(d)
         self.active_decoys = updated_decoys
 
+        # Update ECCM Burn-Through Timer
+        if self.burn_through_active:
+            self.burn_through_timer -= 1
+            if self.burn_through_timer <= 0:
+                self.burn_through_active = False
+                self.emit_event("ECCM_BURN_THROUGH", active=False)
+                self.add_log("\033[90m[ECCM] Radar burn-through overdrive expired. Returning to standard scan.\033[0m")
+
+        # Process Passive ESM Cross-Bearing Triangulation (Ground C2 + AWACS)
+        self.process_esm_triangulation()
+
         # Identify active Jammers (must be HOSTILE) and AWACS
         ew_aircrafts = [c for c in self.contacts if c.active and getattr(c, 'status', '') == 'HOSTILE' and "EW" in getattr(c, 'type_name', '')]
         has_awacs = any(isinstance(c, AWACS) for c in self.contacts if c.active)
@@ -1049,16 +1147,8 @@ class CommandCenter:
             if c.active:
                 c.move(self)
                 
-                # Check if target is inside any EW jammer's directional strobe (+/- 10 degrees)
-                is_jammed = False
-                for ew in ew_aircrafts:
-                    if ew != c:
-                        angle_diff = abs((c.bearing - ew.bearing + 180) % 360 - 180)
-                        if angle_diff <= 10.0:
-                            is_jammed = True
-                            break
-                            
-                jamming_factor = 0.3 if is_jammed else 1.0 # 30% range if in the jammer's sector
+                # Check jamming factor taking into account ECCM burn-through
+                jamming_factor = self.get_jamming_factor(c, ew_aircrafts)
 
                 # EMCON Detection Check:
                 # If SILENT: ground radar is blind (contacts only visible if within AWACS or CAP visual/radar range)

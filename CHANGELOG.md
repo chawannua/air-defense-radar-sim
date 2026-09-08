@@ -27,9 +27,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented proactive AI interceptor defense `process_ew_interceptor_defense()`: automatically vectors available RTAF wing interceptors against unengaged standoff jammers to clear radar blinding and ghost track injection.
   - Added duplicate engagement prevention and ammo exhaustion validation.
   - Implemented realistic standoff loiter timer and bingo fuel egress (`loiter_timer`): prevents standoff EW platforms from accumulating indefinitely in the theater during prolonged DEFCON 1 engagements.
+- **Anti-Jammer Electronic Counter-Countermeasures (ECCM) Suite**:
+  - Implemented 3-pillar anti-jamming doctrine to combat heavy standoff EW jammers (`EA-18G Growler`, `EC-130H`, `J-16D`):
+    1. **Radar Burn-Through Overdrive Mode (`[F]`)**: AESA transmitter overdrive punches through jamming wedges, elevating detection range multiplier from $0.3\times$ to **$1.5\times$** in jammer azimuth sectors for 20 seconds with visual cyan pencil beam overlay and procedural audio sweep.
+    2. **Home-On-Jam (HOJ) Missile Guidance (`[H]`)**: Passive RF seeker doctrine extending SAM battery engagement range from 200 km to **350 km** against radiating jammers, elevating hit lethality to $\ge 85\%$ and completely bypassing chaff countermeasures.
+    3. **Passive ESM Cross-Bearing Triangulation (Automated)**: Real-time dual-station triangulation between Bangkok Ground C2 `(0, 0)` and airborne Saab 340 AEW&C fixing exact $(x, y)$ coordinates of standoff jammers (`[ESM-FIX]`).
+- **Tactical Audio & UI Integration (`sound_engine.py`, `radar_ui.py`)**:
+  - Added procedural audio synthesizers `synth_eccm_burn()` (AESA 450-2400 Hz overdrive chirp) and `synth_hoj_lock()` (1850 Hz passive RF homing warble).
+  - Added HUD status indicators for `[F] ECCM` and `[H] HOJ` in top status bar row 3.
+  - Added tactical scope overlays: focused overdrive pencil beam slicing through jammer strobe and amber diamond crosshair reticle with coordinate fix for triangulated ESM contacts.
+- **Architectural Governance & Operational Directives (`AGENTS.md`, `SYSTEM_BOUNDARIES.md`)**:
+  - Established permanent agent operational directives mandating skill-first & multi-agent workflows.
+  - Formally locked strictly protected assets (`map_manager.py`, `missions.py`, and all 16 GeoJSON sovereign border datasets) to guarantee zero regressions.
 - **Automated Verification Suite (`test_logic.py`)**:
-  - Expanded automated test suite from 25 to 27 modules with Section 27 covering AI interceptor defense, threat score weighting, and bingo fuel egress.
-  - All 27 test sections passing (100% green).
+  - Expanded automated integration test suite from 25 to 28 modules, adding Section 28 covering burn-through factor elevation, timer countdown/expiration, HOJ 350 km SAM range validation, and passive ESM dual-station triangulation.
+  - All 28 test suites passing cleanly (100% green).
 
 ## [1.1.1] - 2026-09-08
 

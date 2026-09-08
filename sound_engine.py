@@ -441,6 +441,54 @@ def synth_radio_beeps(sr: int = SAMPLE_RATE) -> np.ndarray:
     return np.column_stack((mono, mono))
 
 
+def synth_eccm_burn(sr: int = SAMPLE_RATE) -> np.ndarray:
+    """
+    Synthesizes AESA transmitter overdrive burn-through chirp:
+    High-power electronic rising sweep (450 Hz -> 2400 Hz over 220ms) with saturated
+    phase harmonics and an energetic discharge crackle.
+    """
+    dur = 0.220
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    # Exponential frequency sweep from 450 to 2400 Hz
+    f0, f1 = 450.0, 2400.0
+    phase = 2.0 * np.pi * f0 * ((f1 / f0) ** (t / dur) - 1.0) / np.log(f1 / f0)
+    
+    # Overdriven RF pulse with 2nd and 3rd harmonics
+    carrier = np.sin(phase) + 0.45 * np.sin(2.0 * phase) + 0.25 * np.sin(3.0 * phase)
+    # 50 Hz amplitude modulation for transmitter hum
+    carrier *= (0.80 + 0.20 * np.sin(2.0 * np.pi * 50.0 * t))
+    
+    # Envelope: 10ms rise, sustained overdrive, 30ms exponential decay
+    env = np.ones_like(t)
+    att_idx = int(sr * 0.010)
+    env[:att_idx] = np.linspace(0.0, 1.0, att_idx)
+    rel_idx = int(sr * 0.030)
+    env[-rel_idx:] = np.linspace(1.0, 0.0, rel_idx)
+    
+    # Saturated overdrive distortion
+    mono = np.tanh(carrier * 2.2) * env * 0.90
+    return np.column_stack((mono, mono))
+
+
+def synth_hoj_lock(sr: int = SAMPLE_RATE) -> np.ndarray:
+    """
+    Synthesizes Home-On-Jam passive RF seeker tone:
+    1850 Hz carrier frequency rapidly modulated by a 35 Hz vibrato warble
+    for 180ms, signaling passive emitter lock.
+    """
+    dur = 0.180
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    # Frequency modulation: 1850 Hz center +/- 120 Hz at 35 Hz
+    freq_mod = 1850.0 + 120.0 * np.sin(2.0 * np.pi * 35.0 * t)
+    phase = 2.0 * np.pi * np.cumsum(freq_mod) / sr
+    carrier = np.sin(phase) + 0.30 * np.sin(2.0 * phase)
+    
+    # Bell-like envelope
+    env = np.minimum(t / 0.005, 1.0) * np.exp(-2.5 * (t / dur))
+    mono = np.tanh(carrier * 1.5) * env * 0.85
+    return np.column_stack((mono, mono))
+
+
 # ============================================================================
 # SOUND MANAGER CLASS
 # ============================================================================
@@ -477,6 +525,8 @@ class SoundManager:
         self._snd_radio_squawk: Any = MockSound("radio_squawk")
         self._snd_radio_roger: Any = MockSound("radio_roger")
         self._snd_radio_beeps: Any = MockSound("radio_beeps")
+        self._snd_eccm_burn: Any = MockSound("eccm_burn")
+        self._snd_hoj_lock: Any = MockSound("hoj_lock")
 
         # Asynchronous radio chatter worker
         self._radio_queue: queue.Queue = queue.Queue(maxsize=8)
@@ -523,6 +573,8 @@ class SoundManager:
             self._snd_radio_squawk = _to_stereo_sound(synth_radio_squawk())
             self._snd_radio_roger = _to_stereo_sound(synth_radio_roger())
             self._snd_radio_beeps = _to_stereo_sound(synth_radio_beeps())
+            self._snd_eccm_burn = _to_stereo_sound(synth_eccm_burn())
+            self._snd_hoj_lock = _to_stereo_sound(synth_hoj_lock())
 
             self._audio_available = True
             self._apply_volume()
@@ -547,6 +599,8 @@ class SoundManager:
             self._snd_radio_squawk,
             self._snd_radio_roger,
             self._snd_radio_beeps,
+            self._snd_eccm_burn,
+            self._snd_hoj_lock,
         ]
         for s in sounds:
             try:
@@ -619,6 +673,14 @@ class SoundManager:
     def play_contact_alert(self) -> None:
         """Plays tactical high-pitched warning pip (1200 Hz, 60ms)."""
         self._play_sound(self._snd_contact_alert)
+
+    def play_eccm_burn(self) -> None:
+        """Plays AESA transmitter overdrive burn-through chirp (450 Hz -> 2400 Hz sweep)."""
+        self._play_sound(self._snd_eccm_burn)
+
+    def play_hoj_lock(self) -> None:
+        """Plays Home-On-Jam passive RF seeker homing tone (1850 Hz warble)."""
+        self._play_sound(self._snd_hoj_lock)
 
     def radio_callout(self, text: str) -> None:
         """

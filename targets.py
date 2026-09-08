@@ -41,6 +41,8 @@ class AirContact(ABC):
         # Set heavy EW capability & standoff loiter
         self._is_heavy_ew = False
         self.loiter_timer = None
+        self.is_esm_triangulated = False
+        self.esm_fix_coord = None
 
     @property
     def is_heavy_ew(self):
