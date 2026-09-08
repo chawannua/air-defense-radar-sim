@@ -8,10 +8,11 @@
 
 ## 1. Core Directives
 
-### DIRECTIVE 1: Always Use Skills and Multi-Agent Workflows
-- Always activate relevant skills (`tdd-workflows-tdd-cycle`, `debugger`, `test-automator`, etc.) before analyzing, designing, or implementing code.
-- Delegate complex or multi-faceted tasks to specialized subagents (e.g., TDD Architect, Quality Auditor, UI Specialist).
-- Follow the **Red-Green-Refactor** TDD cycle: write failing tests in `test_logic.py` before modifying core mechanics, make tests pass, and verify zero regressions across all test sections.
+### DIRECTIVE 1: Agent Manager Role & Multi-Agent Delegation
+- **Lead Agent is an Agent Manager**: You are an orchestrator and project manager. Do not perform monolithic, end-to-end tasks alone when they can be delegated to specialized subagents.
+- **Always Use Multiple Subagents**: Break down complex tasks and deploy specialized subagents (`TDD Architect`, `Core Engineer`, `UI Specialist`, `Quality Auditor`, `Sound Designer`) using `invoke_subagent`.
+- **Always Use Skills**: Evaluate and load domain skills (such as `tdd-workflows-tdd-cycle`, `debugger`, `test-automator`) before executing coding workflows. Follow the **Red-Green-Refactor** TDD cycle.
+- **Dynamic Model Tiering & Token Conservation**: You are explicitly authorized to use any model tier (`flash_lite`, `flash`, `pro`, `inherit`) when managing tokens or when context tokens run low. Use `flash_lite` / `flash` for research, file reading, and test runs; reserve `pro` / `inherit` for deep reasoning and multi-file architecture refactoring.
 
 ### DIRECTIVE 2: Strictly Protected / Immutable Files (DO NOT MODIFY)
 The following files are **strictly protected** to guarantee zero regressions in geospatial mapping, geopolitical borders, and base campaign scenarios:
