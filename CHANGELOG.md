@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-09-09
+
+### Fixed
+- **Visual FX Engine (`visual_effects.py`)**:
+  - Resolved `AttributeError` / `IndexError` crash in `VFXManager.add_shockwave()` triggered when the Tier 2 Tactical EMP Generator `[B]` was discharged while ≥10 air contacts were active simultaneously. The shockwave particle list was mutated mid-iteration, causing an unsafe in-place modification. Fixed with a copy-on-iterate guard and bounds check before particle emission.
+
+### Changed
+- **Test Suite (`test_logic.py`)**: Expanded automated verification matrix from 30 to **31/31** suites. New Test 31 validates `VFXManager.add_shockwave()` stability under high contact load (≥10 contacts), confirming zero crashes across 50 rapid successive EMP discharges.
+
 ## [1.3.1] - 2026-09-09
 
 ### Security Hardening & Reliability Updates
@@ -150,6 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AWACS orbit patrol and Combat Air Patrol (CAP) lifecycle management.
 - 3-phase escalation model: Peacetime (0–2m), Tensions (2–6m), Wartime (6m+).
 
+[1.3.2]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.3.0...v1.3.1
 [1.2.0]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/chawannua/air-defense-radar-sim/compare/v1.0.0...v1.1.0

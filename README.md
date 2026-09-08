@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/version-1.3.1-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/version-1.3.2-blue.svg)](CHANGELOG.md)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Pygame 2.0+](https://img.shields.io/badge/Pygame-2.0%2B-FF6F00?style=for-the-badge&logo=python&logoColor=white)](https://pygame.org)
 [![NumPy](https://img.shields.io/badge/NumPy-1.24%2B-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org)
@@ -13,11 +13,11 @@
 ## 📡 AEGIS Air Defense Radar Simulator
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
-### ⚡ Current Release: `v1.3.1` (Security Hardening & Stability Patches)
-The official patch addressing non-deterministic event bus leaks, un-clamped resolution scaling, race conditions in alarm systems, and synchronization of missile tracers. 
+### ⚡ Current Release: `v1.3.2` (EMP Shockwave Crash Fix & Stability Hotfix)
+The official hotfix resolving the `VFXManager.add_shockwave()` crash triggered by the Tier 2 Tactical EMP Generator `[B]` discharge under heavy contact loads, plus complementary test suite expansion to 31/31.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.3.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (30/30)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.3.2)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (31/31)](test_logic.py)
 
 </div>
 
@@ -36,7 +36,7 @@ The official patch addressing non-deterministic event bus leaks, un-clamped reso
 9. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 10. [Complete Tactical Keybindings](#complete-tactical-keybindings)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
-12. [Automated Testing (30/30 Test Suite)](#automated-testing-2828-test-suite)
+12. [Automated Testing (31/31 Test Suite)](#automated-testing-2828-test-suite)
 13. [Release History & Version Evolution (v1.0.0 → v1.3.0)](#release-history--version-evolution-v100--v120)
 14. [Installation & Build Guide](#installation--build-guide)
 15. [Dependencies](#dependencies)
@@ -517,7 +517,7 @@ The project is structured according to strict Object-Oriented Programming (OOP) 
 
 ---
 
-## Automated Testing (30/30 Test Suite)
+## Automated Testing (31/31 Test Suite)
 
 AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 28 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
@@ -556,25 +556,29 @@ $ python test_logic.py
 [PASS] 26. Tier 2 Black Ops Experimental Arsenal Gating, Purchases & Mechanics
 [PASS] 27. AI Interceptor Prioritization & Standoff EW Suppression
 [PASS] 28. Anti-Jammer Electronic Counter-Countermeasures (ECCM Burn-Through [F], HOJ [H] 350km SAM, Passive ESM Triangulation)
+[PASS] 29. Thread-Safety RLock, Resolution Clamp & Event Ledger Memory Cap (v1.3.1 Hardening)
+[PASS] 30. MISSILE_LAUNCH Tracer Target Coordinate Synchronization
+[PASS] 31. VFXManager.add_shockwave() EMP Discharge Stability Under High Contact Load (v1.3.2 Hotfix)
 
 ==================================================
-ALL 28 TEST MODULES PASSED (100% SUCCESS RATE)
+ALL 31 TEST MODULES PASSED (100% SUCCESS RATE)
 ```
 
 ---
 
-## Release History & Version Evolution (v1.0.0 → v1.3.0)
+## Release History & Version Evolution (v1.0.0 → v1.3.2)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.3.0`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.3.0` ➔ `v1.3.2`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
 - The version increment from **`v1.1.0`** to **`v1.1.1`** delivered critical bug fixes, UI coordinate harmonizations, audio click elimination, and asset recovery safeguards.
 - The version increment from **`v1.2.0`** to **`v1.3.0`** introduces Interactive AWACS Command & Control, a complete Procedural Audio Engine Overhaul, and comprehensive Input Disambiguation.
+- The version increment from **`v1.3.1`** to **`v1.3.2`** delivers the `VFXManager.add_shockwave()` crash hotfix triggered by Tactical EMP `[B]` discharge under heavy contact loads, and expands the test suite to 31/31.
 
 ### 🌟 Version 1.3.0 Feature Highlights
 - **Controllable AWACS Operations:** Fully interactive AWACS integration granting a 400 km look-down sensor horizon, dynamic right-click patrol station retasking, adjustable orbit radii (20–150 km), and instant Return-To-Base (RTB) commands.
@@ -582,13 +586,13 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - **Input & Navigation Disambiguation:** Complete removal of ambiguous WASD panning—camera navigation is now strictly mapped to Arrow Keys. `[W]`, `[S]`, and `[D]` are exclusively reserved for tactical actions (AWACS, Salvo, Decoy).
 - **Test Matrix Expansion:** Formally updated test suite matrix expanded to 30/30 deterministic tests passing with 0 errors (100% green).
 
-| Capability Area | Release `v1.1.1` (Phase 3 Hardened) | Release `v1.2.0` (Black Ops & ECCM Suite) | Release `v1.3.0` (AWACS & Audio Overhaul) |
-|---|---|---|---|
-| **Geospatial Map Engine** | Fixed dashed ADIZ rendering bug (`dy` NameError) & added Civil Airport Hubs. | Formally locked and protected via `SYSTEM_BOUNDARIES.md` (100% zero-regression guarantee). | Integrated AWACS 400 km look-down radar bubble. |
-| **Visual FX & UI Rendering** | Fixed VFX double offset culling; centered modals to screen viewport; restored 60 FPS. | Added ECCM cyan overdrive pencil beam, ESM-FIX diamond reticles, and HOJ tracking indicators. | HUD explicit controls display; disambiguated right-click target interaction. |
-| **Audio Engine** | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. | Added procedural synthesizers `synth_eccm_burn()` (AESA chirp) and `synth_hoj_lock()` (1850 Hz warble). | Synthesized missile roar redesigned, DEFCON alarm 10s auto-cutoff, brevity callouts. |
-| **Combat & Asset Mechanics** | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. | Implemented Tier 2 Black Ops Arsenal (5 upgrades), EMP shockwave `[B]`, Burn-Through `[F]`, HOJ `[H]`, and AWACS ESM cross-fix. | Interactive AWACS orbit retask `[Right-Click]`, orbit radius `[+/-]`, and `[R]` RTB commands. |
-| **Automated Verification** | 25/25 Test Suite + 2,000-frame headless fuzz monkey test. | 28/28 Automated Test Suite passing with 0 errors (100% green). | **30/30 Automated Test Suite** passing with 0 errors (100% green). |
+| Capability Area | Release `v1.1.1` (Phase 3 Hardened) | Release `v1.2.0` (Black Ops & ECCM Suite) | Release `v1.3.0` (AWACS & Audio Overhaul) | Release `v1.3.2` (EMP Shockwave Hotfix) |
+|---|---|---|---|---|
+| **Geospatial Map Engine** | Fixed dashed ADIZ rendering bug (`dy` NameError) & added Civil Airport Hubs. | Formally locked and protected via `SYSTEM_BOUNDARIES.md` (100% zero-regression guarantee). | Integrated AWACS 400 km look-down radar bubble. | No change — protected asset. |
+| **Visual FX & UI Rendering** | Fixed VFX double offset culling; centered modals to screen viewport; restored 60 FPS. | Added ECCM cyan overdrive pencil beam, ESM-FIX diamond reticles, and HOJ tracking indicators. | HUD explicit controls display; disambiguated right-click target interaction. | Fixed `VFXManager.add_shockwave()` crash on EMP `[B]` discharge under high contact load. |
+| **Audio Engine** | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. | Added procedural synthesizers `synth_eccm_burn()` (AESA chirp) and `synth_hoj_lock()` (1850 Hz warble). | Synthesized missile roar redesigned, DEFCON alarm 10s auto-cutoff, brevity callouts. | No change. |
+| **Combat & Asset Mechanics** | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. | Implemented Tier 2 Black Ops Arsenal (5 upgrades), EMP shockwave `[B]`, Burn-Through `[F]`, HOJ `[H]`, and AWACS ESM cross-fix. | Interactive AWACS orbit retask `[Right-Click]`, orbit radius `[+/-]`, and `[R]` RTB commands. | EMP shockwave `[B]` discharge stabilized — no longer crashes with ≥10 active contacts. |
+| **Automated Verification** | 25/25 Test Suite + 2,000-frame headless fuzz monkey test. | 28/28 Automated Test Suite passing with 0 errors (100% green). | **30/30 Automated Test Suite** passing with 0 errors (100% green). | **31/31 Automated Test Suite** passing with 0 errors — Test 31 covers `add_shockwave()` stability. |
 
 ---
 
