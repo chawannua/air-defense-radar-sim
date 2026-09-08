@@ -16,7 +16,7 @@
 
 *Featuring 1:10m real-world Natural Earth geospatial geometry across Southeast Asia, 100% procedural NumPy audio synthesis (0 MB external sound files), electronic warfare & anti-radiation missile dynamics, salvo firing doctrines, and scenario campaign operations.*
 
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.1.0 → v1.1.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (26/26)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.1.0 → v1.1.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (27/27)](test_logic.py)
 
 </div>
 
@@ -34,7 +34,7 @@
 8. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 9. [Complete Tactical Keybindings](#complete-tactical-keybindings)
 10. [System Architecture & OOP Design](#system-architecture--oop-design)
-11. [Automated Testing (26/26 Test Suite)](#automated-testing-2626-test-suite)
+11. [Automated Testing (27/27 Test Suite)](#automated-testing-2727-test-suite)
 12. [Release History & Version Bump (v1.0.0 → v1.1.1)](#release-history--version-bump-v100--v111)
 13. [Installation & Build Guide](#installation--build-guide)
 14. [Dependencies](#dependencies)
@@ -497,9 +497,10 @@ $ python test_logic.py
 [PASS] 24. Multi-Format Geodata Mountain Peak Masking Tuple Unpacking Safety
 [PASS] 25. Historical Event Bus Retention for After-Action Report (AAR) Analytics
 [PASS] 26. Tier 2 Black Ops Experimental Arsenal Gating, Purchases & Mechanics
+[PASS] 27. AI Interceptor Prioritization & Standoff EW Suppression
 
 ==================================================
-ALL 26 TEST MODULES PASSED (100% SUCCESS RATE)
+ALL 27 TEST MODULES PASSED (100% SUCCESS RATE)
 ```
 
 ---

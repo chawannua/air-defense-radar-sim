@@ -22,9 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added classified access security restriction modal explaining Tier 1 mastery prerequisite.
   - Added hotkey bindings `[1]-[5]` (tab-aware) and direct global purchase keys `[6]-[0]`.
   - Added combat key `[B]` for instantaneous tactical EMP shockwave discharge.
+- **AI Interceptor Prioritization & EW Suppression (`command_center.py`, `targets.py`)**:
+  - Elevated strategic threat score (+900 bonus) for active EW jamming platforms in `calculate_threat_score()`.
+  - Implemented proactive AI interceptor defense `process_ew_interceptor_defense()`: automatically vectors available RTAF wing interceptors against unengaged standoff jammers to clear radar blinding and ghost track injection.
+  - Added duplicate engagement prevention and ammo exhaustion validation.
+  - Implemented realistic standoff loiter timer and bingo fuel egress (`loiter_timer`): prevents standoff EW platforms from accumulating indefinitely in the theater during prolonged DEFCON 1 engagements.
 - **Automated Verification Suite (`test_logic.py`)**:
-  - Added Section 26 testing suite covering gating conditions, XP deductions, duplicate rejections, and mechanics for all 5 Tier 2 items.
-  - All 26 test sections passing (100% green).
+  - Expanded automated test suite from 25 to 27 modules with Section 27 covering AI interceptor defense, threat score weighting, and bingo fuel egress.
+  - All 27 test sections passing (100% green).
 
 ## [1.1.1] - 2026-09-08
 

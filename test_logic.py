@@ -8,6 +8,7 @@ from targets import (AirContact, Aircraft, Helicopter, Drone, TacticalBM, ICBM,
                      AntiRadiationMissile, CruiseMissile, is_line_of_sight_masked)
 from command_center import CommandCenter
 from personnel import Engagement
+from config import GameConfig
 import random
 import math
 
@@ -694,6 +695,115 @@ check("Insufficient XP" in msg_low_t2,
       f"Failure message should indicate insufficient XP (got '{msg_low_t2}')")
 check("QUANTUM_SPACE_RADAR" not in cmd_low_xp.unlocked_upgrades,
       "Upgrade should not be in unlocked_upgrades when purchase fails due to XP")
+
+print("\n=== 27. AI Interceptor Prioritization & EW Suppression ===")
+
+# --- 1. Strategic EW Threat Score Bonus ---
+normal_plane = Aircraft(9901)
+normal_plane.status = "HOSTILE"
+normal_plane.speed_mach = 0.9
+normal_plane.distance_km = 600.0
+normal_plane.altitude_ft = 30000
+normal_plane.rcs = 3.0
+normal_plane.is_heavy_ew = False
+normal_plane.type_name = "Su-30MKM Flanker"
+score_normal = normal_plane.calculate_threat_score()
+
+ew_plane = Aircraft(9902)
+ew_plane.is_friendly = False
+ew_plane.status = "HOSTILE"
+ew_plane.speed_mach = 0.9
+ew_plane.distance_km = 600.0
+ew_plane.altitude_ft = 30000
+ew_plane.rcs = 3.0
+ew_plane.is_heavy_ew = True
+ew_plane.type_name = "EA-18G Growler (HEAVY EW)"
+score_ew = ew_plane.calculate_threat_score()
+
+check(score_ew >= score_normal + 800,
+      f"EW platform threat score should include >=800 EW strategic bonus: got {score_ew} vs normal {score_normal}")
+
+# --- 2. Proactive AI Fighter Scramble for Unengaged Standoff Jammers ---
+cmd_ai = CommandCenter()
+cmd_ai.ammo["FIGHTER"] = 15
+cmd_ai.active_engagements = []
+
+# Insert hostile EW contact at standoff distance (600 km)
+cmd_ai.contacts = [ew_plane]
+ew_plane.active = True
+ew_plane.status = "HOSTILE"
+
+check(hasattr(cmd_ai, 'process_ew_interceptor_defense'),
+      "CommandCenter should implement process_ew_interceptor_defense()")
+if hasattr(cmd_ai, 'process_ew_interceptor_defense'):
+    scrambled = cmd_ai.process_ew_interceptor_defense()
+    check(scrambled is True, "process_ew_interceptor_defense should return True when scrambling")
+    check(cmd_ai.ammo["FIGHTER"] == 14,
+          f"Fighter ammo should decrement by 1: expected 14, got {cmd_ai.ammo['FIGHTER']}")
+    check(len(cmd_ai.active_engagements) == 1,
+          f"Active engagements should have 1 fighter sortie: got {len(cmd_ai.active_engagements)}")
+    check(cmd_ai.active_engagements[0].target == ew_plane,
+          "Scrambled fighter must target the active EW jammer")
+    check(ew_plane.status in ["ENGAGING", "INTERCEPTING"],
+          f"EW plane status should be ENGAGING or INTERCEPTING, got {ew_plane.status}")
+
+    # --- 3. Anti-Duplicate: Do not double scramble while already engaged ---
+    scrambled_again = cmd_ai.process_ew_interceptor_defense()
+    check(scrambled_again is False, "Should NOT double-scramble fighters against already-targeted jammer")
+    check(cmd_ai.ammo["FIGHTER"] == 14,
+          f"Fighter ammo should remain 14 on double-scramble attempt: got {cmd_ai.ammo['FIGHTER']}")
+    check(len(cmd_ai.active_engagements) == 1,
+          "Active engagements count should remain 1")
+
+# --- 4. Ammo Exhaustion Respect ---
+cmd_empty = CommandCenter()
+cmd_empty.ammo["FIGHTER"] = 0
+ew_plane_2 = Aircraft(9903)
+ew_plane_2.status = "HOSTILE"
+ew_plane_2.is_heavy_ew = True
+ew_plane_2.type_name = "EA-18G Growler (HEAVY EW)"
+cmd_empty.contacts = [ew_plane_2]
+
+if hasattr(cmd_empty, 'process_ew_interceptor_defense'):
+    scrambled_empty = cmd_empty.process_ew_interceptor_defense()
+    check(scrambled_empty is False, "Should NOT scramble when FIGHTER ammo is 0")
+    check(len(cmd_empty.active_engagements) == 0,
+          "No engagements should be created when out of fighter ammo")
+
+# --- 5. Realistic Standoff Loiter & Bingo Fuel Egress ---
+ew_loiter = Aircraft(9904)
+ew_loiter.status = "HOSTILE"
+ew_loiter.is_heavy_ew = True
+ew_loiter.type_name = "EA-18G Growler (HEAVY EW)"
+ew_loiter.distance_km = 450.0
+cmd_loiter = CommandCenter()
+cmd_loiter.contacts = [ew_loiter]
+
+check(hasattr(ew_loiter, 'loiter_timer'),
+      "EW aircraft should have a loiter_timer attribute for realistic mission duration")
+if hasattr(ew_loiter, 'loiter_timer'):
+    ew_loiter.loiter_timer = 1  # Force immediate bingo fuel expiration
+    hp_before_egress = cmd_loiter.base_hp
+    # Process movement / tick
+    ew_loiter.move(cmd_loiter)
+    check(ew_loiter.active is False, "EW aircraft should deactivate / egress on bingo fuel")
+    check(cmd_loiter.base_hp == hp_before_egress,
+          "Egressing EW aircraft must NOT damage base HP")
+
+# --- 6. Engagement Resolution: Interceptor splashes jammer ---
+if hasattr(cmd_ai, 'active_engagements') and len(cmd_ai.active_engagements) > 0:
+    cmd_ai.active_engagements[0].time_to_impact = 1
+    kills_before = cmd_ai.kills
+    old_f16_hit = GameConfig.HIT_CHANCE_F16
+    try:
+        GameConfig.HIT_CHANCE_F16 = 1.0  # Guarantee hit for deterministic test
+        cmd_ai.process_engagements()
+        check(ew_plane.active is False or ew_plane.status == "CLEARED",
+              "Interceptor must neutralize active EW jammer upon missile impact")
+        check(cmd_ai.kills == kills_before + 1,
+              f"Kills count should increment: expected {kills_before + 1}, got {cmd_ai.kills}")
+    finally:
+        GameConfig.HIT_CHANCE_F16 = old_f16_hit
 
 print("\n" + "="*50)
 if errors:

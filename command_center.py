@@ -706,6 +706,62 @@ class CommandCenter:
             highest_threat = self.threat_queue.pop_highest_priority()
             if highest_threat: self.add_log(self.weapon_op.authorize_engagement(highest_threat))
 
+        # Proactive AI fighter defense against standoff EW jammers
+        self.process_ew_interceptor_defense()
+
+    def process_ew_interceptor_defense(self):
+        """
+        AI Interceptor Prioritization:
+        Scrambles available RTAF interceptors against unengaged standoff EW jammers
+        to prevent persistent electronic warfare jamming and radar blinding.
+        """
+        if self.ammo.get("FIGHTER", 0) <= 0:
+            return False
+
+        # Find active hostile/unidentified EW platforms
+        all_engaged_targets = [eng.target for eng in self.active_engagements if getattr(eng, 'target', None) and eng.target.active]
+
+        unengaged_jammers = []
+        for c in self.contacts:
+            if not c.active:
+                continue
+            is_ew = getattr(c, 'is_heavy_ew', False) or "EW" in getattr(c, 'type_name', '') or getattr(c, 'scenario', '') == 'EW'
+            if is_ew and c.status in ["HOSTILE", "SUSPECT", "UNIDENTIFIED"]:
+                if c not in all_engaged_targets and c.status not in ["CLEARED", "FRIENDLY"]:
+                    unengaged_jammers.append(c)
+
+        if not unengaged_jammers:
+            return False
+
+        # Prioritize heavy EW first, then closest
+        unengaged_jammers.sort(key=lambda j: (0 if getattr(j, 'is_heavy_ew', False) else 1, j.distance_km))
+        target_jam = unengaged_jammers[0]
+
+        bx, by, bname = get_closest_airbase(target_jam)
+        fighter_type = get_wing_aircraft(bname)
+        self.ammo["FIGHTER"] -= 1
+
+        dist_from_base = math.hypot(target_jam.x_km - bx, target_jam.y_km - by)
+        closure_rate = max(1.0, target_jam.speed_mach + GameConfig.WEAPON_SPEED_F16)
+        prep_time = getattr(GameConfig, 'PREP_TIME_F16', 15)
+        impact_time = max(1, int(dist_from_base / closure_rate) + prep_time)
+
+        eng = Engagement(target_jam, fighter_type, impact_time, bx, by)
+        self.active_engagements.append(eng)
+        target_jam.status = "INTERCEPTING"
+
+        self.emit_event(
+            "MISSILE_LAUNCH",
+            weapon=fighter_type,
+            target_id=target_jam.id_code,
+            target_x=target_jam.x_km,
+            target_y=target_jam.y_km,
+            salvo_mode="SINGLE",
+            salvo_count=1
+        )
+        self.add_log(f"\033[95;1m[AI-C2] EW SUPPRESSION SORTIE: {fighter_type} scrambled from {bname} targeting jammer {target_jam.id_code}!\033[0m")
+        return True
+
     def manual_override_fire(self, target, wpn):
         # Altitude Ceilings Check
         alt = target.altitude_ft

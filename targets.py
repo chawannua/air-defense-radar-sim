@@ -38,8 +38,19 @@ class AirContact(ABC):
         self.destination = "UNKNOWN"
         self.detected_by = "UNKNOWN"
         
-        # Set heavy EW capability
-        self.is_heavy_ew = False
+        # Set heavy EW capability & standoff loiter
+        self._is_heavy_ew = False
+        self.loiter_timer = None
+
+    @property
+    def is_heavy_ew(self):
+        return self._is_heavy_ew
+
+    @is_heavy_ew.setter
+    def is_heavy_ew(self, val):
+        self._is_heavy_ew = bool(val)
+        if self._is_heavy_ew and self.loiter_timer is None:
+            self.loiter_timer = random.randint(180, 300)
 
     @abstractmethod
     def identify_target(self): pass
@@ -80,12 +91,30 @@ class AirContact(ABC):
         score += int(10000 / distance_factor)
         if self.altitude_ft < 5000: score += 300 
         if self.rcs < 1.0: score += 200 
+        
+        # Strategic EW disruption priority
+        if getattr(self, 'is_heavy_ew', False) or "EW" in getattr(self, 'type_name', '') or getattr(self, 'scenario', '') == 'EW':
+            score += 900
+            
         return score
 
     def move(self, *args, **kwargs):
         self.prev_x_km = self.x_km
         self.prev_y_km = self.y_km
         
+        # Standoff EW loiter and bingo fuel egress
+        is_ew = getattr(self, 'is_heavy_ew', False) or "EW" in getattr(self, 'type_name', '') or "EW" in getattr(self, 'true_type', '')
+        if is_ew and self.loiter_timer is None:
+            self.loiter_timer = random.randint(180, 300)
+
+        if self.loiter_timer is not None:
+            self.loiter_timer -= 1
+            if self.loiter_timer <= 0:
+                self.active = False
+                if args and hasattr(args[0], 'add_log'):
+                    args[0].add_log(f"\033[94m[INTEL] {self.id_code} (EW Jammer) bingo fuel. Egressing operational sector.\033[0m")
+                return
+
         speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC
         self.distance_km -= speed_per_tick
         if self.distance_km < 0:
