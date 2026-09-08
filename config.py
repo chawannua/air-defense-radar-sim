@@ -1,6 +1,6 @@
 # config.py
 class GameConfig:
-    VERSION = "1.1.1"
+    VERSION = "1.2.0"
 
     # Real-world RTAF airbase positions in relative km from Bangkok (harmonized with geodata)
     AIRBASES = [
