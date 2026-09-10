@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/version-1.3.2-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/github/v/release/chawannua/air-defense-radar-sim?label=version&style=flat-square)](CHANGELOG.md)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Pygame 2.0+](https://img.shields.io/badge/Pygame-2.0%2B-FF6F00?style=for-the-badge&logo=python&logoColor=white)](https://pygame.org)
 [![NumPy](https://img.shields.io/badge/NumPy-1.24%2B-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org)
