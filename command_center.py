@@ -8,6 +8,7 @@ from targets import (ICBM, TacticalBM, Drone, Helicopter, Aircraft,
                      AntiRadiationMissile, CruiseMissile, VIPTransport)
 from personnel import ThreatQueue, RadarOperator, WeaponOfficer, Engagement, get_closest_airbase, get_wing_aircraft
 from missions import MissionManager
+from profiles import DEFAULT_PROFILE
 import math
 
 class CommandCenter:
@@ -26,16 +27,30 @@ class CommandCenter:
     ]
     XP_THRESHOLDS = [0, 500, 1200, 2200, 3500, 5200, 7500, 10500, 14500, 20000, 28000]
 
-    def __init__(self):
+    def __init__(self, profile=None):
+        # SimulationProfile: read-only spawn/behavior knobs (Spectator vs Player).
+        # NEVER mutate GameConfig from this -- it is only ever resolved/read.
+        self.profile = profile if profile is not None else DEFAULT_PROFILE
+        profile_cfg = self.profile.resolve_config()
+
+        # Scale factors derived from the profile relative to GameConfig defaults,
+        # applied to the (mostly hardcoded) wave/spawn formulas below so a
+        # Spectator profile visibly spawns more contacts than a Player profile,
+        # without ever writing back into GameConfig itself.
+        self._wave_chance_scale = profile_cfg["WAVE_CHANCE"] / GameConfig.WAVE_CHANCE
+        self._wave_size_scale = profile_cfg["WAVE_SIZE_MAX"] / GameConfig.WAVE_SIZE_MAX
+        self._wave_size_min = profile_cfg["WAVE_SIZE_MIN"]
+        self._wave_cooldown_after_scale = profile_cfg["WAVE_COOLDOWN_AFTER"] / GameConfig.WAVE_COOLDOWN_AFTER
+
         self.contacts = []
         self.unseen_contacts = []
         self.active_engagements = []
-        self.returning_fighters = [] 
+        self.returning_fighters = []
         self.base_hp = 100
         self.tick_count = 0
         self.track_counter = 100
         self.threat_queue = ThreatQueue()
-        self.wave_cooldown = GameConfig.WAVE_COOLDOWN_INITIAL
+        self.wave_cooldown = profile_cfg["WAVE_COOLDOWN_INITIAL"]
         
         self.max_ammo = GameConfig.MAX_AMMO.copy()
         self.ammo = self.max_ammo.copy()
@@ -552,9 +567,15 @@ class CommandCenter:
             self.add_log("\033[41;97m[COMMAND] AIRSPACE CLOSED TO CIVILIAN TRAFFIC. ALL UNKNOWN CONTACTS ARE HOSTILE.\033[0m")
         
         # massive wave attacks (wartime / late tensions only)
-        if wave_enabled and self.wave_cooldown <= 0 and random.random() < (0.08 if phase == "TENSIONS" else 0.12 * min(3.0, 1.0 + (tick - 360) / 1500.0)):
-            self.wave_cooldown = max(80, 200 if phase == "TENSIONS" else int(200 / min(3.0, 1.0 + (tick - 360) / 1500.0)))
-            wave_size = random.randint(5, 10) if phase == "TENSIONS" else int(random.randint(8, 15) * min(3.0, 1.0 + (tick - 360) / 1500.0))
+        # Base trigger chance / cooldown / size are scaled by the active
+        # SimulationProfile (Spectator sees bigger, more frequent waves;
+        # Player sees smaller, less frequent ones) without touching GameConfig.
+        base_wave_trigger_chance = 0.08 if phase == "TENSIONS" else 0.12 * min(3.0, 1.0 + (tick - 360) / 1500.0)
+        if wave_enabled and self.wave_cooldown <= 0 and random.random() < base_wave_trigger_chance * self._wave_chance_scale:
+            base_cooldown = max(80, 200 if phase == "TENSIONS" else int(200 / min(3.0, 1.0 + (tick - 360) / 1500.0)))
+            self.wave_cooldown = max(1, int(base_cooldown * self._wave_cooldown_after_scale))
+            base_wave_size = random.randint(5, 10) if phase == "TENSIONS" else int(random.randint(8, 15) * min(3.0, 1.0 + (tick - 360) / 1500.0))
+            wave_size = max(self._wave_size_min, int(base_wave_size * self._wave_size_scale))
             
             wave_theme = random.choices(
                 ["MIXED", "BALLISTIC_RAIN", "DRONE_SWARM", "FIGHTER_STRIKE", "SEAD_STRIKE", "CRUISE_VOLLEY"], 
@@ -620,7 +641,8 @@ class CommandCenter:
         
         # hostile / unknown contacts
         # EMCON adjusts spawn rate: if SILENT, enemy strike packages cannot find radiating emitters (-25% spawn chance)
-        effective_hostile_chance = hostile_chance * (0.75 if self.emcon_mode == "SILENT" else 1.0)
+        # Also scaled by the active SimulationProfile's wave_chance knob (Spectator: more pressure, Player: less).
+        effective_hostile_chance = hostile_chance * (0.75 if self.emcon_mode == "SILENT" else 1.0) * self._wave_chance_scale
         if random.random() < effective_hostile_chance:
             self.track_counter += 1
             prob = random.random()
@@ -645,7 +667,7 @@ class CommandCenter:
             self.unseen_contacts.append(new_contact)
             
         # False Alarm (Clutter/Ghosts) system: only detected by active ground radar
-        if self.emcon_mode != "SILENT" and random.random() < 0.05:
+        if self.emcon_mode != "SILENT" and random.random() < 0.05 * self._wave_chance_scale:
             self.track_counter += 1
             ghost = GhostTrack(self.track_counter)
             ghost.detected_by = "GND-RADAR"
@@ -765,6 +787,24 @@ class CommandCenter:
                 updated_rtb.append(rtb_time)
         self.returning_fighters = updated_rtb
 
+    # Radius (km) inside which a threat is considered "imminent/leaking" and
+    # the backup auto-fire may take over for the human in Player mode.
+    BACKUP_ENGAGEMENT_RADIUS_KM = 40
+
+    def _is_backup_engagement(self, threat):
+        """BACKUP AUTO-FIRE RULE (Player mode only, profile.autonomous_weapons
+        == False): the WeaponOfficer's auto-target-acquisition is reduced to a
+        last-resort backstop instead of full autonomy. It only engages when a
+        threat is either (a) imminent/leaking -- inside a close last-ditch
+        radius the player clearly hasn't dealt with -- or (b) an unengaged
+        ballistic missile (ICBM/TacticalBM), since manual THAAD/SAM timing
+        against ballistic threats is unforgiving and letting one slip through
+        unchallenged is effectively a lost game. Everything else is left for
+        the human to fire on manually via manual_override_fire()."""
+        if threat.distance_km <= self.BACKUP_ENGAGEMENT_RADIUS_KM:
+            return True
+        return isinstance(threat, (ICBM, TacticalBM))
+
     def process_personnel(self):
         radar_result = self.radar_op.tick()
         if radar_result: self.add_log(radar_result)
@@ -800,7 +840,8 @@ class CommandCenter:
         if not self.weapon_op.is_busy:
             self.threat_queue.build_queue(self.contacts)
             highest_threat = self.threat_queue.pop_highest_priority()
-            if highest_threat: self.add_log(self.weapon_op.authorize_engagement(highest_threat))
+            if highest_threat and (self.profile.autonomous_weapons or self._is_backup_engagement(highest_threat)):
+                self.add_log(self.weapon_op.authorize_engagement(highest_threat))
 
         # Proactive AI fighter defense against standoff EW jammers
         self.process_ew_interceptor_defense()

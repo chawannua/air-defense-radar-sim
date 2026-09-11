@@ -1095,6 +1095,139 @@ if hasattr(vfx, 'add_shockwave'):
 else:
     check(False, "vfx.add_shockwave missing: cannot verify shockwave properties")
 
+print("\n=== 32. Simulation Profiles (Spectator vs Player) ===")
+from profiles import SimulationProfile, SPECTATOR_PROFILE, PLAYER_PROFILE
+
+_gc_snapshot_before = {k: getattr(GameConfig, k) for k in
+                        ("WAVE_CHANCE", "WAVE_SIZE_MIN", "WAVE_SIZE_MAX",
+                         "WAVE_COOLDOWN_INITIAL", "WAVE_COOLDOWN_AFTER")}
+
+_spectator_cfg = SPECTATOR_PROFILE.resolve_config()
+_player_cfg = PLAYER_PROFILE.resolve_config()
+
+_gc_snapshot_after = {k: getattr(GameConfig, k) for k in
+                       ("WAVE_CHANCE", "WAVE_SIZE_MIN", "WAVE_SIZE_MAX",
+                        "WAVE_COOLDOWN_INITIAL", "WAVE_COOLDOWN_AFTER")}
+
+check(_gc_snapshot_before == _gc_snapshot_after,
+      "Reading SimulationProfile configs must not mutate GameConfig class attributes")
+
+check(SPECTATOR_PROFILE.autonomous_weapons is True and SPECTATOR_PROFILE.player_input_enabled is False,
+      "SPECTATOR_PROFILE should be autonomous and not accept player input")
+check(PLAYER_PROFILE.autonomous_weapons is False and PLAYER_PROFILE.player_input_enabled is True,
+      "PLAYER_PROFILE should require player input and not be autonomous")
+
+check(_spectator_cfg["WAVE_CHANCE"] > _player_cfg["WAVE_CHANCE"],
+      "SPECTATOR_PROFILE wave_chance should exceed PLAYER_PROFILE wave_chance")
+check(_spectator_cfg["WAVE_SIZE_MAX"] > _player_cfg["WAVE_SIZE_MAX"],
+      "SPECTATOR_PROFILE wave_size_max should exceed PLAYER_PROFILE wave_size_max")
+check(_spectator_cfg["WAVE_SIZE_MIN"] >= _player_cfg["WAVE_SIZE_MIN"],
+      "SPECTATOR_PROFILE wave_size_min should be >= PLAYER_PROFILE wave_size_min")
+check(_spectator_cfg["WAVE_COOLDOWN_INITIAL"] < _player_cfg["WAVE_COOLDOWN_INITIAL"],
+      "SPECTATOR_PROFILE should have shorter initial wave cooldown than PLAYER_PROFILE")
+check(_spectator_cfg["WAVE_COOLDOWN_AFTER"] < _player_cfg["WAVE_COOLDOWN_AFTER"],
+      "SPECTATOR_PROFILE should have shorter repeat wave cooldown than PLAYER_PROFILE")
+
+_default_profile = SimulationProfile(name="TEST_DEFAULT")
+check(_default_profile.resolve_config()["WAVE_CHANCE"] == GameConfig.WAVE_CHANCE,
+      "A SimulationProfile with no overrides should fall back to GameConfig.WAVE_CHANCE")
+
+print("\n=== 33. Cinematic Camera Director ===")
+from camera_director import CameraDirector
+
+cam = CameraDirector(seconds_per_leg=2.0)
+samples = [cam.values]
+for _ in range(10):
+    cam.update(0.15)
+    samples.append(cam.values)
+
+check(all(all(math.isfinite(v) for v in s) for s in samples),
+      "CameraDirector.update should never produce NaN/inf camera values")
+
+distinct_positions = len({(round(x, 3), round(y, 3)) for x, y, _z in samples})
+check(distinct_positions > 1,
+      "CameraDirector.update should produce smoothly changing (non-identical) positions over time")
+
+check(samples[0] != samples[-1],
+      "CameraDirector values after several updates should differ from the initial values")
+
+print("\n=== 34. CommandCenter Profile-Driven Spawn & Weapon Autonomy ===")
+from profiles import PLAYER_PROFILE as _PLAYER_PROFILE, SPECTATOR_PROFILE as _SPECTATOR_PROFILE
+
+_gc_snapshot_cc_before = {k: getattr(GameConfig, k) for k in
+                           ("WAVE_CHANCE", "WAVE_SIZE_MIN", "WAVE_SIZE_MAX",
+                            "WAVE_COOLDOWN_INITIAL", "WAVE_COOLDOWN_AFTER")}
+
+# (a) Spectator produces strictly larger wave pressure than Player (seeded for determinism)
+random.seed(1234)
+spec_cmd = CommandCenter(profile=_SPECTATOR_PROFILE)
+spec_cmd.tick_count = 400  # WARTIME phase, waves enabled
+spec_cmd.wave_cooldown = 0
+spec_sizes = []
+for _ in range(40):
+    before = len(spec_cmd.unseen_contacts)
+    spec_cmd.detect_airspace()
+    spec_sizes.append(len(spec_cmd.unseen_contacts) - before)
+    spec_cmd.tick_count += 1
+
+random.seed(1234)
+plyr_cmd = CommandCenter(profile=_PLAYER_PROFILE)
+plyr_cmd.tick_count = 400
+plyr_cmd.wave_cooldown = 0
+plyr_sizes = []
+for _ in range(40):
+    before = len(plyr_cmd.unseen_contacts)
+    plyr_cmd.detect_airspace()
+    plyr_sizes.append(len(plyr_cmd.unseen_contacts) - before)
+    plyr_cmd.tick_count += 1
+
+check(sum(spec_sizes) > sum(plyr_sizes),
+      f"CommandCenter(SPECTATOR_PROFILE) should spawn more contacts over time than PLAYER_PROFILE "
+      f"(spectator={sum(spec_sizes)}, player={sum(plyr_sizes)})")
+
+# (b) GameConfig is still unmutated after constructing CommandCenters with both profiles
+_gc_snapshot_cc_after = {k: getattr(GameConfig, k) for k in
+                          ("WAVE_CHANCE", "WAVE_SIZE_MIN", "WAVE_SIZE_MAX",
+                           "WAVE_COOLDOWN_INITIAL", "WAVE_COOLDOWN_AFTER")}
+check(_gc_snapshot_cc_before == _gc_snapshot_cc_after,
+      "Constructing CommandCenters with SPECTATOR/PLAYER profiles must not mutate GameConfig")
+
+# (c) player_input_enabled flags
+check(_SPECTATOR_PROFILE.player_input_enabled is False,
+      "SPECTATOR_PROFILE.player_input_enabled should be False (view-only)")
+check(_PLAYER_PROFILE.player_input_enabled is True,
+      "PLAYER_PROFILE.player_input_enabled should be True (commands accepted)")
+
+# (d) Backup auto-fire rule: does NOT fire in the non-imminent case under PLAYER_PROFILE,
+# but DOES fire under SPECTATOR_PROFILE (autonomous_weapons=True always engages).
+far_fighter = Aircraft(999, friendly_weight=0)
+far_fighter.scenario = "HOSTILE_FIGHTER"
+far_fighter.status = "HOSTILE"
+far_fighter.distance_km = 500  # far outside the backup imminent radius, not a ballistic threat
+
+plyr_backup_cmd = CommandCenter(profile=_PLAYER_PROFILE)
+check(plyr_backup_cmd._is_backup_engagement(far_fighter) is False,
+      "PLAYER_PROFILE backup auto-fire should NOT treat a far, non-ballistic contact as imminent")
+plyr_backup_cmd.contacts = [far_fighter]
+plyr_backup_cmd.process_personnel()
+check(far_fighter.status == "HOSTILE",
+      "Under PLAYER_PROFILE, a non-imminent hostile should NOT be auto-engaged (human holds the trigger)")
+
+spec_backup_cmd = CommandCenter(profile=_SPECTATOR_PROFILE)
+spec_backup_cmd.contacts = [far_fighter]
+far_fighter.status = "HOSTILE"
+spec_backup_cmd.process_personnel()
+check(far_fighter.status in ("ENGAGING", "INTERCEPTING"),
+      "Under SPECTATOR_PROFILE, autonomous_weapons should auto-engage even a non-imminent hostile")
+
+# Imminent/leaking case: PLAYER_PROFILE should still auto-engage as a backstop
+close_fighter = Aircraft(998, friendly_weight=0)
+close_fighter.scenario = "HOSTILE_FIGHTER"
+close_fighter.status = "HOSTILE"
+close_fighter.distance_km = 10  # inside BACKUP_ENGAGEMENT_RADIUS_KM
+check(plyr_backup_cmd._is_backup_engagement(close_fighter) is True,
+      "PLAYER_PROFILE backup auto-fire SHOULD treat an imminent/leaking close contact as backup-engageable")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")

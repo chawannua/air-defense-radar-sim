@@ -54,7 +54,11 @@ def load_real_map():
 MAP_SHAPES_KM, MAP_PEAKS_KM, MAP_AIRBASES_KM = load_real_map()
 MAP_CONTOURS_KM = global_map_manager.contours_km
 
-def start_radar():
+def start_radar(profile=None):
+    if profile is None:
+        from profiles import DEFAULT_PROFILE
+        profile = DEFAULT_PROFILE
+
     pygame.init()
     
     info = pygame.display.Info()
@@ -85,7 +89,7 @@ def start_radar():
     font_md = pygame.font.SysFont('consolas', 16, bold=True)
     font_lg = pygame.font.SysFont('consolas', 22, bold=True)
 
-    cmd = CommandCenter()
+    cmd = CommandCenter(profile=profile)
     sound_mgr = SoundManager()
     vfx_mgr = VFXManager()
     map_mgr = global_map_manager
@@ -200,7 +204,21 @@ def start_radar():
             
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE: running = False; sys.exit()
-                
+
+                # Audio remains a viewer control in both modes -- not a command.
+                if event.key == pygame.K_u:
+                    is_muted = sound_mgr.toggle_mute()
+                    cmd.add_log(f"\033[93m[AUDIO] Audio muted: {is_muted}\033[0m")
+
+            # ---------------------------------------------------------------
+            # COMMAND INPUT GATE: Spectator mode (profile.player_input_enabled
+            # == False) is view-only. None of the fire-control, manual-spawn,
+            # upgrade-purchase, decoy-deploy, EMP-trigger, mission/tactical or
+            # AWACS-retask handlers below are dispatched in that mode -- this
+            # single guard replaces registering them at all, rather than
+            # scattering per-handler checks.
+            # ---------------------------------------------------------------
+            if event.type == pygame.KEYDOWN and profile.player_input_enabled:
                 # Tech Upgrades Purchasing (when Upgrades panel is open)
                 if show_upgrades:
                     if event.key == pygame.K_t:
@@ -289,9 +307,6 @@ def start_radar():
                             vfx_mgr.add_shockwave(CX, CY, max_radius=km_to_px(600), color=(180, 80, 255))
                     else:
                         cmd.add_log("\033[93m[EMP] EMP Generator offline. Unlock in Black Ops Lab [TAB].\033[0m")
-                elif event.key == pygame.K_u:
-                    is_muted = sound_mgr.toggle_mute()
-                    cmd.add_log(f"\033[93m[AUDIO] Audio muted: {is_muted}\033[0m")
                 elif event.key == pygame.K_TAB:
                     show_upgrades = not show_upgrades
                 elif event.key == pygame.K_F1:
@@ -304,7 +319,7 @@ def start_radar():
                     sound_mgr.radio_callout("Map layer toggled.")
                     cmd.add_log(f"\033[96m[MAP] DISPLAY MODE: {mode_name}\033[0m")
                 elif event.key == pygame.K_r:
-                    cmd = CommandCenter()
+                    cmd = CommandCenter(profile=profile)
                     selected_contact = None
                     sound_mgr.stop_alarm()
                     cmd.add_log("\033[92m[SYS] SORTIE RE-INITIALIZED. COMMAND CENTER ONLINE.\033[0m")
@@ -325,32 +340,34 @@ def start_radar():
                         cmd.add_log("\033[41;97m[COMMAND] PHASE 3 (WARTIME) ENGAGED. AIRSPACE CLOSED. DEFCON 1.\033[0m")
                         sound_mgr.start_alarm()
                         sound_mgr.radio_callout("Vampire! Vampire inbound!")
-                # Toggle fullscreen mode
-                if event.key == pygame.K_F11:
-                    is_fullscreen = not is_fullscreen
-                    if is_fullscreen:
-                        # (0,0) tells pygame to fill the display natively
-                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-                        info_fs = pygame.display.Info()
-                        WIDTH, HEIGHT = info_fs.current_w, info_fs.current_h 
-                    else:
-                        WIDTH, HEIGHT = int(MONITOR_W * 0.9), int(MONITOR_H * 0.9) 
-                        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
-                    
-                    RADAR_AREA = WIDTH
 
                 # Restart game after base is destroyed
                 if event.key == pygame.K_r and cmd.base_hp <= 0:
-                    cmd = CommandCenter()
+                    cmd = CommandCenter(profile=profile)
                     selected_contact = None
                     sweep_angle = 0.0
                     LAST_TICK_TIME = pygame.time.get_ticks()
+
+            # Toggle fullscreen mode -- a display/view control, available in both modes.
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                is_fullscreen = not is_fullscreen
+                if is_fullscreen:
+                    # (0,0) tells pygame to fill the display natively
+                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                    info_fs = pygame.display.Info()
+                    WIDTH, HEIGHT = info_fs.current_w, info_fs.current_h
+                else:
+                    WIDTH, HEIGHT = int(MONITOR_W * 0.9), int(MONITOR_H * 0.9)
+                    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+
+                RADAR_AREA = WIDTH
 
             if event.type == pygame.MOUSEWHEEL:
                 zoom_level += event.y * 0.15
                 zoom_level = max(0.2, min(10.0, zoom_level))
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            # AWACS retask (right-click) is a command -- Spectator is view-only.
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and profile.player_input_enabled:
                 if selected_contact and isinstance(selected_contact, AWACS):
                     mx, my = event.pos
                     def px_to_km(px): return px / zoom_level
