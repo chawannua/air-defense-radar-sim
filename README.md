@@ -34,13 +34,14 @@ Introduces the cinematic Main Menu and Scene Architecture (`scenes.py`, `camera_
 7. [Tactical Armory & Technology Upgrade Tree (`[TAB]`)](#tactical-armory--technology-upgrade-tree-tab)
 8. [Procedural Audio Engine (`sound_engine.py`)](#procedural-audio-engine-sound_enginepy)
 9. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
-10. [Complete Tactical Keybindings](#complete-tactical-keybindings)
+10. [Complete Tactical Keybindings (Menu & Combat)](#complete-tactical-keybindings-menu--combat)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
 12. [Automated Testing (41/41 Test Suite)](#automated-testing-4141-test-suite)
 13. [Release History & Version Evolution (v1.0.0 → v1.4.0)](#release-history--version-evolution-v100--v140)
-14. [Installation & Build Guide](#installation--build-guide)
-15. [Dependencies](#dependencies)
-16. [License & Acknowledgments](#license--acknowledgments)
+14. [Version Control, Release Architecture & Repository Governance](#version-control-release-architecture--repository-governance)
+15. [Installation & Build Guide](#installation--build-guide)
+16. [Dependencies](#dependencies)
+17. [License & Acknowledgments](#license--acknowledgments)
 
 ---
 
@@ -134,7 +135,7 @@ The tactical display is built on an enterprise geospatial projection engine conv
 | Geodata Layer | Source / Format | Elements / Vertices | Description |
 |---|---|---|---|
 | **Thailand Sovereign** | `tha.json` | 20 Rings / 1,545 pts | Complete mainland boundary + Phuket, Ko Samui, Ko Chang, Ko Kut, Ko Phangan, Ko Tarutao, and Ko Lanta. |
-| **Neighboring States** | `*.json` | 8 Sovereign Borders | Myanmar (2,092 pts), Vietnam (1,960 pts), Indonesia/Sumatra (1,641 pts), Southern China/Hainan (1,830 pts), Laos (770 pts), Malaysia (698 pts), Cambodia (542 pts), Singapore (18 pts). |
+| **Neighboring States** | `*.json` | 10 Sovereign Borders | Myanmar (2,092 pts), Vietnam (1,960 pts), Indonesia/Sumatra (1,641 pts), Southern China/Hainan (1,830 pts), Laos (770 pts), Malaysia (698 pts), Cambodia (542 pts), Singapore (18 pts), Philippines (`phl.json`), Taiwan (`twn.json`). |
 | **Maritime Coastlines** | `coastlines.json` | 229 Segments / 8,338 pts | High-resolution 1:10m Natural Earth coastal boundaries for the Gulf of Thailand, Andaman Sea, and South China Sea. |
 | **International Borders**| `borders.json` | 522 Segments / 2,873 pts | Land boundary demarcations between regional states. |
 | **Bangkok FIR / ADIZ** | Algorithmic Polygon | 31 Strategic Waypoints | Authentic Thai Air Defense Identification Zone boundary rendered in amber tactical dashed borders. |
@@ -444,7 +445,20 @@ A dedicated game-feel engine translates kinetic impacts into visceral tactical f
 
 ---
 
-## Complete Tactical Keybindings
+## Complete Tactical Keybindings (Menu & Combat)
+
+### Pre-Simulation: Main Menu Navigation (`scenes.py`)
+
+| Keybinding / Input | Context | Menu Action |
+|---|---|---|
+| **`[Up Arrow]` / `[W]`** | Main Menu | Move selection cursor up (`SPECTATOR` $\to$ `PLAYER` $\to$ `EXIT`) |
+| **`[Down Arrow]` / `[S]`** | Main Menu | Move selection cursor down |
+| **`[Enter]` / `[Space]`** | Main Menu | Activate selected item (Launch chosen sortie mode or exit) |
+| **`[Mouse Motion]`** | Main Menu | Hover selection over menu options with visual green highlight |
+| **`[Mouse Left-Click]`** | Main Menu | Direct click-to-launch selected mode |
+| **`[ESC]`** | Main Menu | Clean simulation termination |
+
+### Tactical Air Defense C2 Operations (`radar_ui.py`)
 
 | Keybinding | Context | Tactical Action |
 |---|---|---|
@@ -468,10 +482,10 @@ A dedicated game-feel engine translates kinetic impacts into visceral tactical f
 | **`[F2]`** | Global | Cycle **Map Overlay**: `FULL TACTICAL` $\to$ `SOVEREIGN FOCUS` $\to$ `MINIMAL` $\to$ `DARK` |
 | **`[U]`** | Global | Toggle **Audio Mute** (Procedural synthesizer silence) |
 | **`[F11]`** | Global | Toggle **Fullscreen / Windowed** mode |
-| **`[R]`** | Global / Defeat | **Re-initialize Sortie**: Resets command center and tactical systems |
+| **`[R]`** | Global / Defeat | **Re-initialize Sortie**: Resets command center and tactical systems (functional in both Spectator & Player modes) |
 | **`[ESC]`** | Global | Terminate simulation and exit cleanly |
 | **`[Arrow Keys]`** | Global | Pan tactical radar camera (W, S, D reserved for tactical actions) |
-| **`[Mouse Wheel]`**| Global | Smooth Zoom In / Zoom Out (0.2x to 10.0x scale) |
+| **`[Mouse Wheel]`**| Global | Smooth Zoom In / Zoom Out (0.10x to 10.0x scale) |
 | **`[Mid/Right Drag]`**| Global | Pan camera via mouse drag |
 | **`[W]`** | Global | Select airborne **AWACS** aircraft & activate airborne radar C2 menu |
 | **`[Right-Click]`** | AWACS Selected | Retask AWACS to new orbit patrol station at cursor coordinate |
@@ -486,6 +500,86 @@ A dedicated game-feel engine translates kinetic impacts into visceral tactical f
 ## System Architecture & OOP Design
 
 The project is structured according to strict Object-Oriented Programming (OOP) principles, clean separation of concerns, and an event-driven architecture.
+
+### Subsystem Architecture & Execution Flow
+
+```
+                                      [ main.py ]
+                                           │  Bootstraps Pygame Display & Scene Manager
+                                           ▼
+                                [ scenes.py (MenuScene) ]
+                                ├── camera_director.py (Smoothstep RTAF Waypoint Pan)
+                                └── profiles.py (SimulationProfile Selection)
+                                           │
+                        ┌──────────────────┴──────────────────┐
+                        ▼                                     ▼
+             [ SPECTATOR_PROFILE ]                   [ PLAYER_PROFILE ]
+             - Autonomous AI C2                      - Human Holds Trigger
+             - 2.0x Spawn Pressure                   - Balanced Threat Waves
+             - View-Only Command Gate                - Starvation-Free Backup Fire
+                        └──────────────────┬──────────────────┘
+                                           ▼
+                                [ radar_ui.py:start_radar() ]
+                                           │  Composes & Updates C2 Systems
+                                           ▼
+                               [ command_center.py:CommandCenter ]
+                               (Tactical Aggregate Root & Event Bus)
+       ┌──────────────────┬────────────────┬─────────────────┬──────────────────┐
+       ▼                  ▼                ▼                 ▼                  ▼
+[ map_manager.py ]  [ targets.py ]  [ personnel.py ]  [ missions.py ]   [ sound_engine.py ]
+- 11x GeoJSON       - 10x Contact   - RadarOperator   - OP-DEFENSE      - NumPy DSP Audio
+- Peak Masking        Subclasses    - WeaponOfficer   - OP-GUARDIAN     - 0 MB WAV/MP3 Files
+- Surface Cache     - Kinematics    - Rank & XP       - OP-IRONSWARM    - Float32 Synthesizers
+                    - Threat Queue                    - OP-GHOST
+                                                                                │
+                                                                                ▼
+                                                                      [ visual_effects.py ]
+                                                                      - T² Trauma Camera
+                                                                      - Shockwave Rings
+                                                                      - Thermodynamic Embers
+```
+
+### Complete Repository Directory Layout
+
+```
+air-defense-radar-sim/
+├── main.py                   # Application entry point; initializes Pygame & launches SceneManager
+├── scenes.py                 # Scene state machine: Scene base class, SceneManager, dark-tactical MenuScene
+├── camera_director.py        # Cinematic camera: smoothstep waypoint easing across RTAF airbases, cosine zoom
+├── profiles.py               # Decoupled SimulationProfile: SPECTATOR_PROFILE, PLAYER_PROFILE, DEFAULT_PROFILE
+├── radar_ui.py               # Presentation layer: AESA sweep render, PPI CRT phosphors, HUD overlays, input handlers
+├── command_center.py         # Simulation core & aggregate root: engagement doctrine, ECCM triad, threat queue
+├── map_manager.py            # Geospatial projection: Natural Earth 1:10m vectors, mountain peak LOS masking, caching
+├── targets.py                # Domain models: AirContact ABC and 10 polymorphic target subclasses
+├── personnel.py              # AI tactical crew: RadarOperator, WeaponOfficer, XP career rank progression
+├── missions.py               # Operational scenarios: OP-DEFENSE, OP-GUARDIAN, OP-IRONSWARM, OP-GHOST
+├── sound_engine.py           # 100% procedural audio: NumPy mathematical DSP synthesis (zero audio files)
+├── visual_effects.py         # Visual juice engine: T² camera trauma model, shockwaves, shrapnel, lead vectors
+├── config.py                 # Simulation balance constants, RTAF airbase coordinates, weapon envelopes (single truth)
+├── test_logic.py             # Headless automated verification suite: 41 test modules passing 100%
+├── CONTRIBUTING.md           # Developer onboarding, domain modeling guides, and contribution rules
+├── CHANGELOG.md              # Historical version changelog adhering to Keep a Changelog & SemVer
+├── SYSTEM_BOUNDARIES.md      # Immutable boundaries and modification governance for developers and AI agents
+├── AGENTS.md                 # Agent orchestration directives and dynamic model tiering rules
+├── requirements.txt          # Minimal runtime dependencies (pygame >= 2.0.0, numpy >= 1.24.0)
+├── .gitignore                # Strict repository hygiene (ignores work/, *.exe, *.log, byte-cache)
+└── *.json                    # 1:10m Natural Earth geodata:
+    ├── tha.json              # Thailand sovereign border (20 rings, 1,545 vertices)
+    ├── mmr.json              # Myanmar sovereign boundary
+    ├── lao.json              # Laos sovereign boundary
+    ├── khm.json              # Cambodia sovereign boundary
+    ├── mys.json              # Malaysia sovereign boundary
+    ├── sgp.json              # Singapore sovereign boundary
+    ├── vnm.json              # Vietnam sovereign boundary
+    ├── chn.json              # Southern China & Hainan Island
+    ├── idn.json              # Indonesia & Sumatra
+    ├── phl.json              # Philippines boundary (+57% theater expansion)
+    ├── twn.json              # Taiwan boundary (+57% theater expansion)
+    ├── coastlines.json       # Maritime coastlines (229 segments, 8,338 vertices)
+    └── borders.json          # International land demarcations (522 segments, 2,873 vertices)
+```
+
+### Domain Contact Hierarchy
 
 ```
                                   AirContact (ABC)
@@ -614,6 +708,69 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 | **Audio Engine** | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. | Added procedural synthesizers `synth_eccm_burn()` (AESA chirp) and `synth_hoj_lock()` (1850 Hz warble). | Synthesized missile roar redesigned, DEFCON alarm 10s auto-cutoff, brevity callouts. | No change. | Seamless audio transition between menu and combat; debounced alarm callouts. |
 | **Combat & Asset Mechanics** | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. | Implemented Tier 2 Black Ops Arsenal (5 upgrades), EMP shockwave `[B]`, Burn-Through `[F]`, HOJ `[H]`, and AWACS ESM cross-fix. | Interactive AWACS orbit retask `[Right-Click]`, orbit radius `[+/-]`, and `[R]` RTB commands. | EMP shockwave `[B]` discharge stabilized — no longer crashes with ≥10 active contacts. | Decoupled Spectator/Player profiles; leaker-prioritized Auto-CIWS; physical chaff; RF-gated EW floods; starvation-free backup fire. |
 | **Automated Verification** | 25/25 Test Suite + 2,000-frame headless fuzz monkey test. | 28/28 Automated Test Suite passing with 0 errors (100% green). | **30/30 Automated Test Suite** passing with 0 errors (100% green). | **31/31 Automated Test Suite** passing with 0 errors — Test 31 covers `add_shockwave()` stability. | **41/41 Automated Test Suite** passing with 0 errors (100% green) — Tests 32–41 cover profiles, AI doctrine & anti-starvation locks. |
+
+---
+
+## Version Control, Release Architecture & Repository Governance
+
+AEGIS Radar maintains strict software engineering and version control standards designed for mission-critical reliability, traceable evolution, and reproducible simulation builds.
+
+### 1. Repository Topology & Branching Model
+- **Trunk-Based Development (`main`)**: The repository maintains a single long-lived `main` branch. All features, fixes, and documentation improvements are validated locally via the automated test suite before atomic integration.
+- **Linear, Clean History**: The repository history is kept strictly linear, free of extraneous merge bubbles or work-in-progress checkpoint commits. Every commit on `origin/main` represents a complete, compilable, and passing state.
+- **Single-Author Attribution Integrity**: 100% of all repository commits are authored by the primary project architect (`Chawannua <chawannua@gmail.com>`). The repository enforces a strict trailer hygiene policy: third-party AI assistant trailers (such as `Co-Authored-By: Claude ...` or `Claude-Session: ...`) are strictly forbidden and sanitized to preserve pure project authorship and avoid GitHub contribution graph pollution.
+
+### 2. Semantic Versioning 2.0.0 (SemVer)
+The project strictly enforces [Semantic Versioning 2.0.0](https://semver.org/) under the `MAJOR.MINOR.PATCH` specification:
+- **`MAJOR` (x.0.0)**: Breaking architectural changes, incompatible save/replay telemetry schemas, or fundamental restructuring of the core simulation loop.
+- **`MINOR` (0.x.0)**: Backwards-compatible tactical features, new weapon systems, geodata theater expansions, audio DSP synthesizers, and operational mission additions (e.g., `v1.1.0` Geodata Engine, `v1.2.0` Black Ops & ECCM, `v1.3.0` Controllable AWACS, `v1.4.0` Main Menu & Context-Aware AI).
+- **`PATCH` (0.0.x)**: Backwards-compatible bug fixes, UI coordinate harmonizations, performance optimizations, and crash hotfixes (e.g., `v1.1.1` Coordinate Fixes, `v1.3.1` Thread Safety & Input Disambiguation, `v1.3.2` EMP Shockwave Crash Hotfix).
+
+### 3. Conventional Commits 1.0.0 Standard
+All commit messages adhere to the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification:
+```
+<type>(<scope>): <short imperative subject summary>
+
+[optional multi-line body explaining rationale and verification metrics]
+```
+Standardized commit types utilized across the repository:
+- `feat`: Implementation of new tactical features, weapon systems, map layers, or UI scenes.
+- `fix`: Resolution of simulation bugs, numerical glitches, coordinate offsets, or crash triggers.
+- `docs`: Documentation expansions, README synchronization, CHANGELOG updates, or architecture diagrams.
+- `test`: Addition, refactoring, or expansion of headless unit/regression test modules.
+- `chore`: Version bumps, dependency maintenance, release preparation, or file pruning.
+- `ci`: Build scripts, PyInstaller spec configurations, or distribution workflows.
+- `perf`: Numerical optimization, surface caching, rendering latency, or DSP memory profiling.
+
+### 4. 5-Point Release Synchronization Protocol
+To guarantee zero version drift across documentation, runtime binaries, and source code, every release undergoes an atomic 5-point synchronization gate:
+
+| Touchpoint | File / Asset | Verification Rule |
+|---|---|---|
+| **1. Simulation Config** | [`config.py`](config.py) | `GameConfig.VERSION` string matches target release version (e.g., `"1.4.0"`). |
+| **2. Application Entry** | [`main.py`](main.py) | `__version__` string matches target release version (e.g., `"1.4.0"`). |
+| **3. Changelog** | [`CHANGELOG.md`](CHANGELOG.md) | Dedicated `[X.Y.Z] - YYYY-MM-DD` section containing Keep a Changelog categories (`Added`, `Changed`, `Fixed`, `Verification`). |
+| **4. Technical Documentation**| [`README.md`](README.md) | Current Release banner, Quick Links, Feature Highlights table, and Evolution Chain reflect new version. |
+| **5. Git Release Tag** | `refs/tags/vX.Y.Z` | Annotated Git tag created with release notes: `git tag -a vX.Y.Z -m "Release vX.Y.Z: ..."` |
+
+### 5. Pre-Tag Verification Quality Gate
+No release tag may be minted or pushed without achieving a 100% clean bill of health from the automated test suite:
+```bash
+python test_logic.py
+```
+- **Zero Failures**: All **41/41 test modules** (325+ assertions) must evaluate to `[PASS]`.
+- **Adversarial Regression Locks**: Tests 38–41 explicitly lock in critical behavioral guards:
+  - *Test 38*: `DEFAULT_PROFILE` command input retention (un-profiled callers retain human console controls).
+  - *Test 39*: Spectator IFF re-designation guard against accidental civilian shootdown court-martial.
+  - *Test 40*: Post-defeat sortie restart reachable across all simulation profiles.
+  - *Test 41*: Starvation-free player-mode backup fire queue traversal over a 40-tick horizon.
+
+### 6. Repository Sanitation & Artifact Hygiene
+The repository enforces strict `.gitignore` rules to prevent repository bloat and binary pollution:
+- **Build Environments**: Untracked 176MB portable Python distributions (`work/`) preventing unnecessary multi-gigabyte git clones.
+- **Compiled Binaries**: Ignores `build/`, `dist/`, `*.spec`, `*.exe`, `*.bin`. Releases are distributed via official GitHub Release binary attachments rather than git tracking.
+- **Runtime Logs & Cache**: Automatically ignores `*.log`, `full_log.txt`, `error.log`, `__pycache__/`, and `.pytest_cache/`.
+- **Geodata Protection**: All 13 core geospatial datasets (`*.json`) are tracked as read-only, immutable assets governed under [`SYSTEM_BOUNDARIES.md`](SYSTEM_BOUNDARIES.md).
 
 ---
 
