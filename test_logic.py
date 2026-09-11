@@ -1752,8 +1752,8 @@ _registry42 = dict(_re42.findall(r'"(\w+)":\s*"([\w.]+\.json)"', _m42.group(1)))
 
 _map42 = _MapManager42()
 
-check(len(_registry42) == 20,
-      f"Registry must list 20 regions after the v1.4.1 expansion (found {len(_registry42)})")
+check(len(_registry42) == 21,
+      f"Registry must list 21 regions once Japan joins the theatre (found {len(_registry42)})")
 
 _missing42 = [f for f in _registry42.values() if not os.path.exists(os.path.join(_here42, f))]
 check(not _missing42,
@@ -1778,7 +1778,7 @@ _BOX42 = {  # iso: (lon_min, lon_max, lat_min, lat_max) from Natural Earth 1:10m
     "LKA": (79.7, 81.9, 5.9, 9.8),  "NPL": (80.0, 88.2, 26.3, 30.4),
     "BTN": (88.7, 92.1, 26.7, 28.4), "BRN": (114.0, 115.4, 4.0, 5.1),
     "TLS": (124.0, 127.3, -9.5, -8.1), "KOR": (124.6, 131.9, 33.2, 38.6),
-    "PRK": (124.2, 130.7, 37.7, 43.0),
+    "PRK": (124.2, 130.7, 37.7, 43.0), "JPN": (122.9, 145.9, 24.2, 45.6),
 }
 _TOL42 = 1.5  # degrees of slack for simplification nudging an extremity
 for _iso42, (_lo42, _hi42, _la42, _ha42) in sorted(_BOX42.items()):
@@ -1852,13 +1852,27 @@ from map_manager import (MapManager as _MapManager43, detect_clip_lines as _dete
 _map43 = _MapManager43()
 _cut_lons43, _cut_lats43 = _map43.data_frame
 
-check(bool(_cut_lons43 or _cut_lats43),
-      f"the clip window must be detected from the geodata, not assumed "
-      f"(lons={sorted(_cut_lons43)}, lats={sorted(_cut_lats43)})")
+# The window was widened past Japan, so the cut that used to slice the
+# archipelago at 130.9E must no longer exist at all. This is the regression
+# guard for the refetch: if someone re-cuts the data narrow again, Japan gets
+# sliced and this fires.
+check(130.9 not in _cut_lons43,
+      f"meridian 130.9 must no longer cut the theatre - it sliced Japan in half "
+      f"(detected meridians: {sorted(_cut_lons43)})")
+check(43.0 not in _cut_lats43,
+      f"parallel 43.0 must no longer cut the theatre (detected parallels: {sorted(_cut_lats43)})")
 
-# Natural Earth cut this theatre at lon 130.9 and lat -9.5 / 43.0.
-check(130.9 in _cut_lons43, f"meridian 130.9 must be recognised as a cut (got {sorted(_cut_lons43)})")
-check(43.0 in _cut_lats43, f"parallel 43.0 must be recognised as a cut (got {sorted(_cut_lats43)})")
+# Japan must arrive whole: Hokkaido in the north and the Ryukyus in the south.
+check(_map43.country_polys.get("JPN"), "Japan must be loaded into the theatre")
+_jraw43 = _json42.load(open(os.path.join(_here42, "jpn.json"), encoding="utf-8"))
+_jlats43 = [_p43[1] for _r43 in _jraw43 for _p43 in _r43]
+_jlons43 = [_p43[0] for _r43 in _jraw43 for _p43 in _r43]
+check(max(_jlats43) > 45.0,
+      f"Hokkaido must survive the window (northernmost Japanese vertex {max(_jlats43):.2f}N)")
+check(min(_jlats43) < 25.0,
+      f"the Ryukyus must survive the window (southernmost Japanese vertex {min(_jlats43):.2f}N)")
+check(max(_jlons43) > 145.0,
+      f"eastern Hokkaido must survive the window (easternmost Japanese vertex {max(_jlons43):.2f}E)")
 
 # The real defect: after loading, no long perfectly-axis-aligned run may survive.
 # Genuine coastline is never both perfectly straight and hundreds of km long.
@@ -1937,11 +1951,76 @@ check(_MapManager43.LBL_HQ[0] < _MapManager43.LBL_BASE[0] < _MapManager43.LBL_PE
       "the C2 HQ must outrank an airbase, which must outrank a mountain peak")
 check(_MapManager43.LBL_HQ[1] == 0.0 and _MapManager43.LBL_SOVEREIGN[1] == 0.0,
       "the HQ and the sovereign label must never be culled by zoom")
-_ZOOM_FLOOR43 = 0.09  # radar_ui.py clamp
+_zm43 = _re42.search(r"zoom_level = max\((\d+\.\d+),",
+                     open(os.path.join(os.path.dirname(__file__), "radar_ui.py"),
+                          encoding="utf-8").read())
+check(_zm43 is not None, "zoom floor must be parseable from radar_ui.py")
+_ZOOM_FLOOR43 = float(_zm43.group(1)) if _zm43 else 0.07
 for _n43 in ("LBL_PEAK", "LBL_HUB", "LBL_BASE", "LBL_MARITIME"):
     check(getattr(_MapManager43, _n43)[1] > _ZOOM_FLOOR43,
           f"{_n43} must be culled at the {_ZOOM_FLOOR43} zoom floor, where it only "
           f"adds to the smear (min zoom {getattr(_MapManager43, _n43)[1]})")
+
+# 44. Viewport culling and level-of-detail
+#
+# The theatre carries ~97k drawable points and the surface cache misses on every
+# pan, so render() rejects off-screen strokes on their bounding box and thins
+# strokes finer than LOD_MIN_PX. Both are silent optimisations - if either is
+# wrong the map just quietly loses geography, which no other assertion notices.
+print("\n=== 44. Viewport Culling & Level Of Detail ===")
+from map_manager import stroke_meta as _meta44, LOD_MIN_PX as _LOD44
+
+_line44 = [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0)]
+_m44 = _meta44(_line44)
+check(_m44[0] == 0.0 and _m44[1] == 0.0 and _m44[2] == 10.0 and _m44[3] == 5.0,
+      f"stroke_meta must report the true bounding box (got {_m44[:4]})")
+check(abs(_m44[4] - 7.5) < 1e-9,
+      f"stroke_meta must report the mean segment length (got {_m44[4]})")
+
+# Metadata must stay index-aligned with the geometry it describes, or culling
+# rejects the wrong stroke and the map loses a random country.
+for _iso44, _rings44 in _map43.country_polys.items():
+    check(len(_map43.country_meta.get(_iso44, [])) == len(_rings44),
+          f"{_iso44} metadata must be index-aligned with its rings "
+          f"({len(_map43.country_meta.get(_iso44, []))} vs {len(_rings44)})")
+check(len(_map43.coast_meta) == len(_map43.coastlines_km),
+      f"coastline metadata must be index-aligned ({len(_map43.coast_meta)} vs "
+      f"{len(_map43.coastlines_km)})")
+check(len(_map43.border_meta) == len(_map43.borders_km),
+      f"border metadata must be index-aligned ({len(_map43.border_meta)} vs "
+      f"{len(_map43.borders_km)})")
+
+# Every metadata box must actually contain its stroke.
+_bad44 = []
+for _iso44, _rings44 in _map43.country_polys.items():
+    for _i44, _r44 in enumerate(_rings44):
+        _b44 = _map43.country_meta[_iso44][_i44]
+        if any(not (_b44[0] <= _x44 <= _b44[2] and _b44[1] <= _y44 <= _b44[3])
+               for _x44, _y44 in _r44):
+            _bad44.append(f"{_iso44}[{_i44}]")
+check(not _bad44,
+      f"every culling box must contain its own stroke (escaped: {_bad44[:5]})")
+
+# At the default 0.8 zoom the operator must still get every vertex. Mirror the
+# stride arithmetic in render() rather than restating a threshold, and drive it
+# from the real spacing of Thailand's mainland rather than an assumed figure.
+def _stride44(seg_km, zoom):
+    step = seg_km * zoom
+    if step <= 0.0 or step >= _LOD44:
+        return 1
+    return max(1, int(_LOD44 / step))
+
+_tha44 = max(_map43.country_polys["THA"], key=len)
+_seg44 = _meta44(_tha44)[4]
+check(_stride44(_seg44, 0.8) == 1,
+      f"LOD must not thin anything at the default 0.8 zoom (Thailand mainland "
+      f"spacing {_seg44:.2f} km -> {_seg44 * 0.8:.2f} px, threshold {_LOD44}, "
+      f"stride {_stride44(_seg44, 0.8)})")
+check(_stride44(_seg44, 5.0) == 1,
+      "LOD must never thin when zoomed right in")
+check(_stride44(_seg44, 0.1) > 1,
+      f"LOD must thin when zoomed out, or the widened theatre blows the frame "
+      f"budget (stride at 0.1 zoom: {_stride44(_seg44, 0.1)})")
 
 print("\n" + "="*50)
 if errors:
