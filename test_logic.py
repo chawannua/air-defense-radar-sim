@@ -1813,21 +1813,26 @@ check(_xspan42 > 3716 and _yspan42 > 2930,
       f"Theatre must exceed the v1.4.0 baseline of 3716 x 2930 km "
       f"(got {_xspan42:.0f} x {_yspan42:.0f} km)")
 
-# radar_ui.py clamps zoom to max(0.10, ...) and sizes the window at 90% of the monitor,
-# so the tightest real case is the narrowest supported display, not a fixed 1600px.
+# radar_ui.py clamps the zoom and sizes the window at 90% of the monitor, so the
+# tightest real case is the narrowest supported display. Read the clamp out of the
+# source rather than restating it here - a copy of a constant drifts from it.
 _MIN_MONITOR_W42 = 1024
 _half42 = _MIN_MONITOR_W42 * 0.9 / 2.0
+_ui42 = open(os.path.join(_here42, "radar_ui.py"), encoding="utf-8").read()
+_fm42 = _re42.search(r"zoom_level = max\((\d+\.\d+),", _ui42)
+check(_fm42 is not None, "zoom floor must be parseable from radar_ui.py")
+_floor42 = float(_fm42.group(1)) if _fm42 else 0.10
 _far42 = max((x * x + y * y) ** 0.5 for x, y in zip(_xs42, _ys42))
-check(_far42 * 0.10 < _half42,
-      f"At the 0.10 zoom floor the furthest point must stay on screen on the narrowest "
-      f"supported {_MIN_MONITOR_W42}px display ({_far42:.0f} km -> {_far42 * 0.10:.0f} px, "
-      f"limit {_half42:.0f})")
+check(_far42 * _floor42 < _half42,
+      f"At the {_floor42} zoom floor from radar_ui.py the furthest point must stay on "
+      f"screen on the narrowest supported {_MIN_MONITOR_W42}px display "
+      f"({_far42:.0f} km -> {_far42 * _floor42:.0f} px, limit {_half42:.0f})")
 
 # These two strings drifted apart once before (main.py at 1.3.1 while config.py said
 # 1.3.2), so assert against the real module attribute, not just GameConfig.
-check(_main42.__version__ == GameConfig.VERSION == "1.5.1",
+check(_main42.__version__ == GameConfig.VERSION == "1.6.0",
       f"main.py __version__ ({_main42.__version__}) and GameConfig.VERSION "
-      f"({GameConfig.VERSION}) must both read 1.5.1")
+      f"({GameConfig.VERSION}) must both read 1.6.0")
 
 print("\n" + "="*50)
 if errors:

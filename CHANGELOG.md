@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-09-12
+
+### Changed
+- **Uniform map detail across the whole theatre.** v1.4.1 grew the map roughly fivefold in area but left the high-fidelity layers covering only the original Southeast Asia box, so expansion regions rendered with a single thin outline while SEA carried three overlapping layers. Every layer is now rebuilt at the density of Thailand itself - Douglas-Peucker at `eps = 0.005019`, the tolerance that reproduces `tha.json` exactly - giving **17-27 points per 100 km everywhere** against Thailand at 18.5.
+
+| Layer | Before | After |
+|---|---|---|
+| `coastlines.json` | 8,338 pts (SEA box only) | **27,639 pts** (full theatre) |
+| `borders.json` | 2,873 pts (SEA box only) | **7,785 pts** (full theatre) |
+| `phl.json` | 110 pts | **3,608 pts** |
+| `twn.json` | 9 pts | **256 pts** |
+| `chn.json` | 1,830 pts, cut at lon 114 / lat 25.5 | **5,994 pts**, cut on the theatre frame |
+| `idn.json` | 1,641 pts, cut at lon 114 / lat -1 | **7,816 pts**, cut on the theatre frame |
+| `mys.json`, `mmr.json`, `kor.json` | cut mid-map | re-cut on the frame |
+
+- **The mid-map rectangle is gone.** Its cause was not the renderer: `coastlines.json`, `borders.json` and five country polygons had all been clipped to a `lon 89-114, lat -1-25.5` box during the original SEA localisation, so China and Indonesia ended in open water partway across the map. Every layer now terminates on one shared frame (`lon 68.1-130.9, lat -9.5-43.0`), so the straight edge reads as the map border rather than a stray box.
+- **Zoom floor 0.10 -> 0.09** (`radar_ui.py:369`). Restoring the north-east corner of China moved the furthest point to 4,611 km, rendering 461.1 px from centre against a 460.8 px half-window on a 1024px display - over by a third of a pixel. Test group 42 caught it. The floor now leaves 46 px of margin.
+
+### Added
+- **Eleven country labels** (`c_label_data`, 11 -> 22 entries): India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, South Korea, North Korea, Philippines and Taiwan previously rendered as unnamed landmasses.
+
+### Fixed
+- Test group 42 now **parses the zoom clamp out of `radar_ui.py`** instead of restating it. A copied constant drifts from its original; this is the same failure mode the version-lockstep guard exists to prevent.
+
+### Known limitation
+Uncached map render is **~26 ms against a 16.7 ms frame budget** (7.4 ms before the expansion). The frame is cached on position, zoom and mode, so steady state is unaffected, but panning and zooming invalidate it every frame and the camera will run at roughly 40 FPS while moving.
+
 ## [1.5.1] - 2026-09-12
 
 ### Added

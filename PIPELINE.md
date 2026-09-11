@@ -11,15 +11,15 @@
 
 ---
 
-## Current State (as of v1.5.1)
+## Current State (as of v1.6.0)
 
 | Item | Value |
 |---|---|
-| Version | `1.5.1` — `main.py:2` (`__version__`) and `config.py:3` (`GameConfig.VERSION`) must always agree; **test group 42 now enforces this**, it is no longer convention |
+| Version | `1.6.0` — `main.py:2` (`__version__`) and `config.py:3` (`GameConfig.VERSION`) must always agree; **test group 42 now enforces this**, it is no longer convention |
 | Branch | `main`, trunk-based, linear history |
 | Test suite | `python test_logic.py` → **42 groups**, must print `ALL TESTS PASSED` |
 | Entry point | `python main.py` → menu → mode select → `start_radar(profile=...)` |
-| Map coverage | 20 countries, extent x span `6,788 km`, y span `5,806 km`, furthest point `4,552 km` |
+| Map coverage | 20 countries on one clip frame (`lon 68.1-130.9, lat -9.5-43.0`); x span `6,786 km`, y span `5,806 km`, furthest `4,611 km`; every layer 17-27 pts/100km |
 
 ### Architecture notes that are easy to get wrong
 
@@ -163,6 +163,7 @@ Test coverage gap: the suite is UI-free. No test exercises the Spectator input g
 | Version | Summary |
 |---|---|
 | v1.4.0 | Main menu + cinematic camera, Spectator/Player mode separation, context-aware skill triggers (CIWS / chaff / EW flood), map extended to PHL + TWN (+57% east-west), repo cleanup 3,725 → 37 tracked files, suite 31 → 41 groups |
+| v1.6.0 | Uniform theatre detail: coastlines 8,338 -> 27,639 pts, borders 2,873 -> 7,785, PHL 110 -> 3,608, TWN 9 -> 256; chn/idn/mys/mmr/kor re-cut from the old SEA box onto the shared frame, removing the mid-map rectangle; 11 region labels; zoom floor 0.10 -> 0.09. Uncached render ~26 ms vs 16.7 ms budget |
 | v1.5.1 | Packaging hardened: Windows version resource, radar-scope icon, THIRD_PARTY_NOTICES.md for 78 bundled libraries, LICENSE shipped inside the EXE, UPX disabled. Still unsigned; bundle still unpackable with pyinstxtractor |
 | v1.5.0 | Licence changed MIT -> proprietary source-available; explicitly non-retroactive (v1.4.1 and earlier stay MIT); third-party licensing preserved; CONTRIBUTING.md realigned. No code behaviour change |
 | v1.4.1 | Map expansion 11 -> 20 regions (IND, BGD, LKA, NPL, BTN, BRN, TLS, KOR, PRK) from Natural Earth 1:10m; theatre 3,716 x 2,930 -> 6,788 x 5,806 km (+83% / +98%); registration-only edit to the protected loader (10 ins / 1 del); suite 41 -> 42 groups with per-ISO bounding-box and real version-lockstep assertions; JPN/PNG/AUS excluded as beyond the ~4,000 km guidance |

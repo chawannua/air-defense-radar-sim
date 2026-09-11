@@ -13,11 +13,11 @@
 ## 📡 AEGIS Air Defense Radar Simulator
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
-### ⚡ Current Release: `v1.5.1` (Professional Packaging & Third-Party Notices)
+### ⚡ Current Release: `v1.6.0` (Uniform Theatre Detail)
 Expands the tactical theatre from 11 to 20 registered regions — adding India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, South Korea and North Korea as Natural Earth 1:10m sovereign outlines — growing operational span from 3,716 × 2,930 km to 6,788 × 5,806 km (+83% east-west, +98% north-south). Geodata registration only; the protected map engine gained nine loader entries and no rendering logic was altered. Test suite expansion to 42/42.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.5.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (42/42)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.6.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (42/42)](test_logic.py)
 
 </div>
 
@@ -37,7 +37,7 @@ Expands the tactical theatre from 11 to 20 registered regions — adding India, 
 10. [Complete Tactical Keybindings (Menu & Combat)](#complete-tactical-keybindings-menu--combat)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
 12. [Automated Testing (42/42 Test Suite)](#automated-testing-4242-test-suite)
-13. [Release History & Version Evolution (v1.0.0 → v1.5.1)](#release-history--version-evolution-v100--v151)
+13. [Release History & Version Evolution (v1.0.0 → v1.6.0)](#release-history--version-evolution-v100--v160)
 14. [Version Control, Release Architecture & Repository Governance](#version-control-release-architecture--repository-governance)
 15. [Installation & Build Guide](#installation--build-guide)
 16. [Dependencies](#dependencies)
@@ -669,13 +669,13 @@ ALL 41 TEST MODULES PASSED (100% SUCCESS RATE)
 
 ---
 
-## Release History & Version Evolution (v1.0.0 → v1.5.1)
+## Release History & Version Evolution (v1.0.0 → v1.6.0)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0` ➔ `v1.4.1` ➔ `v1.5.0` ➔ `v1.5.1`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0` ➔ `v1.4.1` ➔ `v1.5.0` ➔ `v1.5.1` ➔ `v1.6.0`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
@@ -688,6 +688,14 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.4.0`** to **`v1.4.1`** expands the tactical theatre from 11 to 20 registered regions across South, South-East and East Asia, growing operational span from 3,716 x 2,930 km to 6,788 x 5,806 km (+83% east-west, +98% north-south). Geodata registration only; no rendering logic altered. Test suite expands to 42/42.
 - The version increment from **`v1.4.1`** to **`v1.5.0`** changes the distribution licence from MIT to a proprietary source-available licence. No simulation behaviour changed; the MINOR bump marks the change in what recipients may do with the software. Releases up to v1.4.1 remain available under MIT.
 - The version increment from **`v1.5.0`** to **`v1.5.1`** hardens distribution packaging: Windows version resource, a real application icon, `THIRD_PARTY_NOTICES.md` for the 78 bundled native libraries, licence files shipped inside the executable, and UPX disabled to reduce antivirus false positives. No simulation behaviour changed.
+- The version increment from **`v1.5.1`** to **`v1.6.0`** brings the entire theatre up to the map detail of Thailand itself. Coastlines grow 8,338 to 27,639 points, borders 2,873 to 7,785, the Philippines 110 to 3,608 and Taiwan 9 to 256, and five country polygons clipped to the original Southeast Asia box are re-cut on the shared theatre frame, removing the rectangle that cut across the map. Eleven regions gain names; zoom floor 0.10 to 0.09.
+
+### 🌟 Version 1.6.0 Feature Highlights
+- **Uniform Theatre Detail:** Every map layer rebuilt at the density of Thailand itself (`eps = 0.005019`), giving **17–27 points per 100 km across the whole theatre** against Thailand at 18.5. Coastlines 8,338 ➔ **27,639** points, borders 2,873 ➔ **7,785**.
+- **Mid-Map Rectangle Eliminated:** `coastlines.json`, `borders.json` and five country polygons had been clipped to a `lon 89–114, lat −1–25.5` box, leaving China and Indonesia ending in open water. All layers now terminate on one shared frame, so the edge reads as the map border.
+- **Blocky Outlines Re-Cut:** Philippines 110 ➔ **3,608** points, Taiwan 9 ➔ **256** — both previously angular fragments beside high-fidelity neighbours.
+- **Eleven Regions Named:** India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, both Koreas, the Philippines and Taiwan gain map labels.
+- **Zoom Floor 0.10 ➔ 0.09:** The restored north-east corner of China pushed the furthest point to 4,611 km, 0.3 px over the limit on a 1024px display. Caught automatically by test group 42, which now reads the clamp from `radar_ui.py` rather than restating it.
 
 ### 🌟 Version 1.5.1 Feature Highlights
 - **Windows Version Resource:** The executable's Details tab reports ProductName, FileVersion `1.5.1.0`, CompanyName and LegalCopyright — previously all blank.
