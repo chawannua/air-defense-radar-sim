@@ -66,4 +66,4 @@ When countering Electronic Warfare (EW) standoff jammers (`EA-18G Growler`, `EC-
 
 ## 3. Testing & Verification Standard
 - Run `python test_logic.py` after any change.
-- All 28 test suites must pass cleanly (`0` errors, `100% OK`).
+- All 41 test suites must pass cleanly (`0` errors, `100% OK`).

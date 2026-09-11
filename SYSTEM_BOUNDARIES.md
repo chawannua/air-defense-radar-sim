@@ -75,4 +75,4 @@ The 3 anti-jammer Electronic Counter-Countermeasures are implemented across the 
 
 ## 4. Verification Standard
 - Always run `python test_logic.py` before and after changes.
-- Zero regressions allowed across all 28 test suites.
+- Zero regressions allowed across all 41 test suites.

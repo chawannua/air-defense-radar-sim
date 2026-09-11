@@ -14,7 +14,7 @@
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
 ### ⚡ Current Release: `v1.4.0` (Main Menu, Spectator/Player Modes & Context-Aware AI)
-The official hotfix resolving the `VFXManager.add_shockwave()` crash triggered by the Tier 2 Tactical EMP Generator `[B]` discharge under heavy contact loads, plus complementary test suite expansion to 31/31.
+Introduces the cinematic Main Menu and Scene Architecture (`scenes.py`, `camera_director.py`), decoupled Spectator and Player simulation profiles (`profiles.py`), context-aware AI combat doctrine (closing-leaker Auto-CIWS, physical chaff, RF-gated EW ghost floods), expanded Philippines & Taiwan geodata theater, and comprehensive test suite expansion to 41/41.
 
 **Quick Links:**
 [Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.4.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (41/41)](test_logic.py)
@@ -36,8 +36,8 @@ The official hotfix resolving the `VFXManager.add_shockwave()` crash triggered b
 9. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 10. [Complete Tactical Keybindings](#complete-tactical-keybindings)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
-12. [Automated Testing (31/31 Test Suite)](#automated-testing-2828-test-suite)
-13. [Release History & Version Evolution (v1.0.0 → v1.3.0)](#release-history--version-evolution-v100--v120)
+12. [Automated Testing (41/41 Test Suite)](#automated-testing-4141-test-suite)
+13. [Release History & Version Evolution (v1.0.0 → v1.4.0)](#release-history--version-evolution-v100--v140)
 14. [Installation & Build Guide](#installation--build-guide)
 15. [Dependencies](#dependencies)
 16. [License & Acknowledgments](#license--acknowledgments)
@@ -517,9 +517,9 @@ The project is structured according to strict Object-Oriented Programming (OOP) 
 
 ---
 
-## Automated Testing (31/31 Test Suite)
+## Automated Testing (41/41 Test Suite)
 
-AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 28 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
+AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 41 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
 ```bash
 $ python test_logic.py
@@ -556,12 +556,22 @@ $ python test_logic.py
 [PASS] 26. Tier 2 Black Ops Experimental Arsenal Gating, Purchases & Mechanics
 [PASS] 27. AI Interceptor Prioritization & Standoff EW Suppression
 [PASS] 28. Anti-Jammer Electronic Counter-Countermeasures (ECCM Burn-Through [F], HOJ [H] 350km SAM, Passive ESM Triangulation)
-[PASS] 29. Thread-Safety RLock, Resolution Clamp & Event Ledger Memory Cap (v1.3.1 Hardening)
-[PASS] 30. MISSILE_LAUNCH Tracer Target Coordinate Synchronization
-[PASS] 31. VFXManager.add_shockwave() EMP Discharge Stability Under High Contact Load (v1.3.2 Hotfix)
+[PASS] 29. Controllable AWACS Operations & Sensor Fusion
+[PASS] 30. Tactical Audio Engine & Alarm Cooldown Logic
+[PASS] 31. Visual Effects Subsystem & EMP Shockwave Ring
+[PASS] 32. Simulation Profiles (Spectator vs Player)
+[PASS] 33. Cinematic Camera Director
+[PASS] 34. CommandCenter Profile-Driven Spawn & Weapon Autonomy
+[PASS] 35. Auto-CIWS Last-Ditch Leaker Discrimination
+[PASS] 36. Context-Derived Chaff / Evasion Countermeasures
+[PASS] 37. EW Ghost Flood Gated on Real Electronic-Warfare State
+[PASS] 38. DEFAULT_PROFILE Retains Command Input
+[PASS] 39. Spectator Cannot Reach IFF Re-Designation (Court-Martial Guard)
+[PASS] 40. Restart After Death Reachable in Both Modes
+[PASS] 41. Player-Mode Backup Fire Must Not Starve on a Distant Priority Threat
 
 ==================================================
-ALL 31 TEST MODULES PASSED (100% SUCCESS RATE)
+ALL 41 TEST MODULES PASSED (100% SUCCESS RATE)
 ```
 
 ---
@@ -581,19 +591,29 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.3.1`** to **`v1.3.2`** delivers the `VFXManager.add_shockwave()` crash hotfix triggered by Tactical EMP `[B]` discharge under heavy contact loads, and expands the test suite to 31/31.
 - The version increment from **`v1.3.2`** to **`v1.4.0`** introduces the cinematic Main Menu and scene system, strict Spectator/Player mode separation, context-aware skill triggers replacing RNG and blind-geometry firing, and expands map coverage to the Philippines and Taiwan (+57% east-west extent). Test suite expands to 41/41.
 
+### 🌟 Version 1.4.0 Feature Highlights
+- **Main Menu & Scene Architecture (`scenes.py`, `camera_director.py`):** State-driven scene manager featuring dark-tactical C2 aesthetics, phosphor green/amber scanlines, full keyboard/mouse navigation, and smoothstep-eased cinematic camera panning over RTAF airbases with cosine zoom breathing.
+- **Strict Simulation Profile Decoupling (`profiles.py`):** Immutable `SimulationProfile` definitions for Spectator (autonomous AI showcase at ~2.0× spawn pressure, unified command-input gate) and Player (balanced waves, human command trigger, backup-only auto-fire).
+- **Context-Aware Combat AI Overhauls:**
+  - *Auto-CIWS:* Replaced blind geometry firing with closing-leaker discrimination, transponder IFF awareness, EW ghost exclusion, outer-layer coordination, and threat-score prioritization capped at 2 targets/tick.
+  - *Physical Chaff Countermeasures:* Replaced static 25% RNG with dynamic `capability × range × salvo × ECCM` derivation and finite dispenser magazines; civil traffic carries zero countermeasures.
+  - *EW Ghost Flooding:* Replaced flat 40% rate with jammer strength and distance scaling; EMCON SILENT radar guarantees zero false track injection.
+- **Geodata Theater Expansion:** Registered sovereign boundary vectors for the Philippines (`phl.json`) and Taiwan (`twn.json`), expanding east-west operational span from 2,360 km to 3,716 km (+57%) with zoom floor lowered to 0.10.
+- **Critical Bug Hardening:** Fixed friendly Saab 340 AEW&C jammer misclassification, gated IFF re-designation against spectator court-martial, decoupled game-over restart from input gates, and eliminated player backup fire threat starvation.
+
 ### 🌟 Version 1.3.0 Feature Highlights
 - **Controllable AWACS Operations:** Fully interactive AWACS integration granting a 400 km look-down sensor horizon, dynamic right-click patrol station retasking, adjustable orbit radii (20–150 km), and instant Return-To-Base (RTB) commands.
 - **Procedural Audio Engine Overhaul:** Synthesized missile launch redesigned for deep resonant roars, DEFCON alarm deadlock fixed with a 10-second auto-cutoff, and dynamic brevity callouts via procedural generation.
 - **Input & Navigation Disambiguation:** Complete removal of ambiguous WASD panning—camera navigation is now strictly mapped to Arrow Keys. `[W]`, `[S]`, and `[D]` are exclusively reserved for tactical actions (AWACS, Salvo, Decoy).
 - **Test Matrix Expansion:** Formally updated test suite matrix expanded to 30/30 deterministic tests passing with 0 errors (100% green).
 
-| Capability Area | Release `v1.1.1` (Phase 3 Hardened) | Release `v1.2.0` (Black Ops & ECCM Suite) | Release `v1.3.0` (AWACS & Audio Overhaul) | Release `v1.3.2` (EMP Shockwave Hotfix) |
-|---|---|---|---|---|
-| **Geospatial Map Engine** | Fixed dashed ADIZ rendering bug (`dy` NameError) & added Civil Airport Hubs. | Formally locked and protected via `SYSTEM_BOUNDARIES.md` (100% zero-regression guarantee). | Integrated AWACS 400 km look-down radar bubble. | No change — protected asset. |
-| **Visual FX & UI Rendering** | Fixed VFX double offset culling; centered modals to screen viewport; restored 60 FPS. | Added ECCM cyan overdrive pencil beam, ESM-FIX diamond reticles, and HOJ tracking indicators. | HUD explicit controls display; disambiguated right-click target interaction. | Fixed `VFXManager.add_shockwave()` crash on EMP `[B]` discharge under high contact load. |
-| **Audio Engine** | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. | Added procedural synthesizers `synth_eccm_burn()` (AESA chirp) and `synth_hoj_lock()` (1850 Hz warble). | Synthesized missile roar redesigned, DEFCON alarm 10s auto-cutoff, brevity callouts. | No change. |
-| **Combat & Asset Mechanics** | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. | Implemented Tier 2 Black Ops Arsenal (5 upgrades), EMP shockwave `[B]`, Burn-Through `[F]`, HOJ `[H]`, and AWACS ESM cross-fix. | Interactive AWACS orbit retask `[Right-Click]`, orbit radius `[+/-]`, and `[R]` RTB commands. | EMP shockwave `[B]` discharge stabilized — no longer crashes with ≥10 active contacts. |
-| **Automated Verification** | 25/25 Test Suite + 2,000-frame headless fuzz monkey test. | 28/28 Automated Test Suite passing with 0 errors (100% green). | **30/30 Automated Test Suite** passing with 0 errors (100% green). | **31/31 Automated Test Suite** passing with 0 errors — Test 31 covers `add_shockwave()` stability. |
+| Capability Area | Release `v1.1.1` (Phase 3 Hardened) | Release `v1.2.0` (Black Ops & ECCM Suite) | Release `v1.3.0` (AWACS & Audio Overhaul) | Release `v1.3.2` (EMP Shockwave Hotfix) | Release `v1.4.0` (Main Menu & Context-Aware AI) |
+|---|---|---|---|---|---|
+| **Geospatial Map Engine** | Fixed dashed ADIZ rendering bug (`dy` NameError) & added Civil Airport Hubs. | Formally locked and protected via `SYSTEM_BOUNDARIES.md` (100% zero-regression guarantee). | Integrated AWACS 400 km look-down radar bubble. | No change — protected asset. | Registered `phl.json` & `twn.json` expanding theater span to 3,716 km (+57%); zoom floor lowered to 0.10. |
+| **Visual FX & UI Rendering** | Fixed VFX double offset culling; centered modals to screen viewport; restored 60 FPS. | Added ECCM cyan overdrive pencil beam, ESM-FIX diamond reticles, and HOJ tracking indicators. | HUD explicit controls display; disambiguated right-click target interaction. | Fixed `VFXManager.add_shockwave()` crash on EMP `[B]` discharge under high contact load. | Cinematic Main Menu (`scenes.py`), smoothstep camera director (`camera_director.py`), phosphor scanline CRT overlays. |
+| **Audio Engine** | Added 3ms attack ramp eliminating DC step pops; C-contiguous buffer enforcement. | Added procedural synthesizers `synth_eccm_burn()` (AESA chirp) and `synth_hoj_lock()` (1850 Hz warble). | Synthesized missile roar redesigned, DEFCON alarm 10s auto-cutoff, brevity callouts. | No change. | Seamless audio transition between menu and combat; debounced alarm callouts. |
+| **Combat & Asset Mechanics** | Fixed CIWS manual fire execution; resolved AWACS/CAP pool recovery leaks; ARM momentum impact. | Implemented Tier 2 Black Ops Arsenal (5 upgrades), EMP shockwave `[B]`, Burn-Through `[F]`, HOJ `[H]`, and AWACS ESM cross-fix. | Interactive AWACS orbit retask `[Right-Click]`, orbit radius `[+/-]`, and `[R]` RTB commands. | EMP shockwave `[B]` discharge stabilized — no longer crashes with ≥10 active contacts. | Decoupled Spectator/Player profiles; leaker-prioritized Auto-CIWS; physical chaff; RF-gated EW floods; starvation-free backup fire. |
+| **Automated Verification** | 25/25 Test Suite + 2,000-frame headless fuzz monkey test. | 28/28 Automated Test Suite passing with 0 errors (100% green). | **30/30 Automated Test Suite** passing with 0 errors (100% green). | **31/31 Automated Test Suite** passing with 0 errors — Test 31 covers `add_shockwave()` stability. | **41/41 Automated Test Suite** passing with 0 errors (100% green) — Tests 32–41 cover profiles, AI doctrine & anti-starvation locks. |
 
 ---
 
@@ -637,9 +657,10 @@ pip install pyinstaller
 
 python -m PyInstaller --onefile --noconsole --name "AEGIS_Radar" `
   --add-data "tha.json;." --add-data "mmr.json;." --add-data "lao.json;." `
-  --add-data "khm.json;." --add-data "mys.json;." --add-data "vnm.json;." `
-  --add-data "chn.json;." --add-data "idn.json;." --add-data "phl.json;." `
-  --add-data "twn.json;." --add-data "borders.json;." --add-data "coastlines.json;." `
+  --add-data "khm.json;." --add-data "mys.json;." --add-data "sgp.json;." `
+  --add-data "vnm.json;." --add-data "chn.json;." --add-data "idn.json;." `
+  --add-data "phl.json;." --add-data "twn.json;." --add-data "borders.json;." `
+  --add-data "coastlines.json;." `
   main.py
 ```
 
