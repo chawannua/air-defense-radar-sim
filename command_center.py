@@ -57,6 +57,9 @@ class CommandCenter:
         self.reload_timers = {"THAAD": 0, "SAM": 0, "CIWS": 0} 
         self.awacs_pool = 2
         self.cap_pool = 6
+        # tick stamps per threat type, for the rolling per-hour ceiling
+        self._threat_log = {}
+        self._cap_station_idx = 0
         
         # --- Logistics 60s System ---
         self.idle_timers = {wpn: 0 for wpn in self.max_ammo}
@@ -539,26 +542,34 @@ class CommandCenter:
         # --- escalation phases ---
         tick = self.tick_count
         
+        # Rates come from GameConfig.THREAT_PHASES so the threat model is
+        # tunable in one place instead of buried in this function.
         if tick < 120:
             phase = "PEACETIME"
-            hostile_chance = 0.03          # 3% chance per tick of any contact
-            civilian_chance = 0.35         # lots of airliners
+            cfg = GameConfig.THREAT_PHASES["PEACETIME"]
+            hostile_chance = cfg["hostile_per_tick"]
+            civilian_chance = cfg["civilian_per_tick"]
+            civilian_ratio = cfg["civilian_ratio"]
             wave_enabled = False
-            civilian_ratio = 0.90          # 90% of Aircraft spawns are friendly
         elif tick < 360:
             phase = "TENSIONS"
+            cfg = GameConfig.THREAT_PHASES["TENSIONS"]
             progress = (tick - 120) / 240.0  # 0.0 to 1.0 across this phase
-            hostile_chance = 0.08 + progress * 0.15
-            civilian_chance = 0.30 - progress * 0.20
+            hostile_chance = cfg["hostile_per_tick"] + (
+                cfg["hostile_per_tick_end"] - cfg["hostile_per_tick"]) * progress
+            civilian_chance = cfg["civilian_per_tick"] + (
+                cfg["civilian_per_tick_end"] - cfg["civilian_per_tick"]) * progress
+            civilian_ratio = cfg["civilian_ratio"] + (
+                cfg["civilian_ratio_end"] - cfg["civilian_ratio"]) * progress
             wave_enabled = progress > 0.5  # waves start halfway through tensions
-            civilian_ratio = 0.70 - progress * 0.40  # 70% down to 30%
         else:
             phase = "WARTIME"
+            cfg = GameConfig.THREAT_PHASES["WARTIME"]
             escalation = min(2.0, 1.0 + (tick - 360) / 1500.0)
-            hostile_chance = 0.25 * escalation
-            civilian_chance = 0.03         # almost no civvies, airspace is closed
+            hostile_chance = cfg["hostile_per_tick"] * escalation
+            civilian_chance = cfg["civilian_per_tick"]
+            civilian_ratio = cfg["civilian_ratio"]
             wave_enabled = True
-            civilian_ratio = 0.05          # 5% chance a contact is civilian straggler
         
         # log phase transitions
         if tick == 120:
@@ -597,40 +608,22 @@ class CommandCenter:
             elif wave_theme == "CRUISE_VOLLEY":
                 self.add_log("\033[41;97m[TACTICAL WARNING] TERRAIN-MASKED CRUISE MISSILE VOLLEY DETECTED!\033[0m")
             
+            THEME_POOLS = {
+                "BALLISTIC_RAIN": {"ICBM": 10, "TBM": 90},
+                "DRONE_SWARM":    {"DRONE": 100},
+                "FIGHTER_STRIKE": {"FIGHTER": 100},
+                "SEAD_STRIKE":    {"ARM": 100, "CRUISE": 1},
+                "CRUISE_VOLLEY":  {"CRUISE": 100},
+            }
+            pool = THEME_POOLS.get(wave_theme, dict(GameConfig.THREAT_WEIGHTS))
             for _ in range(wave_size):
-                self.track_counter += 1
-                
-                if wave_theme == "BALLISTIC_RAIN":
-                    threat_type = random.choices(["ICBM", "TBM"], weights=[10, 90], k=1)[0]
-                elif wave_theme == "DRONE_SWARM":
-                    threat_type = "DRONE"
-                elif wave_theme == "FIGHTER_STRIKE":
-                    threat_type = "FIGHTER"
-                elif wave_theme == "SEAD_STRIKE":
-                    threat_type = "ARM" if self.emcon_mode != "SILENT" else "CRUISE"
-                elif wave_theme == "CRUISE_VOLLEY":
-                    threat_type = "CRUISE"
-                else: 
-                    threat_type = random.choices(
-                        ["ICBM", "TBM", "DRONE", "FIGHTER", "HELI", "ARM", "CRUISE"], 
-                        weights=[5, 15, 20, 25, 10, 15 if self.emcon_mode != "SILENT" else 0, 10], k=1)[0]
-                
-                if threat_type == "ICBM": 
-                    new_contact = ICBM(self.track_counter); new_contact.detected_by = "SPACE-COM"
-                elif threat_type == "TBM": 
-                    new_contact = TacticalBM(self.track_counter); new_contact.detected_by = "GND-EWR"
-                elif threat_type == "DRONE": 
-                    new_contact = Drone(self.track_counter); new_contact.detected_by = "AWACS"
-                elif threat_type == "HELI": 
-                    new_contact = Helicopter(self.track_counter); new_contact.scenario = "HOSTILE_HELI"; new_contact.detected_by = "GND-RADAR"
-                elif threat_type == "ARM":
-                    new_contact = AntiRadiationMissile(self.track_counter); new_contact.detected_by = "GND-RADAR"
-                elif threat_type == "CRUISE":
-                    new_contact = CruiseMissile(self.track_counter); new_contact.detected_by = "GND-RADAR"
-                else: 
-                    new_contact = Aircraft(self.track_counter, friendly_weight=0); new_contact.scenario = "HOSTILE_FIGHTER"; new_contact.detected_by = "GND-RADAR"
-                
-                self.unseen_contacts.append(new_contact)
+                # Every wave unit passes the same hourly ceiling as a lone
+                # spawn, so a ballistic rain thins itself out instead of
+                # dumping a dozen launches on the scope.
+                threat_type = self.pick_threat(pool)
+                if threat_type is None:
+                    break
+                self.unseen_contacts.append(self.spawn_threat(threat_type))
         
         # civilian traffic (airliners passing through)
         if random.random() < civilian_chance:
@@ -644,27 +637,17 @@ class CommandCenter:
         # Also scaled by the active SimulationProfile's wave_chance knob (Spectator: more pressure, Player: less).
         effective_hostile_chance = hostile_chance * (0.75 if self.emcon_mode == "SILENT" else 1.0) * self._wave_chance_scale
         if random.random() < effective_hostile_chance:
-            self.track_counter += 1
-            prob = random.random()
-            if prob < 0.04: 
-                new_contact = ICBM(self.track_counter); new_contact.detected_by = "SPACE-COM"
-            elif prob < 0.10: 
-                new_contact = TacticalBM(self.track_counter); new_contact.detected_by = "GND-EWR"
-            elif prob < 0.18:
-                # Anti-Radiation Missiles only target emitting ground radar
-                if self.emcon_mode != "SILENT":
-                    new_contact = AntiRadiationMissile(self.track_counter); new_contact.detected_by = "GND-RADAR"
-                else:
-                    new_contact = CruiseMissile(self.track_counter); new_contact.detected_by = "GND-RADAR"
-            elif prob < 0.25:
-                new_contact = CruiseMissile(self.track_counter); new_contact.detected_by = "GND-RADAR"
-            elif prob < 0.35: 
-                new_contact = Drone(self.track_counter); new_contact.detected_by = "AWACS"
-            elif prob < 0.40: 
-                new_contact = Helicopter(self.track_counter); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"])
-            else: 
-                new_contact = Aircraft(self.track_counter, friendly_weight=int(civilian_ratio * 100)); new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"])
-            self.unseen_contacts.append(new_contact)
+            threat_type = self.pick_threat()
+            if threat_type == "FIGHTER":
+                # A fighter-shaped contact may still resolve as a civilian
+                # straggler in the earlier phases; civilian_ratio decides.
+                self.track_counter += 1
+                new_contact = Aircraft(self.track_counter,
+                                       friendly_weight=int(civilian_ratio * 100))
+                new_contact.detected_by = random.choice(["GND-RADAR", "AWACS"])
+                self.unseen_contacts.append(new_contact)
+            elif threat_type is not None:
+                self.unseen_contacts.append(self.spawn_threat(threat_type))
             
         # False Alarm (Clutter/Ghosts) system: only detected by active ground radar
         if self.emcon_mode != "SILENT" and random.random() < 0.05 * self._wave_chance_scale:
@@ -802,17 +785,25 @@ class CommandCenter:
                 self.add_log(f"\033[94m[AIRBASE] {c.id_code} landed safely and refueling.\033[0m")
                 
         flying_caps = [c for c in active_caps if c.active]
-        # Maintain 2 active CAP stations (North: Wing 4, South: Wing 7)
-        if len(flying_caps) < 2 and self.cap_pool > 0:
-            if self.tick_count % 5 == 0: # Stagger launches by 5 seconds
+        # Rotate CAP across the stations in GameConfig.CAP_STATIONS so every
+        # listed wing flies, each launching from its own field with its own
+        # aircraft, instead of two hardcoded wings.
+        stations = GameConfig.CAP_STATIONS
+        if stations and len(flying_caps) < GameConfig.CAP_CONCURRENT and self.cap_pool > 0:
+            if self.tick_count % 5 == 0:  # Stagger launches by 5 seconds
+                manned = {getattr(c, "wing", None) for c in flying_caps}
+                choices = [st for st in stations if st[0] not in manned] or list(stations)
+                station = choices[self._cap_station_idx % len(choices)]
+                self._cap_station_idx += 1
+                wing, orbit_x, orbit_y, station_name = station
+                fighter = GameConfig.wing_fighter(wing)
+                field = next((n for _x, _y, n in GameConfig.AIRBASES
+                              if n.startswith("Wing %d (" % wing)), "Wing %d" % wing)
                 self.track_counter += 1
-                is_north = len(flying_caps) == 0 or flying_caps[0].home_y > -300
-                if is_north:
-                    cap = CAPFighter(self.track_counter, 4, 150.0, 300.0, "F-16A/B Block 15 (CAP)")
-                    self.add_log("\033[94m[AIRBASE] Wing 4 (Takhli) launching F-16 for Northern CAP.\033[0m")
-                else:
-                    cap = CAPFighter(self.track_counter, 7, 50.0, -350.0, "JAS-39 Gripen (CAP)")
-                    self.add_log("\033[94m[AIRBASE] Wing 7 (Surat Thani) launching Gripen for Southern CAP.\033[0m")
+                cap = CAPFighter(self.track_counter, wing, orbit_x, orbit_y,
+                                 "%s (CAP)" % fighter)
+                self.add_log("\033[94m[AIRBASE] %s launching %s for %s.\033[0m"
+                             % (field, fighter, station_name))
                 self.contacts.append(cap)
                 self.cap_pool -= 1
                 
@@ -1042,6 +1033,64 @@ class CommandCenter:
             self.add_log(f"\033[95m[MANUAL OVERRIDE]\033[0m SCRAMBLED {display_wpn}{salvo_suffix}{origin_str} intercepting {target.id_code}")
         else:
             self.add_log(f"\033[91m[WARNING]\033[0m {wpn} Out of Ammo!")
+
+    def threat_allowed(self, kind):
+        """Rolling one-hour ceiling per threat type.
+
+        Returns True and records the spawn, or False when the type has already
+        used its GameConfig.THREAT_MAX_PER_HOUR budget for the last hour of
+        scope time. Wave spawns go through here too, which is what stops a
+        ballistic rain putting five TBM launches on the scope inside an hour.
+        """
+        cap = GameConfig.THREAT_MAX_PER_HOUR.get(kind)
+        if cap is None:
+            return True
+        cutoff = self.tick_count - GameConfig.THREAT_WINDOW_TICKS
+        stamps = [t for t in self._threat_log.get(kind, []) if t > cutoff]
+        if len(stamps) >= cap:
+            self._threat_log[kind] = stamps
+            return False
+        stamps.append(self.tick_count)
+        self._threat_log[kind] = stamps
+        return True
+
+    def pick_threat(self, weights=None):
+        """Choose a threat type by rarity weight, respecting the hourly cap.
+
+        Returns None when every candidate is capped out. The caller treats that
+        as a quiet sky rather than substituting a different threat.
+        """
+        pool = dict(weights or GameConfig.THREAT_WEIGHTS)
+        if self.emcon_mode == "SILENT":
+            pool.pop("ARM", None)  # an ARM cannot home on a dark radar
+        while pool:
+            kinds = list(pool.keys())
+            kind = random.choices(kinds, weights=[pool[k] for k in kinds], k=1)[0]
+            if self.threat_allowed(kind):
+                return kind
+            pool.pop(kind)
+        return None
+
+    def spawn_threat(self, kind):
+        """Build one contact of the named type with its detection source."""
+        self.track_counter += 1
+        if kind == "ICBM":
+            c = ICBM(self.track_counter); c.detected_by = "SPACE-COM"
+        elif kind == "TBM":
+            c = TacticalBM(self.track_counter); c.detected_by = "GND-EWR"
+        elif kind == "DRONE":
+            c = Drone(self.track_counter); c.detected_by = "AWACS"
+        elif kind == "HELI":
+            c = Helicopter(self.track_counter); c.scenario = "HOSTILE_HELI"
+            c.detected_by = "GND-RADAR"
+        elif kind == "ARM":
+            c = AntiRadiationMissile(self.track_counter); c.detected_by = "GND-RADAR"
+        elif kind == "CRUISE":
+            c = CruiseMissile(self.track_counter); c.detected_by = "GND-RADAR"
+        else:
+            c = Aircraft(self.track_counter, friendly_weight=0)
+            c.scenario = "HOSTILE_FIGHTER"; c.detected_by = "GND-RADAR"
+        return c
 
     def manual_spawn(self, target_type):
         self.track_counter += 1

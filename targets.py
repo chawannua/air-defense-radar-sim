@@ -497,15 +497,12 @@ class CAPFighter(AirContact):
         self.fuel = 100.0
         self.state = "TRANSIT_TO_STATION"
         
-        # Exact Home Base coordinates based on Wing
-        if wing == 1:
-            self.home_x, self.home_y = 170.0, -130.0 # Korat approx
-        elif wing == 4:
-            self.home_x, self.home_y = -18.0, -167.0 # Takhli approx
-        elif wing == 21:
-            self.home_x, self.home_y = 470.0, -165.0 # Ubon approx
-        else:
-            self.home_x, self.home_y = -148.0, -511.0 # Surat Thani
+        # Home field comes from GameConfig.AIRBASES, the same table the map
+        # draws. This used to be a hardcoded copy with the latitude sign
+        # flipped, so Korat, Takhli and Ubon - all north of Bangkok - launched
+        # their CAP hundreds of km to the south.
+        self.wing = wing
+        self.home_x, self.home_y = GameConfig.wing_home(wing)
             
         self.orbit_center_x = orbit_x
         self.orbit_center_y = orbit_y

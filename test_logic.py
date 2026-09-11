@@ -2145,6 +2145,99 @@ check(68.0 not in _cl44,
       f"a half-degree straight run at the data edge must not be believed as a "
       f"cut (detected meridians: {sorted(_cl44)})")
 
+# 45. Threat rarity, CAP home fields, zoom anchoring
+#
+# Three gameplay defects, all invisible to the rest of the suite:
+#   - spawn rates were hardcoded so hot that ~90 ballistic launches an hour
+#     reached the scope
+#   - CAPFighter carried its own copy of the airbase coordinates with the
+#     latitude sign flipped, launching northern wings south of Bangkok
+#   - zoom scaled about the map origin, so panning to Japan and zooming
+#     dragged the view back to Bangkok
+print("\n=== 45. Threat Rarity, CAP Fields & Zoom Anchoring ===")
+import collections as _coll45
+from command_center import CommandCenter as _CC45
+from profiles import DEFAULT_PROFILE as _PROF45
+from targets import CAPFighter as _CAP45, ICBM as _ICBM45, TacticalBM as _TBM45
+from targets import AntiRadiationMissile as _ARM45, CruiseMissile as _CRZ45
+from targets import Drone as _DRN45, Helicopter as _HEL45, Aircraft as _AC45
+
+# --- rates live in config, not buried in the spawn function ---
+for _k45 in ("THREAT_PHASES", "THREAT_WEIGHTS", "THREAT_MAX_PER_HOUR",
+             "THREAT_WINDOW_TICKS", "CAP_STATIONS"):
+    check(hasattr(GameConfig, _k45), f"GameConfig must expose {_k45}")
+
+# --- the hourly ceiling must actually bind, over a full simulated hour ---
+random.seed(1234)
+_cmd45 = _CC45(profile=_PROF45)
+_counts45 = _coll45.Counter()
+_KINDS45 = [(_ICBM45, "ICBM"), (_TBM45, "TBM"), (_ARM45, "ARM"),
+            (_CRZ45, "CRUISE"), (_DRN45, "DRONE"), (_HEL45, "HELI")]
+for _t45 in range(1, GameConfig.THREAT_WINDOW_TICKS + 1):
+    _cmd45.tick_count = _t45
+    _n45 = len(_cmd45.unseen_contacts)
+    _cmd45.detect_airspace()
+    for _c45 in _cmd45.unseen_contacts[_n45:]:
+        for _cls45, _name45 in _KINDS45:
+            if isinstance(_c45, _cls45):
+                _counts45[_name45] += 1
+                break
+    _cmd45.unseen_contacts = []
+
+for _kind45, _cap45 in sorted(GameConfig.THREAT_MAX_PER_HOUR.items()):
+    _got45 = _counts45.get(_kind45, 0)
+    check(_got45 <= _cap45,
+          f"{_kind45} must respect its {_cap45}/hour ceiling (spawned {_got45})")
+
+_ball45 = _counts45.get("ICBM", 0) + _counts45.get("TBM", 0)
+check(_ball45 <= 5,
+      f"ballistic launches must stay rare: {_ball45} in one hour, and the "
+      f"player reported 5/hour as already unrealistic (was ~90 before the fix)")
+
+# --- CAP fighters launch from their own field ---
+_bad45 = []
+for _wing45, _ox45, _oy45, _st45 in GameConfig.CAP_STATIONS:
+    _cap_obj45 = _CAP45(9999, _wing45, _ox45, _oy45, "test")
+    if (_cap_obj45.home_x, _cap_obj45.home_y) != GameConfig.wing_home(_wing45):
+        _bad45.append(_wing45)
+check(not _bad45,
+      f"every CAP station must spawn at its own AIRBASES field (wrong: {_bad45})")
+
+# Korat, Takhli and Ubon are north of Bangkok. The old hardcoded table put all
+# three at negative y, several hundred km south of their real fields.
+for _wing45 in (1, 4, 21):
+    _x45, _y45 = GameConfig.wing_home(_wing45)
+    check(_y45 > 0,
+          f"Wing {_wing45} must sit north of Bangkok (got y={_y45:+.1f} km)")
+
+# --- more than the original two wings fly CAP ---
+random.seed(7)
+_cmd45b = _CC45(profile=_PROF45)
+_flown45 = set()
+for _t45 in range(0, 1200, 5):
+    _cmd45b.tick_count = _t45
+    _cmd45b.process_reloads()
+    for _c45 in list(_cmd45b.contacts):
+        if isinstance(_c45, _CAP45):
+            _flown45.add(_c45.wing)
+            _c45.active = False
+            _cmd45b.contacts.remove(_c45)
+            _cmd45b.cap_pool += 1
+check(len(_flown45) >= 3,
+      f"CAP must rotate across wings, not just two hardcoded ones (flew: {sorted(_flown45)})")
+
+# --- zoom must move the camera, not just the scale ---
+# Read it out of the source the same way the zoom-floor check does: the wheel
+# handler has to compensate the camera, or zoom magnifies about the map origin.
+_ui45 = open(os.path.join(_here42, "radar_ui.py"), encoding="utf-8").read()
+_wheel45 = _ui45[_ui45.index("pygame.MOUSEWHEEL"):]
+_wheel45 = _wheel45[:_wheel45.index("if event.type", 40)]
+check("camera_x =" in _wheel45 and "camera_y =" in _wheel45,
+      "the mouse-wheel handler must reposition the camera, otherwise zoom "
+      "scales about the map origin and drags the view back to Bangkok")
+check("get_pos()" in _wheel45,
+      "zoom must anchor on the cursor position")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")
