@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-09-12
+
+### Added
+- **Windows version resource (`version_info.txt`)**: the executable's Details tab was entirely blank. It now reports ProductName, FileVersion `1.5.1.0`, CompanyName, FileDescription and LegalCopyright.
+- **Application icon (`aegis.ico`)**: a PPI radar-scope icon at 256/128/64/48/32/16 px, drawn from the simulation's own phosphor palette. The build previously shipped PyInstaller's default icon.
+- **`THIRD_PARTY_NOTICES.md`**: attribution for the 78 native libraries bundled in the executable - pygame (LGPL-2.1), NumPy (BSD-3-Clause), the SDL2 family (zlib), FreeType (FTL), libpng, libjpeg, libogg/libopus, libwebp, PortMidi - plus PyInstaller's bootloader exception and the public-domain Natural Earth data. FreeType, libjpeg, libpng and the BSD-3 components require their notices be retained in redistributions; this was previously not done.
+  - Includes the LGPL-2.1 section 6 relinking notice, offering the object files needed to relink against a modified pygame.
+
+### Changed
+- **`LICENSE` and `THIRD_PARTY_NOTICES.md` now ship inside the executable.** The spec previously collected `*.json` only, so anyone downloading just the binary received no licence terms at all - which undercuts enforcing them.
+- **UPX compression disabled.** UPX-packed entry points are a well-known antivirus heuristic, and the saved megabytes are not worth the false-positive rate on an unsigned binary.
+
+### Known limitation
+The executable is **not code-signed**, so Windows SmartScreen will warn on first run. Signing requires a purchased certificate. Separately, a PyInstaller bundle can be unpacked with `pyinstxtractor` and the bytecode decompiled, so the proprietary licence adopted in v1.5.0 is not yet backed by any technical measure.
+
 ## [1.5.0] - 2026-09-12
 
 ### Changed
