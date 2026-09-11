@@ -1,26 +1,29 @@
+# Byte-compiled / cache
 __pycache__/
 *.py[cod]
+.pytest_cache/
+
+# Build artefacts
 build/
 dist/
 *.spec
 *.exe
 *.bin
+
+# Portable Python build environment (176MB, not part of the source)
+work/
+
+# Logs
 *.log
 full_log.txt
 error.log
+
+# Environments
 .env
 .venv
 env/
 venv/
-.pytest_cache/
+
+# OS cruft
 .DS_Store
 Thumbs.db
-dist/
-build/
-*.spec
-AEGIS_Radar.exe
-full_log.txt
-*.log
-__pycache__/
-*.pyc
-.env
