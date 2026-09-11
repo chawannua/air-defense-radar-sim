@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-09-12
+
+### Fixed
+- **Ballistic launches were roughly ninety an hour.** The spawn rates lived inside `detect_airspace()` as literals, and one tick is one second. Wartime ran a `0.25-0.50` per-tick hostile chance with 10% of those ballistic, so the scope saw about **90 ballistic launches every hour**, and a `BALLISTIC_RAIN` wave added 5-15 more in a single burst. The threat model now lives in `GameConfig`: `THREAT_PHASES` holds the per-phase rates, `THREAT_WEIGHTS` the relative rarity of each type, and `THREAT_MAX_PER_HOUR` a rolling one-hour ceiling that wave spawns obey too. Measured by driving `detect_airspace()` through a full simulated hour:
+
+| Threat | Ceiling / hour | Spawned in 1 h |
+|---|---|---|
+| ICBM | 1 | **1** |
+| TBM | 3 | **3** |
+| ARM | 8 | **8** |
+| CRUISE | 12 | **12** |
+| HELI | 12 | **12** |
+| DRONE | 40 | **40** |
+| FIGHTER | 60 | **60** |
+
+  Ballistic total: **4 an hour against ~90 before**. Every type reaches its ceiling, so the ceilings - not the underlying rates - are what the player feels; they are one dict in `config.py` and can be lowered without touching spawn code.
+
+- **CAP fighters launched from the wrong airfields.** `CAPFighter` carried its own copy of the airbase coordinates with the latitude sign flipped, so Korat, Takhli and Ubon - all north of Bangkok - put their fighters several hundred km *south* of their real fields, over the Gulf. Home position now reads `GameConfig.wing_home()`, which reads `AIRBASES`, the same table the map draws from, so the two cannot drift apart. Verified over **600 live CAP launches** across wings 4, 7, 21 and 41: zero at a wrong field.
+
+- **Zooming dragged the view back to Bangkok.** Screen position is `CX + x_km * zoom` where `CX` is Bangkok, so changing zoom alone magnifies about Bangkok. Panning out to Japan and scrolling slid the view home. The mouse-wheel handler now compensates the camera so the world point under the cursor stays under the cursor. Measured across a real `0.80 -> 1.25` wheel event with the view panned away: drift **0.21 km**.
+
+### Changed
+- **CAP rotates across four wings instead of two.** Only wings 4 and 7 ever flew. Stations are now listed in `GameConfig.CAP_STATIONS` - Northern (Wing 4, Takhli), Southern (Wing 7, Surat Thani), Eastern (Wing 21, Ubon) and Northwestern (Wing 41, Chiang Mai) - and each wing flies the aircraft `WING_AIRCRAFT` lists for it rather than a shared default.
+
+### Added
+- Test group 45 covers all three defects: the hourly ceilings over a full simulated hour, every CAP station spawning at its own `AIRBASES` field with northern wings north of Bangkok, CAP rotation across more than two wings, and the wheel handler repositioning the camera. Suite **44 -> 45 groups**.
+
 ## [1.7.0] - 2026-09-12
 
 ### Fixed
