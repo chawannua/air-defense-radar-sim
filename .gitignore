@@ -7,6 +7,10 @@ __pycache__/
 build/
 dist/
 *.spec
+# ...but the two hand-maintained deployment specs ARE build configuration
+# and must be reproducible from a clean clone.
+!AEGIS_Radar.spec
+!AEGIS_Radar_debug.spec
 *.exe
 *.bin
 
