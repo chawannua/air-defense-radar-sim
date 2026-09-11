@@ -13,11 +13,11 @@
 ## 📡 AEGIS Air Defense Radar Simulator
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
-### ⚡ Current Release: `v1.6.0` (Uniform Theatre Detail)
-Expands the tactical theatre from 11 to 20 registered regions — adding India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, South Korea and North Korea as Natural Earth 1:10m sovereign outlines — growing operational span from 3,716 × 2,930 km to 6,788 × 5,806 km (+83% east-west, +98% north-south). Geodata registration only; the protected map engine gained nine loader entries and no rendering logic was altered. Test suite expansion to 42/42.
+### ⚡ Current Release: `v1.7.0` (Japan & The Frame Budget)
+Removes the straight edge that cut across the map. It was never a map border: polygons straddling the clip frame were returned *closed along the cut*, so the frame itself was drawn as coastline — `chn.json` alone carried **~3,000 km** of fake straight border. Cuts are now detected from the geometry and trimmed. Japan joins as the **21st region**, whole from the Ryukyus to eastern Hokkaido, reversing the v1.4.1 exclusion; the theatre grows to **8,399 × 6,294 km**. Labels are tiered, zoom-gated and collision-culled instead of smearing when zoomed out. Worst-case uncached render improves **23.4 → 17.9 ms** despite 39% more geometry. Test suite expansion to 44/44.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.6.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (42/42)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.7.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (44/44)](test_logic.py)
 
 </div>
 
@@ -36,8 +36,8 @@ Expands the tactical theatre from 11 to 20 registered regions — adding India, 
 9. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 10. [Complete Tactical Keybindings (Menu & Combat)](#complete-tactical-keybindings-menu--combat)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
-12. [Automated Testing (42/42 Test Suite)](#automated-testing-4242-test-suite)
-13. [Release History & Version Evolution (v1.0.0 → v1.6.0)](#release-history--version-evolution-v100--v160)
+12. [Automated Testing (44/44 Test Suite)](#automated-testing-4444-test-suite)
+13. [Release History & Version Evolution (v1.0.0 → v1.7.0)](#release-history--version-evolution-v100--v170)
 14. [Version Control, Release Architecture & Repository Governance](#version-control-release-architecture--repository-governance)
 15. [Installation & Build Guide](#installation--build-guide)
 16. [Dependencies](#dependencies)
@@ -102,9 +102,14 @@ Expands the tactical theatre from 11 to 20 registered regions — adding India, 
 
 ## System Boundaries & Modification Governance
 
-> This repository enforces strict modification boundaries, documented in [`AGENTS.md`](AGENTS.md):
-> - **Strictly Protected (Immutable)**: `map_manager.py` (v1.1.0 Natural Earth map geometry), all GeoJSON maps (`tha.json`, `coastlines.json`, etc.), and `missions.py`.
-> - **Permitted**: `command_center.py`, `targets.py`, `radar_ui.py`, `sound_engine.py`, `test_logic.py`, `README.md`, `CHANGELOG.md`.
+> This repository enforces modification boundaries. **[`AGENTS.md`](AGENTS.md) is the single
+> source of truth for them** — deliberately not restated in full here, because a second copy of
+> these rules previously drifted and ended up protecting files that no longer existed.
+>
+> In outline: `map_manager.py`, the GeoJSON maps, `missions.py` and the PyInstaller specs are
+> **protected — not immutable**. They may be changed only by an explicit decision recorded in the
+> commit message, stating why no alternative existed. Everything else is freely editable, with
+> `test_logic.py` append-only. Read [`AGENTS.md`](AGENTS.md) for the authoritative list.
 
 ## Real-World Tactical Map Engine (`map_manager.py`)
 
@@ -610,7 +615,7 @@ air-defense-radar-sim/
 
 ---
 
-## Automated Testing (42/42 Test Suite)
+## Automated Testing (44/44 Test Suite)
 
 AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 42 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
@@ -669,13 +674,13 @@ ALL 41 TEST MODULES PASSED (100% SUCCESS RATE)
 
 ---
 
-## Release History & Version Evolution (v1.0.0 → v1.6.0)
+## Release History & Version Evolution (v1.0.0 → v1.7.0)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0` ➔ `v1.4.1` ➔ `v1.5.0` ➔ `v1.5.1` ➔ `v1.6.0`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0` ➔ `v1.4.1` ➔ `v1.5.0` ➔ `v1.5.1` ➔ `v1.6.0` ➔ `v1.7.0`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
@@ -689,6 +694,16 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.4.1`** to **`v1.5.0`** changes the distribution licence from MIT to a proprietary source-available licence. No simulation behaviour changed; the MINOR bump marks the change in what recipients may do with the software. Releases up to v1.4.1 remain available under MIT.
 - The version increment from **`v1.5.0`** to **`v1.5.1`** hardens distribution packaging: Windows version resource, a real application icon, `THIRD_PARTY_NOTICES.md` for the 78 bundled native libraries, licence files shipped inside the executable, and UPX disabled to reduce antivirus false positives. No simulation behaviour changed.
 - The version increment from **`v1.5.1`** to **`v1.6.0`** brings the entire theatre up to the map detail of Thailand itself. Coastlines grow 8,338 to 27,639 points, borders 2,873 to 7,785, the Philippines 110 to 3,608 and Taiwan 9 to 256, and five country polygons clipped to the original Southeast Asia box are re-cut on the shared theatre frame, removing the rectangle that cut across the map. Eleven regions gain names; zoom floor 0.10 to 0.09.
+- The version increment from **`v1.6.0`** to **`v1.7.0`** finishes what v1.6.0 started. Terminating every layer on one shared frame did not make the straight edge read as a map border — the clipper returns straddling polygons closed along the cut, so the frame was being drawn as coastline. Cuts are now detected from the geometry and trimmed, Japan is reinstated as the 21st region on a window wide enough to contain it whole, labels gain zoom tiers and collision culling, and the render is brought back inside its frame budget on 39% more geometry. Test suite expands to 44/44.
+
+### 🌟 Version 1.7.0 Feature Highlights
+- **The Straight Edge Was Never A Border:** v1.6.0 reasoned that terminating every layer on one clip frame would make the edge "read as the map border rather than a stray box". It did not. A polygon straddling the frame comes back *closed along the cut*, so the frame was drawn as coastline — `chn.json` alone carrying **36.25° (~3,000 km)** of perfectly straight fake border across northern China. Longest surviving axis-aligned run: **~3,000 km ➔ 19 km**.
+- **Diagnosis Corrected:** Korea and the eastern archipelagos looked like crude polygons because they were pressed against that frame, *not* because they lacked detail. Measured medians: Korea **2.87 km**, Philippines **3.90 km**, Thailand **4.45 km** per segment — the Philippines was already finer than Thailand.
+- **Cuts Detected, Not Assumed:** A cut is a perfectly axis-aligned run of vertices at the extreme edge of the data, which real coastline never is. The Indonesia–Papua New Guinea border runs dead straight along the 141st meridian and is correctly left alone, because it sits inside the data extent rather than on it.
+- **Japan Reinstated — 21 Regions:** v1.4.1 recorded JPN, PNG and AUS as "excluded as beyond the ~4,000 km guidance"; that guidance was already exceeded at 4,611 km. The theatre is re-cut to `lon 68–146, lat −11–46`, containing the whole archipelago from the **Ryukyus at 24.21°N** to **eastern Hokkaido at 145.82°E**. Theatre span **6,786 × 5,806 ➔ 8,399 × 6,294 km**.
+- **Labels Stop Smearing:** Tiers (`LBL_HQ` ➔ `LBL_PEAK`) carry a priority and a minimum zoom; text is collected, gated, collision-culled and drawn above all linework. The default 0.8 zoom keeps every label, peak and contour it had.
+- **Frame Budget Restored:** v1.6.0 shipped knowing the uncached render cost ~26 ms against 16.7 ms, and the cache misses on every pan. Bounding-box rejection before any vertex is transformed, zoom-aware thinning, and an inlined projection in the three hot passes bring the worst case to **17.9 ms from 23.4 ms** — on **39% more geometry** (69k ➔ 97k points).
+- **Zoom Floor 0.09 ➔ 0.07:** The furthest point moves to 5,968 km. The floor moved rather than the assertion, preserving the invariant test group 42 already enforced.
 
 ### 🌟 Version 1.6.0 Feature Highlights
 - **Uniform Theatre Detail:** Every map layer rebuilt at the density of Thailand itself (`eps = 0.005019`), giving **17–27 points per 100 km across the whole theatre** against Thailand at 18.5. Coastlines 8,338 ➔ **27,639** points, borders 2,873 ➔ **7,785**.
@@ -791,7 +806,7 @@ No release tag may be minted or pushed without achieving a 100% clean bill of he
 ```bash
 python test_logic.py
 ```
-- **Zero Failures**: All **42/42 test modules** (325+ assertions) must evaluate to `[PASS]`.
+- **Zero Failures**: All **44/44 test modules** (370+ assertions) must evaluate to `[PASS]`.
 - **Adversarial Regression Locks**: Tests 38–41 explicitly lock in critical behavioral guards:
   - *Test 38*: `DEFAULT_PROFILE` command input retention (un-profiled callers retain human console controls).
   - *Test 39*: Spectator IFF re-designation guard against accidental civilian shootdown court-martial.

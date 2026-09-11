@@ -11,15 +11,15 @@
 
 ---
 
-## Current State (as of v1.6.0)
+## Current State (as of v1.7.0)
 
 | Item | Value |
 |---|---|
-| Version | `1.6.0` — `main.py:2` (`__version__`) and `config.py:3` (`GameConfig.VERSION`) must always agree; **test group 42 now enforces this**, it is no longer convention |
+| Version | `1.7.0` — `main.py:2` (`__version__`) and `config.py:3` (`GameConfig.VERSION`) must always agree; **test group 42 now enforces this**, it is no longer convention |
 | Branch | `main`, trunk-based, linear history |
-| Test suite | `python test_logic.py` → **42 groups**, must print `ALL TESTS PASSED` |
+| Test suite | `python test_logic.py` → **44 groups**, must print `ALL TESTS PASSED` |
 | Entry point | `python main.py` → menu → mode select → `start_radar(profile=...)` |
-| Map coverage | 20 countries on one clip frame (`lon 68.1-130.9, lat -9.5-43.0`); x span `6,786 km`, y span `5,806 km`, furthest `4,611 km`; every layer 17-27 pts/100km |
+| Map coverage | 21 countries on the window `lon 68-146, lat -11-46`; x span `8,399 km`, y span `6,294 km`, furthest `5,968 km`; 97k drawable points. Only `lat 46.0` cuts the theatre and the loader trims it, so no clip edge is ever drawn |
 
 ### Architecture notes that are easy to get wrong
 
@@ -162,6 +162,7 @@ Test coverage gap: the suite is UI-free. No test exercises the Spectator input g
 
 | Version | Summary |
 |---|---|
+| v1.7.0 | Clip edges were being drawn as coastline (chn.json alone ~3,000 km of fake straight border, plus a hard frame round the theatre); cuts are now detected from the geometry and trimmed. Labels tiered, zoom-gated and collision-culled. Theatre re-cut to `lon 68-146, lat -11-46` adding JPN whole, reversing the v1.4.1 ~4,000 km exclusion; zoom floor 0.09 -> 0.07. Render 23.4 -> 17.9 ms worst case on 39% more geometry via bbox culling, LOD and an inlined projection. Suite 42 -> 44 groups |
 | v1.4.0 | Main menu + cinematic camera, Spectator/Player mode separation, context-aware skill triggers (CIWS / chaff / EW flood), map extended to PHL + TWN (+57% east-west), repo cleanup 3,725 → 37 tracked files, suite 31 → 41 groups |
 | v1.6.0 | Uniform theatre detail: coastlines 8,338 -> 27,639 pts, borders 2,873 -> 7,785, PHL 110 -> 3,608, TWN 9 -> 256; chn/idn/mys/mmr/kor re-cut from the old SEA box onto the shared frame, removing the mid-map rectangle; 11 region labels; zoom floor 0.10 -> 0.09. Uncached render ~26 ms vs 16.7 ms budget |
 | v1.5.1 | Packaging hardened: Windows version resource, radar-scope icon, THIRD_PARTY_NOTICES.md for 78 bundled libraries, LICENSE shipped inside the EXE, UPX disabled. Still unsigned; bundle still unpackable with pyinstxtractor |

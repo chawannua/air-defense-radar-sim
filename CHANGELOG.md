@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-09-12
+
+### Fixed
+- **The straight edge across the map was never a map border.** v1.6.0 terminated every layer on one shared clip frame on the reasoning that "the straight edge reads as the map border rather than a stray box". It does not. A polygon straddling the frame is returned *closed along the cut* by the clipper, so the frame was being drawn as though it were coastline: `chn.json` alone carried **36.25 degrees (~3,000 km)** of perfectly straight fake border across northern China, and the theatre sat inside a visible hard rectangle. Landmasses pressed against that rectangle - Korea, the eastern archipelagos - read as crude polygons because of it, not because of their resolution. Measured medians before the fix: Korea **2.87 km**, Philippines **3.90 km**, Thailand **4.45 km** per segment. The Philippines was already finer than Thailand.
+
+  Clip lines are now detected from the geometry rather than assumed - a perfectly axis-aligned run of vertices sitting at the extreme edge of the data, which real coastline never is. Rings touching one are split into open runs; rings clear of one are untouched and stay closed. Longest surviving axis-aligned run: **~3,000 km -> 19 km**.
+
+- **Labels no longer smear when zoomed out.** Every label tier rendered at every scale with no culling, so at the zoom floor the theatre became an unreadable pile of overlapping text. Text is now collected into priority tiers (`LBL_HQ` through `LBL_PEAK`), gated on a minimum zoom, and collision-culled in a final pass that also lifts all text above the linework. The default 0.8 zoom is unchanged - every label, peak and contour it carried before is still drawn.
+
+### Added
+- **Japan joins the theatre as the 21st region.** v1.4.1 recorded JPN, PNG and AUS as "excluded as beyond the ~4,000 km guidance"; that guidance was already exceeded at the time (furthest point 4,611 km) and Japan is reinstated deliberately here, not by oversight. Every region was regenerated from Natural Earth 1:10m on a window of `lon 68..146, lat -11..46`, which contains the whole archipelago - Ryukyus at **24.21N** through eastern Hokkaido at **145.82E** - with no cut touching it. The old boundary at `130.9E` had been slicing Japan in half. Japan gains a country label, Tokyo and Okinawa regional hubs, and East China Sea / Philippine Sea / Sea of Japan maritime labels.
+
+| Layer | v1.6.0 | v1.7.0 |
+|---|---|---|
+| `coastlines.json` | 27,639 pts | **39,410 pts** |
+| `borders.json` | 7,785 pts | **9,305 pts** |
+| `jpn.json` | absent | **4,390 pts** (99 rings) |
+| Regions | 20 | **21** |
+| Theatre span | 6,786 x 5,806 km | **8,399 x 6,294 km** |
+| Cuts inside the theatre | 3 (`lon 130.9`, `lat -9.5 / 43.0`) | **1** (`lat 46.0`, trimmed) |
+
+### Changed
+- **Zoom floor 0.09 -> 0.07** (`radar_ui.py:369`). The widened window puts **5,968 km** between Bangkok and the furthest point; the old floor would have left it off screen on the narrowest supported 1024px display. The floor moved rather than the assertion, preserving the invariant test group 42 already enforced.
+- **Render brought back inside the frame budget.** v1.6.0 shipped knowing the uncached render cost ~26 ms against a 16.7 ms budget, and the surface cache misses on every pan. This release adds 39% more geometry (69k -> 97k drawable points), so that was measured before anything was regenerated. Strokes are now rejected on a precomputed bounding box before a single vertex is transformed, thinned to the resolution the current zoom can resolve (`LOD_MIN_PX`), and the three hot linework passes inline the km-to-screen projection instead of calling it once per point.
+
+| Zoom | Before | After |
+|---|---|---|
+| floor (0.09 -> 0.07) | 23.1 ms | **12.6 ms** |
+| 0.30 | 23.4 ms | **17.9 ms** (worst case) |
+| 0.80 (default) | 21.4 ms | **12.5 ms** (every vertex kept) |
+| 2.00 | - | **9.3 ms** |
+
+- `README.md` geodata figures corrected against the files actually shipped; the table had drifted to claiming 229 coastline segments against 885 present on disk.
+
+### Review
+An adversarial review pass ran against both commits before this version was cut.
+It found no critical defects and verified the four highest-risk mechanisms
+empirically rather than by reading - `split_ring_on_frame` property-tested over
+20,000 random rings against a ground-truth segment set (zero losses, zero
+duplicates, correct wrap-around), and viewport culling pixel-diffed on-versus-off
+at four zooms with the camera pushed into all four quadrants (zero differing
+pixels). Three real defects came out of it and are fixed here:
+
+- **An RTAF wing was being suppressed by a decorative country name at the default
+  zoom.** `WING 4 (TAKHLI)` sits 40 px from the `THAILAND` label, which is wider
+  than it; with country names ranked above bases the wing was culled outright and
+  scored 0.00 on a glyph match of the rendered surface. Operational labels now
+  outrank decorative ones - HQ, then RTAF/RTN wings, then the sovereign label,
+  then neighbouring country names. Fixing that exposed a second-order bug: the
+  `SOVEREIGN AIRSPACE` subtitle then rendered with no `THAILAND` above it, so a
+  label can now declare a parent and is dropped when the parent loses.
+- **The level-of-detail guard checked the wrong length.** It tested the input, not
+  the output, so at the zoom floor 326 country rings fell below three points and
+  were drawn as open chords, and 369 coastline strokes collapsed to a single point
+  and were discarded entirely - closed island loops repeat their first vertex
+  last, so the "keep the final point" step never fired for one. All now zero.
+- **A code comment claimed more than the code delivered.** "The default 0.8 zoom
+  keeps every vertex" was false: 213 strokes thin there. The claim is corrected to
+  what is true, and the test that backed it - which sampled only Thailand's
+  mainland, the single most favourable stroke in the theatre - now sweeps every
+  stroke at every zoom against the bound the floored stride actually guarantees.
+
+Two hardening changes came from review nits: a clip line must now carry at least
+2 degrees of accumulated run before it is believed, and cut membership is matched
+within a tolerance so that an export re-rounding `46.0` to `45.99998` cannot
+silently disable the trimming. One residual hazard is documented rather than
+fixed: a window edge placed exactly on a real straight border is indistinguishable
+from a cut, so the theatre must not be re-cut on the 141st meridian, which carries
+the Indonesia-Papua New Guinea border.
+
+### Testing
+- **Suite 42 -> 44 groups.** Both defects were invisible to every existing assertion - point counts and theatre span are identical whether or not the clip frame is drawn - so the new groups guard them directly. Group 43: no clip edge may survive loading, curved and non-extremal geometry must never be flagged as a cut, a straight inland feature must pass through untouched (the Indonesia-PNG border runs dead straight along the 141st meridian and must not be mistaken for one), Japan must arrive whole, and the tiers that cause the smear must be culled at the zoom floor. Group 44: culling metadata must stay index-aligned with its geometry, every bounding box must contain its own stroke, and LOD must never thin at or above the default zoom.
+
 ## [1.6.0] - 2026-09-12
 
 ### Changed
