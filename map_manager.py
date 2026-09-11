@@ -2,7 +2,8 @@
 """
 High-Fidelity Real Tactical Map Engine for AEGIS Air Defense Radar Simulator.
 Renders real-world 1:10m scale geographical data for Thailand and neighboring countries:
-- Myanmar, Laos, Cambodia, Vietnam, Malaysia, Singapore, Indonesia (Sumatra), Southern China and Hainan.
+- Myanmar, Laos, Cambodia, Vietnam, Malaysia, Singapore, Indonesia, China, Hainan,
+  the Philippines, Taiwan, the Korean peninsula and the Japanese archipelago.
 - High-resolution coastlines and international land borders.
 - Bangkok FIR / Thai ADIZ (Air Defense Identification Zone).
 - Maritime body labels (Gulf of Thailand, Andaman Sea, South China Sea, Malacca Strait).
@@ -130,6 +131,30 @@ def split_line_on_frame(line, clip):
     return runs
 
 
+# Vertex budget. The theatre carries ~97k drawable points; transforming all of
+# them costs more than a 60 FPS frame, and the surface cache misses on every
+# pan. Two cheap filters keep the cost proportional to what is actually visible:
+# a bounding-box reject, and thinning strokes whose vertices land closer than
+# LOD_MIN_PX apart - detail finer than that cannot be resolved anyway.
+# Tuned so the default 0.8 zoom and everything tighter keep every vertex.
+LOD_MIN_PX = 4.0
+
+
+def stroke_meta(pts):
+    """(min_x, min_y, max_x, max_y, mean_segment_km) for one projected stroke."""
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    n = len(pts) - 1
+    if n > 0:
+        total = 0.0
+        for i in range(n):
+            total += math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1])
+        seg = total / n
+    else:
+        seg = 0.0
+    return (min(xs), min(ys), max(xs), max(ys), seg)
+
+
 def draw_dashed_polygon(surface, color, points, dash_len=8, space_len=6, width=1):
     """Draw an anti-aliased dashed polygon border."""
     if len(points) < 3:
@@ -189,6 +214,9 @@ class MapManager:
         # Geodata containers (in km relative to Bangkok)
         self.country_polys = {}  # iso -> list of rings (each ring is [(x_km, y_km), ...])
         self.country_closed = {} # iso -> list of bools, parallel to country_polys
+        self.country_meta = {}   # iso -> list of stroke_meta, parallel to country_polys
+        self.coast_meta = []     # parallel to coastlines_km
+        self.border_meta = []    # parallel to borders_km
         self.data_frame = (frozenset(), frozenset())  # meridians/parallels the data was cut on
         self.coastlines_km = []  # list of [(x_km, y_km), ...]
         self.borders_km = []     # list of [(x_km, y_km), ...]
@@ -243,7 +271,8 @@ class MapManager:
             "BRN": "brn.json",
             "TLS": "tls.json",
             "KOR": "kor.json",
-            "PRK": "prk.json"
+            "PRK": "prk.json",
+            "JPN": "jpn.json"
         }
 
         raw_polys = {}
@@ -294,18 +323,21 @@ class MapManager:
                         closed_km.append(is_closed)
             self.country_polys[iso] = rings_km
             self.country_closed[iso] = closed_km
+            self.country_meta[iso] = [stroke_meta(r) for r in rings_km]
 
         for seg in raw_coast:
             for run in split_line_on_frame(seg, frame):
                 seg_km = [latlon_to_km(lon, lat) for lon, lat in run]
                 if len(seg_km) >= 2:
                     self.coastlines_km.append(seg_km)
+                    self.coast_meta.append(stroke_meta(seg_km))
 
         for seg in raw_borders:
             for run in split_line_on_frame(seg, frame):
                 seg_km = [latlon_to_km(lon, lat) for lon, lat in run]
                 if len(seg_km) >= 2:
                     self.borders_km.append(seg_km)
+                    self.border_meta.append(stroke_meta(seg_km))
 
         # Fallback if tha.json is somehow missing
         if "THA" not in self.country_polys or not self.country_polys["THA"]:
@@ -316,6 +348,7 @@ class MapManager:
             ]
             self.country_polys["THA"] = [fallback]
             self.country_closed["THA"] = [True]
+            self.country_meta["THA"] = [stroke_meta(fallback)]
 
         # 4. Bangkok FIR / Thai ADIZ
         adiz_coords = [
@@ -354,6 +387,8 @@ class MapManager:
             ("PENANG [MYS]", 5.297, 100.276, "NEIGHBOR", (100, 140, 170)),
             ("SINGAPORE CHANGI", 1.364, 103.991, "NEIGHBOR", (100, 140, 170)),
             ("SANYA (HAINAN)", 18.302, 109.412, "NEIGHBOR", (100, 140, 170)),
+            ("TOKYO [JPN]", 35.689, 139.692, "NEIGHBOR", (100, 140, 170)),
+            ("OKINAWA [JPN]", 26.334, 127.805, "NEIGHBOR", (100, 140, 170)),
         ]
         self.airbases = []
         for name, lat, lon, btype, col in airbase_data:
@@ -398,6 +433,7 @@ class MapManager:
             ("TIMOR-LESTE", "", -8.8, 125.9, (60, 100, 75)),
             ("SOUTH KOREA", "ROK", 36.4, 127.8, (60, 100, 75)),
             ("NORTH KOREA", "DPRK", 40.0, 127.0, (60, 100, 75)),
+            ("JAPAN", "", 36.4, 138.2, (60, 100, 75)),
         ]
         self.country_labels = []
         for name, sub, lat, lon, col in c_label_data:
@@ -412,6 +448,9 @@ class MapManager:
             ("STRAIT OF MALACCA", 3.5, 99.8),
             ("GULF OF MARTABAN", 16.0, 96.5),
             ("GULF OF TONKIN", 19.8, 107.0),
+            ("EAST CHINA SEA", 28.5, 125.0),
+            ("PHILIPPINE SEA", 20.0, 133.0),
+            ("SEA OF JAPAN", 40.0, 135.0),
         ]
         self.maritime_labels = []
         for name, lat, lon in maritime_data:
@@ -476,10 +515,39 @@ class MapManager:
 
         surf = self._cache_surface
 
+        # The three linework passes below inline this transform instead of
+        # calling it: at ~97k vertices a Python call per point is the single
+        # largest cost in the frame.
         def km_to_screen(x_km, y_km):
             sx = cx + x_km * zoom_level
             sy = cy - y_km * zoom_level
             return (sx, sy)
+
+        # Everything outside the viewport is rejected on its bounding box before
+        # a single vertex is transformed, and what survives is thinned to the
+        # resolution the current zoom can actually show.
+        inv = 1.0 / max(zoom_level, 1e-6)
+        pad = 48.0 * inv
+        view_x0 = (0 - cx) * inv - pad
+        view_x1 = (width - cx) * inv + pad
+        view_y0 = (cy - height) * inv - pad
+        view_y1 = cy * inv + pad
+
+        def on_screen(meta):
+            return not (meta[2] < view_x0 or meta[0] > view_x1
+                        or meta[3] < view_y0 or meta[1] > view_y1)
+
+        def lod(pts, meta):
+            step_px = meta[4] * zoom_level
+            if len(pts) <= 8 or step_px <= 0.0 or step_px >= LOD_MIN_PX:
+                return pts
+            stride = int(LOD_MIN_PX / step_px)
+            if stride <= 1:
+                return pts
+            thinned = pts[::stride]
+            if thinned[-1] != pts[-1]:
+                thinned.append(pts[-1])
+            return thinned
 
         # Text is queued rather than blitted so it lands on top of all linework,
         # thins out by zoom, and yields to whatever matters more where two
@@ -512,17 +580,26 @@ class MapManager:
                 if iso == "THA":
                     continue  # Thailand rendered with sovereign styling below
                 flags = self.country_closed.get(iso, ())
+                metas = self.country_meta.get(iso, ())
                 for idx, ring in enumerate(rings):
                     closed = flags[idx] if idx < len(flags) else True
-                    pts = [km_to_screen(x, y) for x, y in ring]
+                    if idx < len(metas):
+                        if not on_screen(metas[idx]):
+                            continue
+                        ring = lod(ring, metas[idx])
+                    pts = [(cx + x * zoom_level, cy - y * zoom_level) for x, y in ring]
                     if closed and len(pts) >= 3:
                         pygame.draw.aalines(surf, (30, 70, 35), True, pts)
                     elif len(pts) >= 2:
                         pygame.draw.aalines(surf, (30, 70, 35), False, pts)
 
             # Render international land borders
-            for seg in self.borders_km:
-                pts = [km_to_screen(x, y) for x, y in seg]
+            for idx, seg in enumerate(self.borders_km):
+                if idx < len(self.border_meta):
+                    if not on_screen(self.border_meta[idx]):
+                        continue
+                    seg = lod(seg, self.border_meta[idx])
+                pts = [(cx + x * zoom_level, cy - y * zoom_level) for x, y in seg]
                 if len(pts) >= 2:
                     pygame.draw.aalines(surf, (45, 95, 50), False, pts)
 
@@ -530,8 +607,12 @@ class MapManager:
         # 3. High-Resolution Coastlines (All Active Modes)
         # ----------------------------------------------------
         if self.coastlines_km:
-            for seg in self.coastlines_km:
-                pts = [km_to_screen(x, y) for x, y in seg]
+            for idx, seg in enumerate(self.coastlines_km):
+                if idx < len(self.coast_meta):
+                    if not on_screen(self.coast_meta[idx]):
+                        continue
+                    seg = lod(seg, self.coast_meta[idx])
+                pts = [(cx + x * zoom_level, cy - y * zoom_level) for x, y in seg]
                 if len(pts) >= 2:
                     # Crisp anti-aliased maritime coastlines
                     pygame.draw.aalines(surf, (0, 175, 155), False, pts)
@@ -541,9 +622,14 @@ class MapManager:
         # ----------------------------------------------------
         if "THA" in self.country_polys:
             tha_flags = self.country_closed.get("THA", ())
+            tha_metas = self.country_meta.get("THA", ())
             for idx, ring in enumerate(self.country_polys["THA"]):
                 closed = tha_flags[idx] if idx < len(tha_flags) else True
-                pts = [km_to_screen(x, y) for x, y in ring]
+                if idx < len(tha_metas):
+                    if not on_screen(tha_metas[idx]):
+                        continue
+                    ring = lod(ring, tha_metas[idx])
+                pts = [(cx + x * zoom_level, cy - y * zoom_level) for x, y in ring]
                 # Sharp sovereign emerald green for Thailand
                 if closed and len(pts) >= 3:
                     pygame.draw.aalines(surf, (0, 210, 80), True, pts)

@@ -134,12 +134,12 @@ The tactical display is built on an enterprise geospatial projection engine conv
 
 | Geodata Layer | Source / Format | Elements / Vertices | Description |
 |---|---|---|---|
-| **Thailand Sovereign** | `tha.json` | 20 Rings / 1,545 pts | Complete mainland boundary + Phuket, Ko Samui, Ko Chang, Ko Kut, Ko Phangan, Ko Tarutao, and Ko Lanta. |
-| **Neighboring States** | `*.json` | 10 Sovereign Borders | Myanmar (2,092 pts), Vietnam (1,960 pts), Indonesia/Sumatra (1,641 pts), Southern China/Hainan (1,830 pts), Laos (770 pts), Malaysia (698 pts), Cambodia (542 pts), Singapore (18 pts), Philippines (`phl.json`), Taiwan (`twn.json`). |
-| **Maritime Coastlines** | `coastlines.json` | 229 Segments / 8,338 pts | High-resolution 1:10m Natural Earth coastal boundaries for the Gulf of Thailand, Andaman Sea, and South China Sea. |
-| **International Borders**| `borders.json` | 522 Segments / 2,873 pts | Land boundary demarcations between regional states. |
+| **Thailand Sovereign** | `tha.json` | 20 Rings / 1,859 pts | Complete mainland boundary + Phuket, Ko Samui, Ko Chang, Ko Kut, Ko Phangan, Ko Tarutao, and Ko Lanta. |
+| **Neighboring States** | `*.json` | 20 Sovereign Outlines | Indonesia (11,799 pts), Southern China/Hainan (7,504), India (4,677), Japan (4,390), Philippines (4,332), Myanmar (2,724), Vietnam (2,339), South Korea (1,745), Malaysia (1,546), Bangladesh (1,392), North Korea (1,040), Laos (929), Cambodia (665), Nepal (587), Sri Lanka (419), Taiwan (306), Bhutan (211), Timor-Leste (159), Brunei (96), Singapore (22). |
+| **Maritime Coastlines** | `coastlines.json` | 891 Segments / 39,410 pts | High-resolution 1:10m Natural Earth coastal boundaries from the Arabian Sea to the Sea of Okhotsk. |
+| **International Borders**| `borders.json` | 1,338 Segments / 9,305 pts | Land boundary demarcations between regional states. |
 | **Bangkok FIR / ADIZ** | Algorithmic Polygon | 31 Strategic Waypoints | Authentic Thai Air Defense Identification Zone boundary rendered in amber tactical dashed borders. |
-| **Airbases & Hubs** | Tactical Database | 22 Strategic Hubs | 8 RTAF Wings, RTN Utapao, civil gateways (Phuket, Don Mueang, Suvarnabhumi), and 12 neighbor capital/military hubs. |
+| **Airbases & Hubs** | Tactical Database | 24 Strategic Hubs | 8 RTAF Wings, RTN Utapao, civil gateways (Phuket, Don Mueang, Suvarnabhumi), and 12 neighbor capital/military hubs. |
 | **Mountain Topography** | Digital Elevation | 6 Key Peaks + Contours | Topographic relief contours around Doi Inthanon, Doi Pha Hom Pok, Khao Luang, Phu Kradueng, Tenasserim, and Khao Yai. |
 
 ### Topographical Mountain Peak Radar Masking

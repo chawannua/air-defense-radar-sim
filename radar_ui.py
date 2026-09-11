@@ -366,7 +366,7 @@ def start_radar(profile=None):
 
             if event.type == pygame.MOUSEWHEEL:
                 zoom_level += event.y * 0.15
-                zoom_level = max(0.09, min(10.0, zoom_level))
+                zoom_level = max(0.07, min(10.0, zoom_level))
 
             # AWACS retask (right-click) is a command -- Spectator is view-only.
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and profile.player_input_enabled:
