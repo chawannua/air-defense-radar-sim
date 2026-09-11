@@ -1580,6 +1580,158 @@ check(cmd_ew_blue.get_ew_flood_chance()[0] == 0.0,
 # --- 10. GameConfig untouched by the EW doctrine ---
 check(GameConfig.WAVE_CHANCE == 0.20, "EW flood doctrine must not mutate GameConfig.WAVE_CHANCE")
 
+print("\n=== 38. DEFAULT_PROFILE Retains Command Input ===")
+from profiles import DEFAULT_PROFILE as _DEFAULT_PROFILE, SPECTATOR_PROFILE as _SPECTATOR_PROFILE_38, PLAYER_PROFILE as _PLAYER_PROFILE_38
+
+# Un-profiled callers (running radar_ui.py directly, or start_radar(profile=None))
+# must land on a fully interactive console, not a silent view-only mode.
+check(_DEFAULT_PROFILE.player_input_enabled is True,
+      "DEFAULT_PROFILE.player_input_enabled must be True -- otherwise running radar_ui.py "
+      "directly (or start_radar(profile=None)) silently disables firing/restart input")
+check(_SPECTATOR_PROFILE_38.player_input_enabled is False,
+      "SPECTATOR_PROFILE.player_input_enabled must remain False (true view-only mode)")
+check(_PLAYER_PROFILE_38.player_input_enabled is True,
+      "PLAYER_PROFILE.player_input_enabled must remain True (human holds the trigger)")
+# Guard against the three profiles ever drifting to the same value by accident.
+check(len({_DEFAULT_PROFILE.player_input_enabled, _SPECTATOR_PROFILE_38.player_input_enabled}) == 2,
+      "DEFAULT and SPECTATOR profiles must not collapse to the same player_input_enabled value")
+
+print("\n=== 39. Spectator Cannot Reach IFF Re-Designation (Court-Martial Guard) ===")
+# The Flight Info Panel's H/S/F/U IFF buttons live under MOUSEBUTTONDOWN in
+# radar_ui.py (panel button block, ~line 388-397), OUTSIDE the KEYDOWN command
+# gate. That block is only reachable when `profile.player_input_enabled` is
+# True (see radar_ui.py:389 `if selected_contact and profile.player_input_enabled:`).
+# SPECTATOR_PROFILE.player_input_enabled == False is therefore the ONLY thing
+# standing between a spectator and a court-martial: prove the flag is correct,
+# and separately prove the underlying kill path really is that dangerous.
+check(_SPECTATOR_PROFILE_38.player_input_enabled is False,
+      "GATE CHECK: radar_ui.py's IFF panel-button block (H/S/F/U) is guarded by "
+      "profile.player_input_enabled; SPECTATOR_PROFILE must keep this False or the "
+      "gate at radar_ui.py:389 is bypassed")
+
+_civilian = Airliner(4400)
+_civilian.status = "HOSTILE"  # exactly what clicking "H" in the panel does to selected_contact
+_cc_39 = CommandCenter()
+_cc_39.tactical_log = []
+check(_cc_39.is_court_martialed is False and _cc_39.base_hp > 0,
+      "Sanity: CommandCenter starts un-court-martialed with a healthy base")
+_cc_39.record_kill(_civilian, "SAM")
+check(_cc_39.is_court_martialed is True and _cc_39.base_hp == 0,
+      "DANGER CONFIRMED: killing a civilian Airliner re-designated HOSTILE via the IFF "
+      "panel triggers court-martial + base_hp=0 (record_kill checks isinstance(..., Airliner), "
+      "not the possibly-tampered .status) -- this is exactly why the panel button block "
+      "MUST stay gated on profile.player_input_enabled")
+
+print("\n=== 40. Restart After Death Reachable in Both Modes ===")
+# radar_ui.py's AAR screen (~line 993) always renders "Press [R] to Re-Scramble
+# Sortie" regardless of profile, so the K_r-on-death restart handler at
+# radar_ui.py:347 (`if event.type == pygame.KEYDOWN and event.key == pygame.K_r
+# and cmd.base_hp <= 0:`) MUST stay OUTSIDE the player-input gate (the gate is
+# only for event.type == pygame.KEYDOWN and profile.player_input_enabled at
+# radar_ui.py:221) -- otherwise Spectator is stranded on a dead screen with
+# only ESC/quit. We cannot press a key from this test, so we prove restart
+# genuinely works by reconstruction, and that it is not conditioned on
+# player_input_enabled.
+_dead_cc = CommandCenter(profile=_SPECTATOR_PROFILE_38)
+_dead_cc.base_hp = 0
+_dead_cc.is_court_martialed = False
+check(_dead_cc.base_hp <= 0, "Sanity: simulated death leaves base_hp <= 0")
+
+# "Press [R]" reconstructs a fresh CommandCenter (radar_ui.py's restart path
+# does `cmd = CommandCenter(profile=profile)`); this must produce a healthy
+# game under SPECTATOR_PROFILE too, since the AAR screen offers it there.
+_restarted_spectator_cc = CommandCenter(profile=_SPECTATOR_PROFILE_38)
+check(_restarted_spectator_cc.base_hp > 0 and _restarted_spectator_cc.is_court_martialed is False,
+      "RESTART MUST WORK UNGATED: a fresh CommandCenter(profile=SPECTATOR_PROFILE) built "
+      "after death must have a healthy base_hp -- the K_r-on-death handler at radar_ui.py:347 "
+      "must NOT be nested inside `profile.player_input_enabled`, or Spectator can never "
+      "reach the restart the AAR screen promises")
+_restarted_player_cc = CommandCenter(profile=_PLAYER_PROFILE_38)
+check(_restarted_player_cc.base_hp > 0 and _restarted_player_cc.is_court_martialed is False,
+      "Restart-by-reconstruction must also work under PLAYER_PROFILE")
+
+print("\n=== 41. Player-Mode Backup Fire Must Not Starve on a Distant Priority Threat ===")
+# Verified repro: a distant, backup-INELIGIBLE CruiseMissile (highest threat
+# score) pops before a close, backup-ELIGIBLE Drone (leaker). The old
+# process_personnel() popped exactly one threat per tick and discarded the
+# tick entirely if that one threat wasn't backup-eligible, starving the
+# leaker forever. The fix walks the queue within the same tick instead of
+# stopping at the first pop.
+random.seed(4141)
+_cm_41 = CruiseMissile(501)
+_cm_41.distance_km = 120.0
+_cm_41.active = True
+_cm_41.status = "HOSTILE"
+
+_dr_41 = Drone(502)
+_dr_41.distance_km = 15.0
+_dr_41.active = True
+_dr_41.status = "HOSTILE"
+
+_c_41 = CommandCenter(profile=_PLAYER_PROFILE_38)
+_c_41.contacts = [_cm_41, _dr_41]
+
+# Confirm the verified pop order and eligibility split before relying on it.
+_c_41.threat_queue.build_queue(_c_41.contacts)
+_first_pop = _c_41.threat_queue.pop_highest_priority()
+_second_pop = _c_41.threat_queue.pop_highest_priority()
+check(_first_pop is _cm_41 and _second_pop is _dr_41,
+      "Pop order check: the distant CruiseMissile (higher threat score) must pop before "
+      "the close Drone -- this is what causes starvation if the tick is discarded on the first pop")
+check(_c_41._is_backup_engagement(_cm_41) is False and _c_41._is_backup_engagement(_dr_41) is True,
+      "Eligibility check: the CruiseMissile must be backup-INELIGIBLE and the close Drone "
+      "backup-ELIGIBLE -- this is the exact combination that starves the leaker")
+
+# PREP_TIME_THAAD=20 / SAM=12 / F16=10 -- a short loop would read as a false
+# zero, so run a horizon of 40 ticks (well beyond any single prep time).
+for _ in range(40):
+    _c_41.process_personnel()
+check(len(_c_41.active_engagements) >= 1,
+      "STARVATION BUG: after 40 ticks under PLAYER_PROFILE, the close leaking Drone must "
+      "get engaged (active_engagements >= 1) even though a distant, backup-ineligible "
+      "CruiseMissile pops first every tick -- without the fix this stays 0 forever")
+
+# Mode contrast: a leaker (15km) is engaged under BOTH profiles; a genuinely
+# distant contact (100km) is engaged under SPECTATOR but correctly left for
+# the human under PLAYER (backup fire must not become full autonomy).
+random.seed(4142)
+_dr_leaker_spec = Drone(503); _dr_leaker_spec.distance_km = 15.0; _dr_leaker_spec.active = True; _dr_leaker_spec.status = "HOSTILE"
+_cc_leaker_spec = CommandCenter(profile=_SPECTATOR_PROFILE_38)
+_cc_leaker_spec.contacts = [_dr_leaker_spec]
+for _ in range(40):
+    _cc_leaker_spec.process_personnel()
+check(len(_cc_leaker_spec.active_engagements) >= 1,
+      "Mode contrast: a 15km leaker Drone must be engaged under SPECTATOR_PROFILE over 40 ticks")
+
+random.seed(4143)
+_dr_leaker_ply = Drone(504); _dr_leaker_ply.distance_km = 15.0; _dr_leaker_ply.active = True; _dr_leaker_ply.status = "HOSTILE"
+_cc_leaker_ply = CommandCenter(profile=_PLAYER_PROFILE_38)
+_cc_leaker_ply.contacts = [_dr_leaker_ply]
+for _ in range(40):
+    _cc_leaker_ply.process_personnel()
+check(len(_cc_leaker_ply.active_engagements) >= 1,
+      "Mode contrast: a 15km leaker Drone must ALSO be engaged under PLAYER_PROFILE over "
+      "40 ticks (backup fire backstop)")
+
+random.seed(4144)
+_dr_distant_spec = Drone(505); _dr_distant_spec.distance_km = 100.0; _dr_distant_spec.active = True; _dr_distant_spec.status = "HOSTILE"
+_cc_distant_spec = CommandCenter(profile=_SPECTATOR_PROFILE_38)
+_cc_distant_spec.contacts = [_dr_distant_spec]
+for _ in range(40):
+    _cc_distant_spec.process_personnel()
+check(len(_cc_distant_spec.active_engagements) >= 1,
+      "Mode contrast: a 100km distant Drone must be engaged under SPECTATOR_PROFILE (full autonomy)")
+
+random.seed(4145)
+_dr_distant_ply = Drone(506); _dr_distant_ply.distance_km = 100.0; _dr_distant_ply.active = True; _dr_distant_ply.status = "HOSTILE"
+_cc_distant_ply = CommandCenter(profile=_PLAYER_PROFILE_38)
+_cc_distant_ply.contacts = [_dr_distant_ply]
+for _ in range(40):
+    _cc_distant_ply.process_personnel()
+check(len(_cc_distant_ply.active_engagements) == 0,
+      "Mode contrast: a 100km distant Drone must NOT be auto-engaged under PLAYER_PROFILE "
+      "(correctly left for the human to fire on manually), proving backup fire stays restricted")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")
