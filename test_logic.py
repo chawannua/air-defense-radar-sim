@@ -1834,6 +1834,115 @@ check(_main42.__version__ == GameConfig.VERSION == "1.6.0",
       f"main.py __version__ ({_main42.__version__}) and GameConfig.VERSION "
       f"({GameConfig.VERSION}) must both read 1.6.0")
 
+# 43. Clip-cut removal and label decluttering
+#
+# The geodata ships clipped to a rectangular window. Polygons that straddle it
+# come back closed along the cut, which drew a straight 3000 km "border" across
+# northern China and boxed the whole theatre in a visible frame. Labels then
+# rendered at every zoom with no culling, so zooming out smeared the map into
+# unreadable text. Both are guarded here because both are invisible to every
+# other assertion in this file - the point counts and the theatre span are
+# identical either way.
+print("\n=== 43. Map Clip-Cut Removal & Label Decluttering ===")
+import math as _math43
+from map_manager import (MapManager as _MapManager43, detect_clip_lines as _detect43,
+                         split_ring_on_frame as _splitring43,
+                         split_line_on_frame as _splitline43)
+
+_map43 = _MapManager43()
+_cut_lons43, _cut_lats43 = _map43.data_frame
+
+check(bool(_cut_lons43 or _cut_lats43),
+      f"the clip window must be detected from the geodata, not assumed "
+      f"(lons={sorted(_cut_lons43)}, lats={sorted(_cut_lats43)})")
+
+# Natural Earth cut this theatre at lon 130.9 and lat -9.5 / 43.0.
+check(130.9 in _cut_lons43, f"meridian 130.9 must be recognised as a cut (got {sorted(_cut_lons43)})")
+check(43.0 in _cut_lats43, f"parallel 43.0 must be recognised as a cut (got {sorted(_cut_lats43)})")
+
+# The real defect: after loading, no long perfectly-axis-aligned run may survive.
+# Genuine coastline is never both perfectly straight and hundreds of km long.
+_worst43, _where43 = 0.0, None
+for _name43, _sets43 in (("country", [r for v in _map43.country_polys.values() for r in v]),
+                         ("coastline", _map43.coastlines_km),
+                         ("border", _map43.borders_km)):
+    for _r43 in _sets43:
+        for _a43, _b43 in zip(_r43, _r43[1:]):
+            if abs(_a43[0] - _b43[0]) < 1e-9 or abs(_a43[1] - _b43[1]) < 1e-9:
+                _d43 = _math43.hypot(_b43[0] - _a43[0], _b43[1] - _a43[1])
+                if _d43 > _worst43:
+                    _worst43, _where43 = _d43, _name43
+check(_worst43 < 100.0,
+      f"no clip edge may survive as drawable geometry: longest axis-aligned run is "
+      f"{_worst43:.0f} km in {_where43} data (chn.json alone shipped ~3000 km of it)")
+
+# Rings the cut never touched must come back untouched and still closed, or the
+# trimming would silently open every island in the theatre.
+_square43 = [(10.0, 10.0), (11.0, 10.0), (11.0, 11.0), (10.0, 11.0), (10.0, 10.0)]
+_runs43 = _splitring43(_square43, (frozenset(), frozenset()))
+check(len(_runs43) == 1 and _runs43[0][1] is True and len(_runs43[0][0]) == 4,
+      f"a ring clear of the cut must stay one closed ring (got {_runs43})")
+
+# A ring whose top edge lies on a cut parallel must open up and lose that edge.
+_clip43 = (frozenset(), frozenset([11.0]))
+_runs43 = _splitring43(_square43, _clip43)
+check(_runs43 and all(not _closed43 for _pts43, _closed43 in _runs43),
+      f"a ring sitting on a cut must be returned open (got {_runs43})")
+_kept43 = [_p43 for _pts43, _c43 in _runs43 for _p43 in _pts43]
+check(not any(_a43[1] == _b43[1] == 11.0
+              for _pts43, _c43 in _runs43 for _a43, _b43 in zip(_pts43, _pts43[1:])),
+      "the cut edge itself must not survive the split")
+check(len(_kept43) >= 3, f"the genuine geography either side of a cut must survive (got {_kept43})")
+
+# Open polylines follow the same rule.
+_line43 = [(10.0, 11.0), (11.0, 11.0), (11.0, 12.0)]
+_runs43 = _splitline43(_line43, _clip43)
+check(all(not (_a43[1] == _b43[1] == 11.0)
+          for _r43 in _runs43 for _a43, _b43 in zip(_r43, _r43[1:])),
+      f"split_line_on_frame must drop the cut segment (got {_runs43})")
+
+# Curved geography must never be mistaken for a cut, and a straight run only
+# counts when it sits at the extreme edge - an axis-aligned inland feature
+# (a reservoir, a surveyed border) has to survive untouched.
+_blob43 = [(100.0 + 10.0 * _math43.cos(_math43.radians(_i43 * 6)),
+            15.0 + 10.0 * _math43.sin(_math43.radians(_i43 * 6)))
+           for _i43 in range(60)]
+_blob43.append(_blob43[0])
+check(_detect43([_blob43]) == (frozenset(), frozenset()),
+      "curved coastline with no straight extremal run must report no cuts")
+
+_inland43 = [(99.0, 14.0), (101.0, 14.0), (101.0, 16.0), (99.0, 16.0), (99.0, 14.0)]
+check(_detect43([_blob43, _inland43]) == (frozenset(), frozenset()),
+      "a perfectly straight feature well inside the data extent must not be "
+      "mistaken for a clip cut")
+_runs43 = _splitring43(_inland43, _detect43([_blob43, _inland43]))
+check(len(_runs43) == 1 and _runs43[0][1] is True,
+      f"and it must therefore come through the split closed and whole (got {_runs43})")
+
+# A straight run that does sit on the data extent is a cut and must be caught.
+_edge43 = [(95.0, 25.0), (105.0, 25.0), (105.0, 24.0), (95.0, 24.0), (95.0, 25.0)]
+_, _cuts43 = _detect43([_blob43, _edge43])
+check(25.0 in _cuts43,
+      f"a straight run along the data extent must be caught as a cut (got {sorted(_cuts43)})")
+
+# Label tiers: priorities unique and ordered, and the tiers that make the map
+# unreadable when zoomed out must actually be gated above the zoom floor.
+_tiers43 = {_n43: getattr(_MapManager43, _n43) for _n43 in dir(_MapManager43)
+            if _n43.startswith("LBL_")}
+check(len(_tiers43) >= 8, f"label tiers must be declared on MapManager (found {sorted(_tiers43)})")
+_prios43 = [_v43[0] for _v43 in _tiers43.values()]
+check(len(set(_prios43)) == len(_prios43),
+      f"label tier priorities must be unique so collisions resolve deterministically ({_tiers43})")
+check(_MapManager43.LBL_HQ[0] < _MapManager43.LBL_BASE[0] < _MapManager43.LBL_PEAK[0],
+      "the C2 HQ must outrank an airbase, which must outrank a mountain peak")
+check(_MapManager43.LBL_HQ[1] == 0.0 and _MapManager43.LBL_SOVEREIGN[1] == 0.0,
+      "the HQ and the sovereign label must never be culled by zoom")
+_ZOOM_FLOOR43 = 0.09  # radar_ui.py clamp
+for _n43 in ("LBL_PEAK", "LBL_HUB", "LBL_BASE", "LBL_MARITIME"):
+    check(getattr(_MapManager43, _n43)[1] > _ZOOM_FLOOR43,
+          f"{_n43} must be culled at the {_ZOOM_FLOOR43} zoom floor, where it only "
+          f"adds to the smear (min zoom {getattr(_MapManager43, _n43)[1]})")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")
