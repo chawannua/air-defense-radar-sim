@@ -3,6 +3,13 @@
 > Reference for anyone or anything modifying this repository, automated tooling included.
 > Read this before changing files. The rules exist to keep the geospatial map engine and
 > campaign scenarios regression-free; they have been earned through actual breakage.
+>
+> **This file is the single source of truth for the rules.** It is the file tooling loads
+> automatically, so durable constraints belong here and nowhere else. For *current work
+> state* — what shipped last, what is next, which defects are open — see
+> [`PIPELINE.md`](PIPELINE.md). Rules here, state there; do not duplicate one into the
+> other. A second copy of these rules previously drifted out of date and ended up
+> protecting two files that had been deleted and one that never existed.
 
 ---
 

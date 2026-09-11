@@ -1,8 +1,13 @@
 # Work Pipeline — Handoff Instructions
 
-> Purpose: lets any operator or agent resume work on this repository with no prior
-> conversation context. Read this top to bottom before making changes.
-> Update the **Status** and **History** sections when you finish a task.
+> Purpose: lets anyone resume work on this repository with no prior context.
+> Read this top to bottom before making changes, and update the **Current State**
+> and **History** sections when you finish a task.
+>
+> **This file holds current state only** — what shipped last, what is next, which defects
+> are open. The durable rules (protected files, permitted scope, verification standard)
+> live in [`AGENTS.md`](AGENTS.md) and must not be restated here. Keeping rules in one
+> place is deliberate: a second copy previously drifted and began contradicting the first.
 
 ---
 

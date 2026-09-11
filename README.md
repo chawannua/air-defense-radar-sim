@@ -102,7 +102,7 @@ Expands the tactical theatre from 11 to 20 registered regions — adding India, 
 
 ## System Boundaries & Modification Governance
 
-> This repository enforces strict modification boundaries, documented in [`SYSTEM_BOUNDARIES.md`](SYSTEM_BOUNDARIES.md) and [`AGENTS.md`](AGENTS.md):
+> This repository enforces strict modification boundaries, documented in [`AGENTS.md`](AGENTS.md):
 > - **Strictly Protected (Immutable)**: `map_manager.py` (v1.1.0 Natural Earth map geometry), all GeoJSON maps (`tha.json`, `coastlines.json`, etc.), and `missions.py`.
 > - **Permitted**: `command_center.py`, `targets.py`, `radar_ui.py`, `sound_engine.py`, `test_logic.py`, `README.md`, `CHANGELOG.md`.
 
@@ -559,7 +559,6 @@ air-defense-radar-sim/
 ├── test_logic.py             # Headless automated verification suite: 42 test modules passing 100%
 ├── DEVELOPMENT.md            # Developer onboarding, domain modeling guides, and architecture notes
 ├── CHANGELOG.md              # Historical version changelog adhering to Keep a Changelog & SemVer
-├── SYSTEM_BOUNDARIES.md      # Immutable boundaries and modification governance
 ├── AGENTS.md                 # Protected files, permitted scope of work, and verification standard
 ├── requirements.txt          # Minimal runtime dependencies (pygame >= 2.0.0, numpy >= 1.24.0)
 ├── .gitignore                # Strict repository hygiene (ignores work/, *.exe, *.log, byte-cache)
@@ -796,7 +795,7 @@ The repository enforces strict `.gitignore` rules to prevent repository bloat an
 - **Build Environments**: Untracked 176MB portable Python distributions (`work/`) preventing unnecessary multi-gigabyte git clones.
 - **Compiled Binaries**: Ignores `build/`, `dist/`, `*.spec`, `*.exe`, `*.bin`. Releases are distributed via official GitHub Release binary attachments rather than git tracking.
 - **Runtime Logs & Cache**: Automatically ignores `*.log`, `full_log.txt`, `error.log`, `__pycache__/`, and `.pytest_cache/`.
-- **Geodata Protection**: All 13 core geospatial datasets (`*.json`) are tracked as read-only, immutable assets governed under [`SYSTEM_BOUNDARIES.md`](SYSTEM_BOUNDARIES.md).
+- **Geodata Protection**: All 22 core geospatial datasets (`*.json`) are tracked as read-only, immutable assets governed under [`AGENTS.md`](AGENTS.md).
 
 ---
 
