@@ -75,4 +75,9 @@ PLAYER_PROFILE = SimulationProfile(
 
 # Default profile: mirrors today's un-profiled behaviour (pure GameConfig
 # defaults), used when start_radar() is called with profile=None.
-DEFAULT_PROFILE = SimulationProfile(name="DEFAULT")
+DEFAULT_PROFILE = SimulationProfile(
+    name="DEFAULT",
+    # Un-profiled callers (e.g. running radar_ui.py directly) are a human
+    # at the console, not a spectator: they must retain command input.
+    player_input_enabled=True,
+)

@@ -341,12 +341,14 @@ def start_radar(profile=None):
                         sound_mgr.start_alarm()
                         sound_mgr.radio_callout("Vampire! Vampire inbound!")
 
-                # Restart game after base is destroyed
-                if event.key == pygame.K_r and cmd.base_hp <= 0:
-                    cmd = CommandCenter(profile=profile)
-                    selected_contact = None
-                    sweep_angle = 0.0
-                    LAST_TICK_TIME = pygame.time.get_ticks()
+            # Restart after base destruction -- available in BOTH modes. The AAR
+            # screen prompts "Press [R] to Re-Scramble Sortie", so gating this
+            # would strand Spectator on a dead screen with only ESC/quit.
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and cmd.base_hp <= 0:
+                cmd = CommandCenter(profile=profile)
+                selected_contact = None
+                sweep_angle = 0.0
+                LAST_TICK_TIME = pygame.time.get_ticks()
 
             # Toggle fullscreen mode -- a display/view control, available in both modes.
             if event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
@@ -383,7 +385,8 @@ def start_radar(profile=None):
                 
                 # Check Flight Info Panel buttons first
                 panel_clicked = False
-                if selected_contact:
+                # IFF re-designation is a COMMAND: Spectator must not reach it.
+                if selected_contact and profile.player_input_enabled:
                     panel_x, panel_y = 20, 120
                     btn_y = panel_y + 165
                     labels = ["H", "S", "F", "U"]

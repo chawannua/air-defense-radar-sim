@@ -900,9 +900,18 @@ class CommandCenter:
 
         if not self.weapon_op.is_busy:
             self.threat_queue.build_queue(self.contacts)
-            highest_threat = self.threat_queue.pop_highest_priority()
-            if highest_threat and (self.profile.autonomous_weapons or self._is_backup_engagement(highest_threat)):
-                self.add_log(self.weapon_op.authorize_engagement(highest_threat))
+            # Walk the queue rather than popping once: in Player mode the highest
+            # scoring threat is often a distant contact the human is handling, and
+            # discarding the tick on it starves a close leaker that backup fire
+            # exists to catch. Spectator (autonomous_weapons=True) still engages
+            # the first pop, so its behaviour is unchanged.
+            while True:
+                highest_threat = self.threat_queue.pop_highest_priority()
+                if not highest_threat:
+                    break
+                if self.profile.autonomous_weapons or self._is_backup_engagement(highest_threat):
+                    self.add_log(self.weapon_op.authorize_engagement(highest_threat))
+                    break
 
         # Proactive AI fighter defense against standoff EW jammers
         self.process_ew_interceptor_defense()
