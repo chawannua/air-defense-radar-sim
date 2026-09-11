@@ -718,7 +718,7 @@ AEGIS Radar maintains strict software engineering and version control standards 
 ### 1. Repository Topology & Branching Model
 - **Trunk-Based Development (`main`)**: The repository maintains a single long-lived `main` branch. All features, fixes, and documentation improvements are validated locally via the automated test suite before atomic integration.
 - **Linear, Clean History**: The repository history is kept strictly linear, free of extraneous merge bubbles or work-in-progress checkpoint commits. Every commit on `origin/main` represents a complete, compilable, and passing state.
-- **Single-Author Attribution Integrity**: 100% of all repository commits are authored by the primary project architect (`Chawannua <chawannua@gmail.com>`). The repository enforces a strict trailer hygiene policy: third-party AI assistant trailers (such as `Co-Authored-By: Claude ...` or `Claude-Session: ...`) are strictly forbidden and sanitized to preserve pure project authorship and avoid GitHub contribution graph pollution.
+- **Single-Author Attribution Integrity**: 100% of all repository commits are authored by the primary project architect (`Chawannua <chawannua@gmail.com>`). The repository enforces a strict commit trailer hygiene policy: no third-party co-author or session trailers are permitted, preserving pure project authorship and a clean contribution graph.
 
 ### 2. Semantic Versioning 2.0.0 (SemVer)
 The project strictly enforces [Semantic Versioning 2.0.0](https://semver.org/) under the `MAJOR.MINOR.PATCH` specification:
