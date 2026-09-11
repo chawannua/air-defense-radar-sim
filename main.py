@@ -1,5 +1,5 @@
 # main.py
-__version__ = "1.4.1"
+__version__ = "1.5.0"
 import sys
 import pygame
 

@@ -13,11 +13,11 @@
 ## 📡 AEGIS Air Defense Radar Simulator
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
-### ⚡ Current Release: `v1.4.1` (Geodata Theatre Expansion — 20 Regions)
+### ⚡ Current Release: `v1.5.0` (Proprietary Source-Available License)
 Expands the tactical theatre from 11 to 20 registered regions — adding India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, South Korea and North Korea as Natural Earth 1:10m sovereign outlines — growing operational span from 3,716 × 2,930 km to 6,788 × 5,806 km (+83% east-west, +98% north-south). Geodata registration only; the protected map engine gained nine loader entries and no rendering logic was altered. Test suite expansion to 42/42.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.4.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (42/42)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.5.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (42/42)](test_logic.py)
 
 </div>
 
@@ -37,7 +37,7 @@ Expands the tactical theatre from 11 to 20 registered regions — adding India, 
 10. [Complete Tactical Keybindings (Menu & Combat)](#complete-tactical-keybindings-menu--combat)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
 12. [Automated Testing (42/42 Test Suite)](#automated-testing-4242-test-suite)
-13. [Release History & Version Evolution (v1.0.0 → v1.4.1)](#release-history--version-evolution-v100--v141)
+13. [Release History & Version Evolution (v1.0.0 → v1.5.0)](#release-history--version-evolution-v100--v150)
 14. [Version Control, Release Architecture & Repository Governance](#version-control-release-architecture--repository-governance)
 15. [Installation & Build Guide](#installation--build-guide)
 16. [Dependencies](#dependencies)
@@ -670,13 +670,13 @@ ALL 41 TEST MODULES PASSED (100% SUCCESS RATE)
 
 ---
 
-## Release History & Version Evolution (v1.0.0 → v1.4.1)
+## Release History & Version Evolution (v1.0.0 → v1.5.0)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0` ➔ `v1.4.1`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0` ➔ `v1.4.1` ➔ `v1.5.0`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
@@ -687,6 +687,14 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.3.1`** to **`v1.3.2`** delivers the `VFXManager.add_shockwave()` crash hotfix triggered by Tactical EMP `[B]` discharge under heavy contact loads, and expands the test suite to 31/31.
 - The version increment from **`v1.3.2`** to **`v1.4.0`** introduces the cinematic Main Menu and scene system, strict Spectator/Player mode separation, context-aware skill triggers replacing RNG and blind-geometry firing, and expands map coverage to the Philippines and Taiwan (+57% east-west extent). Test suite expands to 41/41.
 - The version increment from **`v1.4.0`** to **`v1.4.1`** expands the tactical theatre from 11 to 20 registered regions across South, South-East and East Asia, growing operational span from 3,716 x 2,930 km to 6,788 x 5,806 km (+83% east-west, +98% north-south). Geodata registration only; no rendering logic altered. Test suite expands to 42/42.
+- The version increment from **`v1.4.1`** to **`v1.5.0`** changes the distribution licence from MIT to a proprietary source-available licence. No simulation behaviour changed; the MINOR bump marks the change in what recipients may do with the software. Releases up to v1.4.1 remain available under MIT.
+
+### 🌟 Version 1.5.0 Feature Highlights
+- **Licence Change (MIT ➔ Proprietary Source-Available):** Source remains public for evaluation, study and personal non-commercial use. Modification, derivative works, redistribution and commercial use now require written permission.
+- **Explicitly Non-Retroactive:** Releases up to and including `v1.4.1` were published under MIT and remain available under those terms permanently, recorded in Section 3(b) of the licence rather than left ambiguous.
+- **Third-Party Licensing Preserved:** Section 4 records that pygame (LGPL-2.1), NumPy (BSD-3-Clause), SDL2 (zlib) and FreeType (FTL) remain under their own terms, and that geodata is public-domain Natural Earth. LGPL permits proprietary applications that link pygame.
+- **Documentation Alignment:** `CONTRIBUTING.md` no longer solicits outside contributions; its technical documentation is retained as internal reference.
+- **No Behavioural Change:** The simulation is functionally identical to v1.4.1 — 20 regions, 6,788 × 5,806 km theatre, suite 42/42.
 
 ### 🌟 Version 1.4.1 Feature Highlights
 - **Geodata Theatre Expansion (11 ➔ 20 Regions):** Registered Natural Earth 1:10m sovereign outlines for India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, South Korea and North Korea, extending the theatre from 3,716 × 2,930 km to **6,788 × 5,806 km** (+83% east-west, +98% north-south).

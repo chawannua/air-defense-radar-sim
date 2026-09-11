@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-09-12
+
+### Changed
+- **License: MIT -> Proprietary Source-Available.** The source stays publicly viewable and downloadable for personal, non-commercial evaluation and study. Modification, derivative works, redistribution and commercial use now require written permission from the copyright holder.
+  - **Not retroactive.** Releases up to and including v1.4.1 were published under the MIT License and remain available under those terms in perpetuity. Section 3(b) of the new license states this explicitly so the record is unambiguous.
+  - Third-party components keep their own licensing (pygame LGPL-2.1, NumPy BSD-3-Clause, SDL2 and friends zlib, FreeType FTL). LGPL permits proprietary applications that link pygame, so the relicense creates no conflict. Geographic outline data remains public-domain Natural Earth.
+  - `CONTRIBUTING.md` no longer solicits outside contributions, which would have contradicted the new terms. Its architecture, physics, geodata and audio documentation is retained as internal reference.
+  - The repository remains public, so GitHub's Terms of Service continue to permit any user to view and fork it irrespective of these terms. Only making the repository private would prevent that.
+
+### Note on versioning
+No code behaviour changed in this release; the simulation is byte-for-byte equivalent to v1.4.1. The MINOR bump marks the licensing change, which materially alters what recipients may do with the software. A case exists for treating a relicense as MAJOR; 1.5.0 was chosen by the project owner.
+
 ## [1.4.1] - 2026-09-11
 
 ### Added
