@@ -681,15 +681,76 @@ class CommandCenter:
 
         # EW Glitch Mechanics (Floods radar with false targets)
         # Ghost tracks go directly into contacts — they're injected radar returns, not real aircraft
-        ew_active = any(getattr(c, 'is_heavy_ew', False) and c.active for c in self.contacts)
-        if ew_active and random.random() < 0.4:
-            for _ in range(random.randint(3, 8)):
+        flood_chance, jam_power = self.get_ew_flood_chance()
+        if flood_chance > 0.0 and random.random() < flood_chance:
+            # Ghost volume scales with the jamming power actually being applied.
+            count_lo = max(1, int(round(2 * jam_power)))
+            count_hi = max(count_lo + 1, int(round(6 * jam_power)))
+            for _ in range(random.randint(count_lo, count_hi)):
                 self.track_counter += 1
                 ghost = EWGhostTrack(self.track_counter)
                 ghost.detected_by = "EW-INJECT"
                 ghost.brightness = 1.0
                 ghost.visible_dist = ghost.distance_km
                 self.contacts.append(ghost)
+
+    # --- Electronic attack (ghost flood) doctrine ---------------------------
+    # Range at which a jammer achieves full burn-in against our radar, the
+    # floor its power decays to at extreme standoff, and the per-tick flood
+    # rate at unit jamming power.
+    EW_FLOOD_REFERENCE_KM = 300.0
+    EW_FLOOD_MIN_PROXIMITY = 0.6
+    EW_FLOOD_BASE_RATE = 0.60
+
+    def get_jammer_strength(self, c):
+        """Relative electronic-attack power of a contact (0.0 = not a jammer).
+        Injected ghosts are explicitly excluded so the flood can never feed on
+        the false targets it just created."""
+        if not getattr(c, 'active', False):
+            return 0.0
+        if isinstance(c, (GhostTrack, EWGhostTrack)):
+            return 0.0
+        # Our own AEW&C / CAP are not jamming us (and "AEW&C" would otherwise
+        # match the "EW" capability substring below).
+        if getattr(c, 'is_friendly', False) or getattr(c, 'status', '') == "FRIENDLY":
+            return 0.0
+        if getattr(c, 'is_heavy_ew', False):
+            return 1.0
+        if ("EW" in getattr(c, 'type_name', '') or "EW" in getattr(c, 'true_type', '')
+                or getattr(c, 'scenario', '') == 'EW'):
+            return 0.35
+        return 0.0
+
+    def get_ew_flood_chance(self):
+        """EW GHOST FLOOD RULE: a jammer injects false targets into a radar
+        that is actually radiating. If the ground radar is dark (EMCON SILENT)
+        there is no emission to exploit and the flood cannot happen at all;
+        SECTOR emission offers a narrower window. Otherwise the rate is derived
+        from the jammers really out there -- their electronic-attack strength
+        and their range -- and is suppressed while ECCM burn-through overdrive
+        is punching through the jamming.
+
+        Returns (per-tick flood chance, applied jamming power)."""
+        if self.emcon_mode == "SILENT":
+            return 0.0, 0.0
+
+        jam_power = 0.0
+        for c in self.contacts:
+            strength = self.get_jammer_strength(c)
+            if strength <= 0.0:
+                continue
+            proximity = min(1.0, self.EW_FLOOD_REFERENCE_KM / max(1.0, c.distance_km))
+            jam_power += strength * max(self.EW_FLOOD_MIN_PROXIMITY, proximity)
+
+        if jam_power <= 0.0:
+            return 0.0, 0.0
+        jam_power = min(2.0, jam_power)
+
+        factor = 0.5 if self.emcon_mode == "SECTOR" else 1.0
+        if self.burn_through_active:
+            factor *= 0.35
+
+        return min(0.85, self.EW_FLOOD_BASE_RATE * jam_power * factor), jam_power
 
     def process_reloads(self):
         # --- Base Defense Logistics ---
@@ -1009,6 +1070,23 @@ class CommandCenter:
             target.status = "FRIENDLY" if getattr(target, 'is_friendly', False) else "SUSPECT"
             self.add_log(f"\033[41m[ABORT]\033[0m Cancelled engagement on {target.id_code}")
 
+    def _chaff_defeats_shot(self, target, salvo_count=1):
+        """CHAFF / EVASION RULE: an aircraft only dispenses chaff because a
+        radar-guided missile is actually arriving on it, and whether that chaff
+        works is a function of the tactical picture -- how many cartridges the
+        platform has left, how capable an EW platform it is, how much range and
+        time of flight it has to break the lock, how many missiles are in the
+        ripple, and whether our radar is burning through with ECCM. The dice
+        roll survives (chaff is genuinely probabilistic) but the probability is
+        DERIVED from that context instead of a flat 25%."""
+        chance = target.chaff_evasion_chance(
+            salvo_count=salvo_count,
+            eccm_active=self.burn_through_active
+        )
+        if chance <= 0.0:
+            return False
+        return random.random() < chance
+
     def process_engagements(self):
         surviving_engagements = []
         for eng in self.active_engagements:
@@ -1058,11 +1136,12 @@ class CommandCenter:
                     # Chaff Evasion Mechanic (bypassed if HOJ passive homing is active against radiating jammer)
                     if self.hoj_mode and is_radiating_ew:
                         self.add_log(f"\033[93;1m[HOJ] HOME-ON-JAM ACTIVE: Passive seeker riding {eng.target.id_code} RF strobe (chaff decoy bypassed)!\033[0m")
-                    elif isinstance(eng.target, Aircraft) and random.random() < 0.25:
+                    elif isinstance(eng.target, Aircraft) and self._chaff_defeats_shot(eng.target, salvo_count):
+                        eng.target.chaff_remaining = max(0, getattr(eng.target, 'chaff_remaining', 0) - 1)
                         eng.target.status = "FRIENDLY" if getattr(eng.target, 'is_friendly', False) else "HOSTILE"
                         self.add_log(f"\033[93m[EW] {eng.target.id_code} DEPLOYED CHAFF! SAM DECOYED!\033[0m")
                         continue
-                        
+
                     base_hit = GameConfig.HIT_CHANCE_SAM_NUKE if isinstance(eng.target, ICBM) else \
                                (GameConfig.HIT_CHANCE_SAM_TBM if isinstance(eng.target, TacticalBM) else GameConfig.HIT_CHANCE_SAM_NORMAL)
                     if "AESA_SEEKERS" in self.unlocked_upgrades:
@@ -1150,39 +1229,98 @@ class CommandCenter:
 
         self.active_engagements = surviving_engagements
 
+    # --- Auto-CIWS last-ditch doctrine -------------------------------------
+    # The Phalanx holds one 150-round magazine and needs 10 ticks to reload, so
+    # it is the LAST layer, not an extra one. These knobs keep it spending that
+    # magazine on genuine leakers instead of on whatever drifts through the
+    # terminal bubble.
+    CIWS_TERMINAL_ETA_TICKS = 3     # inside this ETA, override the "outer layer has it" hold
+    CIWS_MAX_TARGETS_PER_TICK = 2   # mounts can only be slewed onto so many leakers per tick
+    CIWS_RESERVE_FRACTION = 0.25    # below this magazine level, single highest-value target only
+
+    def _ciws_engage_range(self, c):
+        """Terminal bubble radius for this contact (faster leakers are taken
+        under fire slightly further out so the burst has time to arrive)."""
+        base_engage_range = getattr(self, 'ciws_engage_range', 30.0 if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades else 5.0)
+        return max(base_engage_range, c.speed_mach * 1.5)
+
+    def _is_outer_layer_engaged(self, c):
+        """True when THAAD/SAM/fighters already have a shot in the air at `c`."""
+        for eng in self.active_engagements:
+            if getattr(eng, 'target', None) is c and getattr(eng, 'weapon_name', '') != "CIWS":
+                return True
+        return False
+
+    def _is_ciws_leaker(self, c):
+        """LAST-DITCH RULE: CIWS only fires on a genuine leaker -- something
+        that is closing on the base, can actually hurt it, and has defeated or
+        bypassed the outer SAM/THAAD/fighter layers. Everything else (injected
+        EW ghosts, bird/weather clutter, IFF squawkers, traffic that merely
+        crossed the bubble, and targets another layer already has a missile on)
+        is held, because a burst spent there is a burst the next real leaker
+        will not get."""
+        if not c.active:
+            return False
+        if c.status in ["FRIENDLY", "CLEARED"]:
+            return False
+        if c.distance_km > self._ciws_engage_range(c):
+            return False
+        # 1. Injected false targets and clutter cannot damage the base.
+        if isinstance(c, (GhostTrack, EWGhostTrack)):
+            return False
+        # 2. A contact answering IFF is not a valid last-ditch target.
+        if getattr(c, 'has_transponder', False):
+            return False
+        # 3. Must genuinely be running in on the base.
+        if not c.is_closing_on_base():
+            return False
+        # 4. Already covered by an outer layer -- only take the shot once the
+        #    leaker is terminal and that layer has demonstrably not stopped it.
+        if self._is_outer_layer_engaged(c) and c.get_eta() > self.CIWS_TERMINAL_ETA_TICKS:
+            return False
+        return True
+
+    def get_ciws_priority_targets(self):
+        """Leakers inside the terminal bubble, ranked by calculate_threat_score()
+        (ICBM > cruise/ARM > TBM > incidental traffic) and clipped to what the
+        mounts -- and the remaining magazine -- can honestly service this tick."""
+        leakers = [c for c in self.contacts if self._is_ciws_leaker(c)]
+        leakers.sort(key=lambda c: (-c.calculate_threat_score(), c.distance_km))
+        budget = self.CIWS_MAX_TARGETS_PER_TICK
+        if self.ammo["CIWS"] <= self.max_ammo["CIWS"] * self.CIWS_RESERVE_FRACTION:
+            budget = 1
+        return leakers[:budget]
+
     def process_auto_ciws(self):
-        # Auto-CIWS with dynamic engagement range
-        for c in self.contacts:
-            base_engage_range = getattr(self, 'ciws_engage_range', 30.0 if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades else 5.0)
-            engage_range = max(base_engage_range, c.speed_mach * 1.5) 
-            
-            if c.active and c.distance_km <= engage_range and c.status not in ["FRIENDLY", "CLEARED"]:
-                if self.ammo["CIWS"] > 0:
-                    # Higher speed targets require more ammunition spread
-                    curtain_spread = max(1, int(c.speed_mach)) 
-                    ammo_used = min(curtain_spread, self.ammo["CIWS"])
-                    self.ammo["CIWS"] -= ammo_used
-                    
-                    hit_multiplier = 1.0 + (ammo_used * 0.10) 
-                    speed_penalty = max(0.0, (c.speed_mach - 0.5) * 0.15) # CIWS struggles with Mach 2+ targets
-                    final_hit_chance = max(0.05, min(0.95, GameConfig.HIT_CHANCE_CIWS * hit_multiplier - speed_penalty))
-                    if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades:
-                        final_hit_chance = max(0.95, final_hit_chance)
-                    
-                    hit = (random.random() <= final_hit_chance)
-                    self.emit_event("CIWS_FIRE", target_id=c.id_code, ammo_used=ammo_used, hit=hit)
-                    if hit:
-                        weapon_label = "Helios Laser" if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades else "Phalanx CIWS"
-                        self.add_log(f"\033[91;1m[AUTO-CIWS] BRRRRRRT! (Spread x{ammo_used}) {c.id_code} SHREDDED by {weapon_label}! (Ammo: {self.ammo['CIWS']})\033[0m")
-                        c.status = "CLEARED"
-                        c.active = False
-                        self.record_kill(c, "CIWS")
-                        self.emit_event("INTERCEPT_KILL", target_id=c.id_code, target_type=c.type_name, weapon="CIWS", distance_km=c.distance_km)
-                    else:
-                        if self.tick_count % 2 == 0: 
-                            self.add_log(f"\033[93;1m[AUTO-CIWS] BRRRRRRT! MISSED {c.id_code} DESPITE SPREAD! TARGET EVADED!\033[0m")
+        # Auto-CIWS: prioritised last-ditch point defence (autonomous in BOTH
+        # Spectator and Player modes -- it is self-defence, never a player toy).
+        for c in self.get_ciws_priority_targets():
+            if self.ammo["CIWS"] > 0:
+                # Higher speed targets require more ammunition spread
+                curtain_spread = max(1, int(c.speed_mach)) 
+                ammo_used = min(curtain_spread, self.ammo["CIWS"])
+                self.ammo["CIWS"] -= ammo_used
+                
+                hit_multiplier = 1.0 + (ammo_used * 0.10) 
+                speed_penalty = max(0.0, (c.speed_mach - 0.5) * 0.15) # CIWS struggles with Mach 2+ targets
+                final_hit_chance = max(0.05, min(0.95, GameConfig.HIT_CHANCE_CIWS * hit_multiplier - speed_penalty))
+                if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades:
+                    final_hit_chance = max(0.95, final_hit_chance)
+                
+                hit = (random.random() <= final_hit_chance)
+                self.emit_event("CIWS_FIRE", target_id=c.id_code, ammo_used=ammo_used, hit=hit)
+                if hit:
+                    weapon_label = "Helios Laser" if "IRON_BEAM_DIRECTED_ENERGY" in self.unlocked_upgrades else "Phalanx CIWS"
+                    self.add_log(f"\033[91;1m[AUTO-CIWS] BRRRRRRT! (Spread x{ammo_used}) {c.id_code} SHREDDED by {weapon_label}! (Ammo: {self.ammo['CIWS']})\033[0m")
+                    c.status = "CLEARED"
+                    c.active = False
+                    self.record_kill(c, "CIWS")
+                    self.emit_event("INTERCEPT_KILL", target_id=c.id_code, target_type=c.type_name, weapon="CIWS", distance_km=c.distance_km)
                 else:
-                    if self.tick_count % 3 == 0: self.add_log(f"\033[41;97m[AUTO-CIWS] CLICK! CIWS RELOADING! BRACE FOR IMPACT: {c.id_code}!\033[0m")
+                    if self.tick_count % 2 == 0: 
+                        self.add_log(f"\033[93;1m[AUTO-CIWS] BRRRRRRT! MISSED {c.id_code} DESPITE SPREAD! TARGET EVADED!\033[0m")
+            else:
+                if self.tick_count % 3 == 0: self.add_log(f"\033[41;97m[AUTO-CIWS] CLICK! CIWS RELOADING! BRACE FOR IMPACT: {c.id_code}!\033[0m")
 
     def update_world(self):
         # Update active RF decoys

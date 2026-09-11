@@ -6,6 +6,11 @@ from config import GameConfig
 
 MACH_TO_KM_PER_SEC = 0.3403
 
+# Range (km) beyond which chaff has the full separation/time-of-flight it needs
+# to bloom and pull a radar seeker off the airframe. Inside it, effectiveness
+# falls off linearly -- a terminal-range shot is essentially undecoyable.
+CHAFF_EFFECTIVE_RANGE_KM = 60.0
+
 class AirContact(ABC):
     def __init__(self, track_number, distance_km):
         self.track_number = track_number
@@ -38,6 +43,10 @@ class AirContact(ABC):
         self.destination = "UNKNOWN"
         self.detected_by = "UNKNOWN"
         
+        # Expendable countermeasures (chaff/flare cartridges). Only platforms
+        # that actually carry dispensers override this in their own __init__.
+        self.chaff_remaining = 0
+
         # Set heavy EW capability & standoff loiter
         self._is_heavy_ew = False
         self.loiter_timer = None
@@ -81,6 +90,64 @@ class AirContact(ABC):
     def get_eta(self):
         speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC 
         return self.distance_km / speed_per_tick if speed_per_tick > 0 else 999
+
+    def closure_rate_km_per_tick(self):
+        """Radial closure toward the defended base at (0, 0), in km/tick.
+        Positive = closing, zero/negative = holding, crossing or opening.
+
+        Uses the real track history (prev_x_km/prev_y_km vs the current range)
+        whenever the contact has actually moved; otherwise it falls back to the
+        heading geometry so a freshly-placed contact still reports a meaningful
+        closure instead of a misleading zero."""
+        prev_distance_km = math.hypot(self.prev_x_km, self.prev_y_km)
+        delta = prev_distance_km - self.distance_km
+        if abs(delta) > 1e-9:
+            return delta
+        bearing_to_base = (self.bearing + 180.0) % 360.0
+        speed_per_tick = self.speed_mach * MACH_TO_KM_PER_SEC
+        return speed_per_tick * math.cos(math.radians(self.heading - bearing_to_base))
+
+    def is_closing_on_base(self):
+        """True when the contact is actually running in on the base, rather
+        than loitering, crossing or egressing through the same airspace."""
+        return self.closure_rate_km_per_tick() > 0
+
+    def chaff_evasion_chance(self, salvo_count=1, eccm_active=False):
+        """Probability this contact defeats an incoming radar-guided missile
+        with chaff.
+
+        Derived from the tactical situation -- remaining countermeasures, the
+        platform's own EW capability, the engagement geometry and the shooter's
+        ECCM state -- never a flat constant. Platforms with no dispensers left
+        (and all civil traffic) return exactly 0.0."""
+        if getattr(self, 'chaff_remaining', 0) <= 0:
+            return 0.0
+
+        # 1. Platform capability: a dedicated jammer sells a far better decoy.
+        if getattr(self, 'is_heavy_ew', False):
+            capability = 0.45
+        elif ("EW" in getattr(self, 'true_type', '') or "EW" in getattr(self, 'type_name', '')
+                or getattr(self, 'scenario', '') == 'EW'):
+            capability = 0.32
+        else:
+            capability = 0.22
+
+        # 2. Geometry: chaff needs separation and time of flight to break a
+        #    lock. A terminal-range shot barely gives the bundle time to bloom.
+        range_factor = min(1.0, max(0.0, self.distance_km) / CHAFF_EFFECTIVE_RANGE_KM)
+
+        # 3. A ripple/salvo cannot all be seduced by a single chaff bundle.
+        if salvo_count >= 3:
+            salvo_factor = 0.5
+        elif salvo_count == 2:
+            salvo_factor = 0.7
+        else:
+            salvo_factor = 1.0
+
+        # 4. Radar burn-through overdrive tracks through the decoy cloud.
+        eccm_factor = 0.4 if eccm_active else 1.0
+
+        return max(0.0, min(0.75, capability * range_factor * salvo_factor * eccm_factor))
 
     def calculate_threat_score(self):
         if self.status == "FRIENDLY": return 0
@@ -168,6 +235,18 @@ class Aircraft(AirContact):
                 self.true_type = random.choice(combat_aircraft)
                 
             self.scenario = "STRIKE"
+
+        # Countermeasure loadout: civil traffic carries no dispensers at all,
+        # combat aircraft carry a finite number of chaff bundles and dedicated
+        # EW platforms carry a deeper magazine.
+        if self.is_friendly:
+            self.chaff_remaining = 0
+        elif self.is_heavy_ew:
+            self.chaff_remaining = random.randint(4, 6)
+        elif "EW" in self.true_type:
+            self.chaff_remaining = random.randint(3, 5)
+        else:
+            self.chaff_remaining = random.randint(2, 4)
 
     def identify_target(self):
         self.type_name = self.true_type

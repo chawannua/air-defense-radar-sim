@@ -112,7 +112,9 @@ class MapManager:
             "MYS": "mys.json",
             "SGP": "sgp.json",
             "IDN": "idn.json",
-            "CHN": "chn.json"
+            "CHN": "chn.json",
+            "PHL": "phl.json",
+            "TWN": "twn.json"
         }
 
         for iso, fname in country_files.items():

@@ -1228,6 +1228,358 @@ close_fighter.distance_km = 10  # inside BACKUP_ENGAGEMENT_RADIUS_KM
 check(plyr_backup_cmd._is_backup_engagement(close_fighter) is True,
       "PLAYER_PROFILE backup auto-fire SHOULD treat an imminent/leaking close contact as backup-engageable")
 
+
+print("\n=== 35. Auto-CIWS Last-Ditch Leaker Discrimination ===")
+
+from targets import GhostTrack as _GhostTrack
+
+
+def _place(contact, dist_km, closing_km=1.0, bearing=0.0):
+    """Position a contact at `dist_km` on `bearing` and set its previous
+    position so it reads as closing (closing_km > 0) or opening (< 0)."""
+    contact.bearing = bearing
+    contact.distance_km = dist_km
+    contact.x_km = dist_km * math.sin(math.radians(bearing))
+    contact.y_km = dist_km * math.cos(math.radians(bearing))
+    prev = dist_km + closing_km
+    contact.prev_x_km = prev * math.sin(math.radians(bearing))
+    contact.prev_y_km = prev * math.cos(math.radians(bearing))
+    return contact
+
+
+def _silent_cmd():
+    c = CommandCenter()
+    c.tactical_log = []
+    return c
+
+
+# --- 1. Closure geometry helper on AirContact ---
+_closing = _place(TacticalBM(4001), 3.0, closing_km=2.0)
+_opening = _place(TacticalBM(4002), 3.0, closing_km=-2.0)
+check(_closing.is_closing_on_base() is True, "A contact whose range is decreasing must read as closing on the base")
+check(_opening.is_closing_on_base() is False, "A contact whose range is increasing must NOT read as closing on the base")
+
+# --- 2. WARRANTED: an unengaged, closing leaker inside the bubble IS engaged ---
+random.seed(20250911)
+cmd_ciws_fire = _silent_cmd()
+leaker = _place(TacticalBM(4010), 3.0, closing_km=2.0)
+leaker.status = "HOSTILE"
+cmd_ciws_fire.contacts = [leaker]
+check(leaker in cmd_ciws_fire.get_ciws_priority_targets(),
+      "Auto-CIWS MUST select a closing, unengaged leaker inside the terminal bubble")
+_ammo_before = cmd_ciws_fire.ammo["CIWS"]
+cmd_ciws_fire.process_auto_ciws()
+check(cmd_ciws_fire.ammo["CIWS"] < _ammo_before,
+      f"Auto-CIWS must expend rounds on a genuine leaker ({_ammo_before} -> {cmd_ciws_fire.ammo['CIWS']})")
+
+# --- 3. UNWARRANTED: a contact in range but NOT closing on the base is held ---
+cmd_ciws_hold = _silent_cmd()
+drifter = _place(Drone(4011), 3.0, closing_km=-1.5)
+drifter.status = "HOSTILE"
+cmd_ciws_hold.contacts = [drifter]
+check(drifter not in cmd_ciws_hold.get_ciws_priority_targets(),
+      "Auto-CIWS must HOLD FIRE on a contact that is inside the bubble but opening/not closing")
+_ammo_before = cmd_ciws_hold.ammo["CIWS"]
+cmd_ciws_hold.process_auto_ciws()
+check(cmd_ciws_hold.ammo["CIWS"] == _ammo_before,
+      "Auto-CIWS must not burn rounds on a non-closing contact")
+
+# --- 4. UNWARRANTED: already handled by an outer layer (SAM in the air, non-terminal) ---
+cmd_ciws_layer = _silent_cmd()
+handled = _place(TacticalBM(4012), 12.0, closing_km=2.0)
+handled.speed_mach = 0.5          # ETA well beyond the terminal override window
+handled.status = "ENGAGING"
+cmd_ciws_layer.contacts = [handled]
+cmd_ciws_layer.active_engagements = [Engagement(handled, "SAM", 3)]
+check(handled.get_eta() > cmd_ciws_layer.CIWS_TERMINAL_ETA_TICKS,
+      "Test fixture sanity: outer-layer target must be outside the CIWS terminal override window")
+check(handled not in cmd_ciws_layer.get_ciws_priority_targets(),
+      "Auto-CIWS must HOLD FIRE on a contact already engaged by the outer SAM/THAAD/fighter layer")
+_ammo_before = cmd_ciws_layer.ammo["CIWS"]
+cmd_ciws_layer.process_auto_ciws()
+check(cmd_ciws_layer.ammo["CIWS"] == _ammo_before,
+      "Auto-CIWS must not double-spend on a target the outer layer already has a shot at")
+
+# --- 5. WARRANTED: the outer layer failed and the leaker is now terminal ---
+cmd_ciws_term = _silent_cmd()
+terminal = _place(TacticalBM(4013), 1.0, closing_km=2.0)
+terminal.speed_mach = 6.0          # ETA ~ 0.5 ticks: last-ditch, override the hold
+terminal.status = "ENGAGING"
+cmd_ciws_term.contacts = [terminal]
+cmd_ciws_term.active_engagements = [Engagement(terminal, "SAM", 5)]
+check(terminal in cmd_ciws_term.get_ciws_priority_targets(),
+      "Auto-CIWS MUST override the outer-layer hold when the leaker is inside the terminal window")
+
+# --- 6. UNWARRANTED: injected EW ghosts / clutter cannot hurt the base ---
+cmd_ciws_ghost = _silent_cmd()
+fake = _place(EWGhostTrack(4014), 2.0, closing_km=1.0)
+fake.status = "UNIDENTIFIED"
+clutter = _place(_GhostTrack(4015), 2.0, closing_km=1.0)
+clutter.status = "UNIDENTIFIED"
+cmd_ciws_ghost.contacts = [fake, clutter]
+check(cmd_ciws_ghost.get_ciws_priority_targets() == [],
+      "Auto-CIWS must HOLD FIRE on injected EW ghosts and weather/bird clutter")
+_ammo_before = cmd_ciws_ghost.ammo["CIWS"]
+cmd_ciws_ghost.process_auto_ciws()
+check(cmd_ciws_ghost.ammo["CIWS"] == _ammo_before,
+      "Auto-CIWS must not expend its magazine on non-kinetic radar returns")
+
+# --- 7. UNWARRANTED: a contact squawking valid IFF is never a last-ditch target ---
+cmd_ciws_iff = _silent_cmd()
+squawker = _place(Aircraft(4016, friendly_weight=100), 2.0, closing_km=1.0)
+squawker.has_transponder = True
+squawker.status = "UNIDENTIFIED"
+cmd_ciws_iff.contacts = [squawker]
+check(squawker not in cmd_ciws_iff.get_ciws_priority_targets(),
+      "Auto-CIWS must HOLD FIRE on an IFF-squawking contact (blue-on-blue / airliner protection)")
+
+# --- 8. PRIORITISATION: the highest threat score is serviced first ---
+cmd_ciws_prio = _silent_cmd()
+low = _place(Drone(4017), 4.0, closing_km=1.0); low.status = "HOSTILE"
+high = _place(ICBM(4018), 4.0, closing_km=1.0); high.status = "HOSTILE"
+mid = _place(TacticalBM(4019), 4.0, closing_km=1.0); mid.status = "HOSTILE"
+cmd_ciws_prio.contacts = [low, mid, high]
+_prio = cmd_ciws_prio.get_ciws_priority_targets()
+check(_prio and _prio[0] is high,
+      f"Auto-CIWS must service the highest calculate_threat_score() leaker first (got {_prio[0].id_code if _prio else None})")
+check(low not in _prio,
+      "Auto-CIWS must not service the lowest-value contact while higher-value leakers are inbound")
+
+# --- 9. MAGAZINE DISCIPLINE: bounded targets per tick, single-target on low ammo ---
+cmd_ciws_budget = _silent_cmd()
+swarm = []
+for i in range(6):
+    d = _place(Drone(4100 + i), 4.0, closing_km=1.0)
+    d.status = "HOSTILE"
+    swarm.append(d)
+cmd_ciws_budget.contacts = list(swarm)
+check(len(cmd_ciws_budget.get_ciws_priority_targets()) <= cmd_ciws_budget.CIWS_MAX_TARGETS_PER_TICK,
+      "Auto-CIWS must not slew onto more than CIWS_MAX_TARGETS_PER_TICK leakers in one tick")
+cmd_ciws_budget.ammo["CIWS"] = 5   # below the reserve fraction
+check(len(cmd_ciws_budget.get_ciws_priority_targets()) == 1,
+      "Auto-CIWS on a near-empty magazine must engage only the single highest-value leaker")
+
+# --- 10. GameConfig remains untouched by the CIWS doctrine ---
+check(GameConfig.MAX_AMMO["CIWS"] == 150, "CIWS doctrine must not mutate GameConfig.MAX_AMMO")
+
+
+print("\n=== 36. Context-Derived Chaff / Evasion Countermeasures ===")
+
+# --- 1. Countermeasure loadout is a real, finite resource ---
+random.seed(777)
+_civ = Aircraft(4200, friendly_weight=100)
+check(_civ.is_friendly is True, "Test fixture sanity: friendly_weight=100 should produce a civil aircraft")
+check(getattr(_civ, 'chaff_remaining', None) == 0,
+      "Civil/friendly aircraft carry no chaff dispensers")
+
+_combat = Aircraft(4201, friendly_weight=0)
+check(getattr(_combat, 'chaff_remaining', 0) > 0,
+      "Hostile combat aircraft must carry a finite chaff load")
+
+# --- 2. UNWARRANTED: no countermeasures left => chaff can never trigger ---
+_dry = Aircraft(4202, friendly_weight=0)
+_dry.distance_km = 200.0
+_dry.chaff_remaining = 0
+check(_dry.chaff_evasion_chance(salvo_count=1) == 0.0,
+      "An aircraft out of chaff must have ZERO evasion chance (not a dice roll)")
+
+# --- 3. WARRANTED: a stocked EW platform under a single-missile shot evades often ---
+_ew = Aircraft(4203, friendly_weight=0)
+_ew.distance_km = 200.0
+_ew.is_heavy_ew = True
+_ew.chaff_remaining = 5
+_plain = Aircraft(4204, friendly_weight=0)
+_plain.distance_km = 200.0
+_plain.true_type = "Su-30MKM Flanker"
+_plain.chaff_remaining = 5
+check(_ew.chaff_evasion_chance(salvo_count=1) > _plain.chaff_evasion_chance(salvo_count=1),
+      "A heavy EW platform must defeat a radar-guided shot more often than a plain fighter")
+check(0.0 < _plain.chaff_evasion_chance(salvo_count=1) < 1.0,
+      "A stocked combat aircraft must have a non-trivial but non-certain chaff chance")
+
+# --- 4. Geometry: a terminal-range shot leaves no time for chaff to bloom ---
+_near = Aircraft(4205, friendly_weight=0); _near.chaff_remaining = 5
+_near.true_type = "Su-30MKM Flanker"; _near.distance_km = 3.0
+_far = Aircraft(4206, friendly_weight=0); _far.chaff_remaining = 5
+_far.true_type = "Su-30MKM Flanker"; _far.distance_km = 250.0
+check(_near.chaff_evasion_chance(salvo_count=1) < _far.chaff_evasion_chance(salvo_count=1),
+      "Chaff must be far less effective against a terminal-range shot than a long-range shot")
+
+# --- 5. A ripple/salvo cannot all be decoyed by one bundle; ECCM burn-through degrades it ---
+check(_far.chaff_evasion_chance(salvo_count=3) < _far.chaff_evasion_chance(salvo_count=1),
+      "A 3-missile salvo must be harder to defeat with chaff than a single missile")
+check(_far.chaff_evasion_chance(salvo_count=1, eccm_active=True) < _far.chaff_evasion_chance(salvo_count=1),
+      "Radar burn-through ECCM must degrade chaff effectiveness")
+
+# --- 6. Not a constant: the probability varies with context ---
+_samples = {
+    _plain.chaff_evasion_chance(salvo_count=1),
+    _near.chaff_evasion_chance(salvo_count=1),
+    _ew.chaff_evasion_chance(salvo_count=1),
+    _far.chaff_evasion_chance(salvo_count=3),
+}
+check(len(_samples) >= 4, f"Chaff probability must be derived from context, not constant (got {sorted(_samples)})")
+
+# --- 7. INTEGRATION: dry aircraft NEVER chaffs, stocked aircraft DOES (seeded) ---
+def _run_sam_shot(target, trials, seed):
+    random.seed(seed)
+    decoyed = 0
+    for _ in range(trials):
+        target.active = True
+        target.status = "ENGAGING"
+        c = CommandCenter()
+        c.tactical_log = []
+        c.contacts = [target]
+        c.active_engagements = [Engagement(target, "SAM", 1)]
+        c.process_engagements()
+        if any("DEPLOYED CHAFF" in entry for entry in c.tactical_log):
+            decoyed += 1
+    return decoyed
+
+_dry_tgt = Aircraft(4207, friendly_weight=0)
+_dry_tgt.distance_km = 250.0
+_dry_tgt.chaff_remaining = 0
+check(_run_sam_shot(_dry_tgt, 40, 31337) == 0,
+      "INTEGRATION: an aircraft with no countermeasures must NEVER deploy chaff")
+
+_wet_tgt = Aircraft(4208, friendly_weight=0)
+_wet_tgt.distance_km = 250.0
+_wet_tgt.is_heavy_ew = True
+_wet_tgt.chaff_remaining = 10**6   # effectively unlimited for the statistical check
+check(_run_sam_shot(_wet_tgt, 40, 31337) > 0,
+      "INTEGRATION: a stocked EW platform under a long-range SAM shot must sometimes chaff")
+
+# --- 8. Chaff consumes the dispenser load ---
+_finite = Aircraft(4209, friendly_weight=0)
+_finite.distance_km = 250.0
+_finite.is_heavy_ew = True
+_finite.chaff_remaining = 3
+_before = _finite.chaff_remaining
+_run_sam_shot(_finite, 60, 999)
+check(_finite.chaff_remaining < _before,
+      f"Deploying chaff must consume the dispenser load ({_before} -> {_finite.chaff_remaining})")
+
+
+print("\n=== 37. EW Ghost Flood Gated on Real Electronic-Warfare State ===")
+
+def _jammer_at(cmd, dist_km, heavy=True, track=4300):
+    j = Aircraft(track, friendly_weight=0)
+    j.distance_km = dist_km
+    j.x_km, j.y_km = 0.0, dist_km
+    j.active = True
+    j.status = "HOSTILE"
+    if heavy:
+        j.is_heavy_ew = True
+        j.true_type = "EA-18G Growler (HEAVY EW)"
+        j.type_name = "EA-18G Growler (HEAVY EW)"
+    else:
+        j.true_type = "Y-9G EW"
+        j.type_name = "Y-9G EW"
+    cmd.contacts = [j]
+    return j
+
+# --- 1. UNWARRANTED: no jammer at all => no flood ---
+cmd_ew_none = CommandCenter()
+cmd_ew_none.tactical_log = []
+cmd_ew_none.contacts = []
+check(cmd_ew_none.get_ew_flood_chance()[0] == 0.0,
+      "No jammer present => EW ghost flood chance must be exactly 0")
+
+# --- 2. UNWARRANTED: radar is not radiating (EMCON SILENT) => no flood ---
+cmd_ew_silent = CommandCenter()
+cmd_ew_silent.tactical_log = []
+_jammer_at(cmd_ew_silent, 60.0)
+cmd_ew_silent.emcon_mode = "SILENT"
+check(cmd_ew_silent.get_ew_flood_chance()[0] == 0.0,
+      "A jammer cannot flood a radar that is not radiating (EMCON SILENT) => chance must be 0")
+
+# --- 3. WARRANTED: radiating radar + close heavy jammer => strong flood ---
+cmd_ew_active = CommandCenter()
+cmd_ew_active.tactical_log = []
+_jammer_at(cmd_ew_active, 60.0)
+cmd_ew_active.emcon_mode = "ACTIVE"
+_close_chance = cmd_ew_active.get_ew_flood_chance()[0]
+check(_close_chance > 0.0, "A radiating radar under a close heavy jammer must suffer a ghost flood")
+
+# --- 4. Derived from range: a distant jammer floods less than a close one ---
+cmd_ew_far = CommandCenter()
+cmd_ew_far.tactical_log = []
+_jammer_at(cmd_ew_far, 1100.0)
+cmd_ew_far.emcon_mode = "ACTIVE"
+_far_chance = cmd_ew_far.get_ew_flood_chance()[0]
+check(_far_chance > 0.0, "A distant jammer still injects some false targets into a radiating radar")
+check(_far_chance < _close_chance,
+      f"Flood rate must fall with jammer range ({_far_chance:.3f} at 1100km vs {_close_chance:.3f} at 60km)")
+
+# --- 5. Derived from strength: a heavy jammer out-floods a standard EW platform ---
+cmd_ew_light = CommandCenter()
+cmd_ew_light.tactical_log = []
+_jammer_at(cmd_ew_light, 60.0, heavy=False)
+cmd_ew_light.emcon_mode = "ACTIVE"
+check(cmd_ew_light.get_ew_flood_chance()[0] < _close_chance,
+      "A standard EW platform must flood less than a heavy dedicated jammer at the same range")
+
+# --- 6. EMCON SECTOR (partial emission) and ECCM burn-through both suppress the flood ---
+cmd_ew_sector = CommandCenter()
+cmd_ew_sector.tactical_log = []
+_jammer_at(cmd_ew_sector, 60.0)
+cmd_ew_sector.emcon_mode = "SECTOR"
+check(0.0 < cmd_ew_sector.get_ew_flood_chance()[0] < _close_chance,
+      "Sector-limited emission must reduce (but not eliminate) the ghost flood")
+
+cmd_ew_eccm = CommandCenter()
+cmd_ew_eccm.tactical_log = []
+_jammer_at(cmd_ew_eccm, 60.0)
+cmd_ew_eccm.emcon_mode = "ACTIVE"
+cmd_ew_eccm.burn_through_active = True
+check(cmd_ew_eccm.get_ew_flood_chance()[0] < _close_chance,
+      "Radar burn-through ECCM must suppress the ghost flood rate")
+
+# --- 7. The flood must not feed on itself: injected ghosts are not jammers ---
+cmd_ew_self = CommandCenter()
+cmd_ew_self.tactical_log = []
+_self_ghost = EWGhostTrack(4350)
+check(cmd_ew_self.get_jammer_strength(_self_ghost) == 0.0,
+      "An injected EW ghost track must never be counted as a jammer (no self-amplifying flood)")
+
+# --- 8. INTEGRATION: SILENT radar produces zero ghosts, ACTIVE radar produces ghosts ---
+random.seed(9090)
+cmd_int_silent = CommandCenter()
+cmd_int_silent.tactical_log = []
+_jammer_at(cmd_int_silent, 80.0, track=4360)
+cmd_int_silent.emcon_mode = "SILENT"
+for _ in range(40):
+    cmd_int_silent.detect_airspace()
+_silent_ghosts = sum(1 for c in cmd_int_silent.contacts if isinstance(c, EWGhostTrack))
+check(_silent_ghosts == 0,
+      f"INTEGRATION: EMCON SILENT must yield zero injected EW ghosts over 40 ticks (got {_silent_ghosts})")
+
+random.seed(9090)
+cmd_int_active = CommandCenter()
+cmd_int_active.tactical_log = []
+_jammer_at(cmd_int_active, 80.0, track=4361)
+cmd_int_active.emcon_mode = "ACTIVE"
+for _ in range(40):
+    cmd_int_active.detect_airspace()
+_active_ghosts = sum(1 for c in cmd_int_active.contacts if isinstance(c, EWGhostTrack))
+check(_active_ghosts > 0,
+      f"INTEGRATION: a radiating radar under a close heavy jammer must be flooded (got {_active_ghosts})")
+
+# --- 9. UNWARRANTED: our own AEW&C is not an enemy jammer ---
+cmd_ew_blue = CommandCenter()
+cmd_ew_blue.tactical_log = []
+_own_awacs = AWACS(4370)          # true_type "Saab 340 AEW&C" contains the "EW" substring
+_own_awacs.distance_km = 150.0
+cmd_ew_blue.contacts = [_own_awacs]
+cmd_ew_blue.emcon_mode = "ACTIVE"
+check(cmd_ew_blue.get_jammer_strength(_own_awacs) == 0.0,
+      "A friendly AEW&C must never be scored as an enemy jammer")
+check(cmd_ew_blue.get_ew_flood_chance()[0] == 0.0,
+      "Friendly AEW&C on station must NOT trigger an enemy EW ghost flood")
+
+# --- 10. GameConfig untouched by the EW doctrine ---
+check(GameConfig.WAVE_CHANCE == 0.20, "EW flood doctrine must not mutate GameConfig.WAVE_CHANCE")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")
