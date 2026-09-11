@@ -1830,9 +1830,9 @@ check(_far42 * _floor42 < _half42,
 
 # These two strings drifted apart once before (main.py at 1.3.1 while config.py said
 # 1.3.2), so assert against the real module attribute, not just GameConfig.
-check(_main42.__version__ == GameConfig.VERSION == "1.7.0",
+check(_main42.__version__ == GameConfig.VERSION == "1.8.0",
       f"main.py __version__ ({_main42.__version__}) and GameConfig.VERSION "
-      f"({GameConfig.VERSION}) must both read 1.7.0")
+      f"({GameConfig.VERSION}) must both read 1.8.0")
 
 # 43. Clip-cut removal and label decluttering
 #
