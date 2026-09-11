@@ -6,15 +6,15 @@
 
 ---
 
-## Current State (as of v1.4.0)
+## Current State (as of v1.4.1)
 
 | Item | Value |
 |---|---|
-| Version | `1.4.0` — `main.py:2` (`__version__`) and `config.py:3` (`GameConfig.VERSION`) must always agree |
+| Version | `1.4.1` — `main.py:2` (`__version__`) and `config.py:3` (`GameConfig.VERSION`) must always agree; **test group 42 now enforces this**, it is no longer convention |
 | Branch | `main`, trunk-based, linear history |
-| Test suite | `python test_logic.py` → **41 groups**, must print `ALL TESTS PASSED` |
+| Test suite | `python test_logic.py` → **42 groups**, must print `ALL TESTS PASSED` |
 | Entry point | `python main.py` → menu → mode select → `start_radar(profile=...)` |
-| Map coverage | 11 countries, extent x `-900..2815 km`, y `-1632..1299 km` |
+| Map coverage | 20 countries, extent x span `6,788 km`, y span `5,806 km`, furthest point `4,552 km` |
 
 ### Architecture notes that are easy to get wrong
 
@@ -33,74 +33,31 @@
 
 ---
 
-## NEXT TASK — Expand the map, then release v1.4.1
+## NEXT TASK — pick one; none is blocking
 
-### Goal
-Increase the geographic coverage of the tactical map beyond the current
-3,716 × 2,930 km theatre, then verify, commit and release as **v1.4.1**.
+v1.4.1 shipped the map expansion. Candidates for the next unit of work, roughly by value:
 
-### Blocker you must resolve first
+### 1. Label the nine new regions (needs the same authorization call as v1.4.1)
+`country_labels` is built from `c_label_data` in `map_manager.py:250-253`, which still lists
+only the pre-v1.4.0 set. India, Korea, Bangladesh and the rest therefore **render as unlabelled
+landmasses**. Fixing this means touching the protected file again. v1.4.1 used PIPELINE option 1
+(minimal edit, `country_files` only) and deliberately did **not** extend that licence to the
+label table — decide explicitly before editing, and say which option you chose in the commit.
+The module docstring (`map_manager.py:4-5`) is likewise still pre-v1.4.0 and lists the old set.
 
-`AGENTS.md` DIRECTIVE 2 lists `map_manager.py` as **strictly protected — must NEVER be
-edited**. But the country loader lives inside it:
+### 2. Re-cut the two coarse outlines
+`twn.json` is 9 points and `phl.json` 110, against 1,545 for `tha.json`. Both render visibly
+blockier than their neighbours now that high-fidelity outlines sit beside them. Both are listed
+as protected in `AGENTS.md` DIRECTIVE 2, so this needs the same explicit decision as above.
+The v1.4.1 converter method reproduces `tha.json` fidelity exactly and can regenerate them:
+Douglas-Peucker at `eps = 0.005019` deg over Natural Earth 1:10m admin-0.
 
-```python
-# map_manager.py, in load_all_data()
-country_files = { "THA": "tha.json", ..., "PHL": "phl.json", "TWN": "twn.json" }
-```
+### 3. Close the v1.4.0 open items
+The seven WARNING/NIT findings listed below are all still open.
 
-Registering new regions requires touching that dict. Pick one and state which you chose
-in the commit message:
-
-1. **Minimal edit (recommended)** — add entries to `country_files` only. The loader is
-   already fully generic: it iterates the dict, projects lat/lon → km via
-   `latlon_to_km()`, and stores into `self.country_polys[iso]`. Only `"THA"` is
-   special-cased (sovereign highlight). No rendering logic changes. This is how PHL and
-   TWN were added in v1.4.0.
-2. **External manifest** — move the mapping to a `map_regions.json` the loader reads, so
-   future regions need no code edit. Costs one structural change to the protected file now,
-   avoids all future ones.
-
-Do **not** refactor the renderer, the caching, the display modes, or `latlon_to_km()`.
-Those are the protected parts that matter.
-
-### There is no unused data left
-
-All 11 country files are registered. `gbr.json` / `irl.json` were removed in v1.4.0 as
-irrelevant (UK/Ireland, left over from before the project was localised to SEA).
-**Expanding coverage requires acquiring new outline data.**
-
-### Data format (match exactly)
-
-Each country file is a JSON **array of rings**; each ring is an array of `[lon, lat]`
-pairs in decimal degrees, WGS84. Rings with fewer than 3 points are skipped by the loader.
-
-```json
-[[[121.777818, 24.394274], [121.175632, 22.790857], ...], ...]
-```
-
-Source used for existing data: **Natural Earth 1:10m** admin-0 country polygons.
-Keep new files at comparable fidelity — `tha.json` is ~30 KB / 1,545 points, whereas
-`twn.json` is only 225 bytes. Very coarse outlines render as blocky shapes and look
-worse than omitting the country.
-
-### Suggested regions (in rough order of tactical relevance)
-
-India, Bangladesh, Sri Lanka, Japan, South Korea, North Korea, Brunei, Timor-Leste,
-Papua New Guinea, Australia (northern coast), Nepal, Bhutan.
-
-Caution: adding very distant land (e.g. all of Australia) pushes the extent far enough
-that the theatre no longer reads at a usable zoom. Prefer regions within roughly
-4,000 km of the Bangkok origin (`RADAR_LAT 13.7563`, `RADAR_LON 100.5018`).
-
-### Zoom floor
-
-`radar_ui.py:367` clamps zoom to `max(0.10, min(10.0, zoom_level))`. The floor was lowered
-from `0.2` to `0.10` in v1.4.0 so the wider theatre fits. If the extent grows substantially
-again, verify the furthest point still fits on screen:
-`furthest_km × zoom_floor` must be **less than** half the window width in pixels.
-
----
+### 4. Cover the UI input paths
+The suite is still UI-free. Three of four critical v1.4.0 defects lived in paths no test touches,
+and no test exercises the Spectator input gate over *mouse* paths.
 
 ## Verification — all must pass before committing
 
@@ -201,4 +158,18 @@ Test coverage gap: the suite is UI-free. No test exercises the Spectator input g
 | Version | Summary |
 |---|---|
 | v1.4.0 | Main menu + cinematic camera, Spectator/Player mode separation, context-aware skill triggers (CIWS / chaff / EW flood), map extended to PHL + TWN (+57% east-west), repo cleanup 3,725 → 37 tracked files, suite 31 → 41 groups |
-| v1.4.1 | *(pending — map expansion, this document's next task)* |
+| v1.4.1 | Map expansion 11 -> 20 regions (IND, BGD, LKA, NPL, BTN, BRN, TLS, KOR, PRK) from Natural Earth 1:10m; theatre 3,716 x 2,930 -> 6,788 x 5,806 km (+83% / +98%); registration-only edit to the protected loader (10 ins / 1 del); suite 41 -> 42 groups with per-ISO bounding-box and real version-lockstep assertions; JPN/PNG/AUS excluded as beyond the ~4,000 km guidance |
+
+---
+
+## Outstanding after v1.4.1
+
+- **Gate 4 was never run.** `python main.py` visual confirmation is still outstanding — every
+  other gate in this document passed headless. The theatre nearly doubled north-south, so if
+  India and the Koreas make it read too wide at default zoom, drop regions and re-cut.
+- **No GitHub Release object.** `v1.4.1` is tagged and pushed, but the `gh` CLI is not installed
+  on this machine, so no Release was published. The README download badge points at
+  `releases/latest` and will not resolve to v1.4.1 until one is created from the tag.
+- **Zoom-floor margin is thin.** At the 0.10 floor the furthest point (North Korea, 4,552 km)
+  renders 455 px from centre; on a 1024px-wide display the half-window is 461 px. Six pixels of
+  margin. Adding anything further out requires lowering the floor again, or dropping PRK/KOR.
