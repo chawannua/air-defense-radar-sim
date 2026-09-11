@@ -1830,9 +1830,9 @@ check(_far42 * _floor42 < _half42,
 
 # These two strings drifted apart once before (main.py at 1.3.1 while config.py said
 # 1.3.2), so assert against the real module attribute, not just GameConfig.
-check(_main42.__version__ == GameConfig.VERSION == "1.6.0",
+check(_main42.__version__ == GameConfig.VERSION == "1.7.0",
       f"main.py __version__ ({_main42.__version__}) and GameConfig.VERSION "
-      f"({GameConfig.VERSION}) must both read 1.6.0")
+      f"({GameConfig.VERSION}) must both read 1.7.0")
 
 # 43. Clip-cut removal and label decluttering
 #
@@ -1949,6 +1949,17 @@ check(len(set(_prios43)) == len(_prios43),
       f"label tier priorities must be unique so collisions resolve deterministically ({_tiers43})")
 check(_MapManager43.LBL_HQ[0] < _MapManager43.LBL_BASE[0] < _MapManager43.LBL_PEAK[0],
       "the C2 HQ must outrank an airbase, which must outrank a mountain peak")
+
+# Operational labels must outrank decorative ones. Ordered the obvious way round
+# - country names above bases - the word THAILAND is wide enough to suppress
+# WING 4 (TAKHLI) entirely at the DEFAULT zoom, 40 px away from it. On an air
+# defence display that is the wrong thing to lose.
+check(_MapManager43.LBL_BASE[0] < _MapManager43.LBL_SOVEREIGN[0]
+      < _MapManager43.LBL_COUNTRY[0],
+      f"an RTAF wing must outrank the sovereign label, which must outrank a "
+      f"neighbouring country name (base={_MapManager43.LBL_BASE[0]}, "
+      f"sovereign={_MapManager43.LBL_SOVEREIGN[0]}, "
+      f"country={_MapManager43.LBL_COUNTRY[0]})")
 check(_MapManager43.LBL_HQ[1] == 0.0 and _MapManager43.LBL_SOVEREIGN[1] == 0.0,
       "the HQ and the sovereign label must never be culled by zoom")
 _zm43 = _re42.search(r"zoom_level = max\((\d+\.\d+),",
@@ -1961,6 +1972,68 @@ for _n43 in ("LBL_PEAK", "LBL_HUB", "LBL_BASE", "LBL_MARITIME"):
           f"{_n43} must be culled at the {_ZOOM_FLOOR43} zoom floor, where it only "
           f"adds to the smear (min zoom {getattr(_MapManager43, _n43)[1]})")
 
+# The label rules above are structural; this renders the map and reads the
+# result back off the surface, which is the only way to catch a label that is
+# queued correctly and then still lost in the collision pass.
+import pygame as _pg43
+_pg43.init()
+_W43, _H43 = 1600, 900
+_Z43 = 0.8
+_surf43 = _pg43.Surface((_W43, _H43), _pg43.SRCALPHA)
+_fxs43 = _pg43.font.SysFont("consolas", 10)
+_fsm43 = _pg43.font.SysFont("consolas", 12)
+_fmd43 = _pg43.font.SysFont("consolas", 16, bold=True)
+_map43.invalidate_cache()
+_map43.render(_surf43, _W43 // 2, _H43 // 2, _Z43, _W43, _H43, _fxs43, _fsm43, _fmd43)
+
+
+def _anchor43(lat, lon):
+    _x43, _y43 = latlon_to_km(lon, lat)
+    return _W43 // 2 + _x43 * _Z43, _H43 // 2 - _y43 * _Z43
+
+
+def _drawn43(tpl, ox, oy):
+    """Fraction of a rendered label's own glyph pixels present on the surface."""
+    _hit43 = _tot43 = 0
+    for _px43 in range(tpl.get_width()):
+        for _py43 in range(tpl.get_height()):
+            _t43 = tpl.get_at((_px43, _py43))
+            if _t43[3] < 200:
+                continue
+            _tot43 += 1
+            _sx43, _sy43 = int(ox) + _px43, int(oy) + _py43
+            if not (0 <= _sx43 < _W43 and 0 <= _sy43 < _H43):
+                continue
+            _s43 = _surf43.get_at((_sx43, _sy43))
+            if max(abs(_s43[0] - _t43[0]), abs(_s43[1] - _t43[1]),
+                   abs(_s43[2] - _t43[2])) < 40:
+                _hit43 += 1
+    return (_hit43 / _tot43) if _tot43 else 0.0
+
+
+# An RTAF wing must actually survive to the surface at the default zoom. With
+# country names ranked above bases, WING 4 (TAKHLI) scored 0.00 here - killed
+# outright by the word THAILAND 40 px away.
+_wx43, _wy43 = _anchor43(15.266, 100.333)
+_wing43 = _drawn43(_fxs43.render("WING 4 (TAKHLI)", True, (0, 190, 255)),
+                   _wx43 + 8, _wy43 - 4)
+check(_wing43 > 0.5,
+      f"WING 4 (TAKHLI) must be drawn at the default zoom, not suppressed by a "
+      f"decorative country name (glyph match {_wing43:.2f})")
+
+# And a subtitle must never outlive the label it belongs to: once bases started
+# winning, "SOVEREIGN AIRSPACE" was left stranded with no THAILAND above it.
+_cx43, _cy43 = _anchor43(15.2, 100.8)
+_col43 = (0, 220, 100)
+_ttl43 = _fmd43.render("THAILAND", True, _col43)
+_sub43 = _fxs43.render("SOVEREIGN AIRSPACE", True,
+                       (_col43[0] // 2 + 30, _col43[1] // 2 + 30, _col43[2] // 2 + 30))
+_title_in43 = _drawn43(_ttl43, _cx43 - _ttl43.get_width() // 2, _cy43 - 10)
+_sub_in43 = _drawn43(_sub43, _cx43 - _sub43.get_width() // 2, _cy43 + 8)
+check(not (_sub_in43 > 0.9 and _title_in43 < 0.5),
+      f"a subtitle must never outlive its own country label (THAILAND "
+      f"{_title_in43:.2f}, SOVEREIGN AIRSPACE {_sub_in43:.2f})")
+
 # 44. Viewport culling and level-of-detail
 #
 # The theatre carries ~97k drawable points and the surface cache misses on every
@@ -1968,7 +2041,8 @@ for _n43 in ("LBL_PEAK", "LBL_HUB", "LBL_BASE", "LBL_MARITIME"):
 # strokes finer than LOD_MIN_PX. Both are silent optimisations - if either is
 # wrong the map just quietly loses geography, which no other assertion notices.
 print("\n=== 44. Viewport Culling & Level Of Detail ===")
-from map_manager import stroke_meta as _meta44, LOD_MIN_PX as _LOD44
+from map_manager import (stroke_meta as _meta44, LOD_MIN_PX as _LOD44,
+                         thin_stroke as _thin44f)
 
 _line44 = [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0)]
 _m44 = _meta44(_line44)
@@ -2013,14 +2087,63 @@ def _stride44(seg_km, zoom):
 _tha44 = max(_map43.country_polys["THA"], key=len)
 _seg44 = _meta44(_tha44)[4]
 check(_stride44(_seg44, 0.8) == 1,
-      f"LOD must not thin anything at the default 0.8 zoom (Thailand mainland "
-      f"spacing {_seg44:.2f} km -> {_seg44 * 0.8:.2f} px, threshold {_LOD44}, "
-      f"stride {_stride44(_seg44, 0.8)})")
+      f"Thailand's mainland must keep every vertex at the default 0.8 zoom "
+      f"(spacing {_seg44:.2f} km -> {_seg44 * 0.8:.2f} px, threshold {_LOD44})")
 check(_stride44(_seg44, 5.0) == 1,
       "LOD must never thin when zoomed right in")
 check(_stride44(_seg44, 0.1) > 1,
       f"LOD must thin when zoomed out, or the widened theatre blows the frame "
       f"budget (stride at 0.1 zoom: {_stride44(_seg44, 0.1)})")
+
+# Thailand's mainland is the single most favourable stroke in the theatre, so
+# asserting on it alone proves almost nothing. The invariant that actually
+# bounds the visual damage holds for every stroke at every zoom: the stride is
+# FLOORED, so stride * step_px <= LOD_MIN_PX and vertices never end up further
+# apart on screen after thinning than the threshold itself. A stroke's overall
+# size is irrelevant; its post-thinning vertex spacing is the thing that shows.
+_all44 = ([(_m44x, _r44x) for _iso44 in _map43.country_meta
+           for _m44x, _r44x in zip(_map43.country_meta[_iso44], _map43.country_polys[_iso44])]
+          + list(zip(_map43.coast_meta, _map43.coastlines_km))
+          + list(zip(_map43.border_meta, _map43.borders_km)))
+_worst44, _at44 = 0.0, None
+for _z44 in (0.07, 0.13, 0.3, 0.5, 0.8, 2.0):
+    for _m44x, _r44x in _all44:
+        _s44 = _stride44(_m44x[4], _z44)
+        if _s44 <= 1:
+            continue  # untouched: its natural spacing is not thinning damage
+        _after44 = _s44 * _m44x[4] * _z44
+        if _after44 > _worst44:
+            _worst44, _at44 = _after44, _z44
+check(_worst44 <= _LOD44 + 1e-9,
+      f"post-thinning vertex spacing must never exceed the {_LOD44} px threshold "
+      f"at any zoom (worst {_worst44:.3f} px at zoom {_at44})")
+
+# A stroke must never be thinned into something the draw calls then discard.
+# A closed island loop repeats its first vertex last, so the "keep the final
+# point" step never fires for one and a hard stride used to collapse it to a
+# single point - 369 coastlines and 326 country rings did exactly that.
+_ring44 = [(_math43.cos(_math43.radians(_i44 * 12)) * 0.4,
+            _math43.sin(_math43.radians(_i44 * 12)) * 0.4) for _i44 in range(30)]
+_ring44.append(_ring44[0])
+_thin44 = _thin44f(_ring44, _meta44(_ring44)[4], 0.001)
+check(len(_thin44) >= 4,
+      f"a closed loop must never be thinned below four points (got {len(_thin44)})")
+
+_collapsed44 = []
+for _m44x, _r44x in _all44:
+    if len(_thin44f(_r44x, _m44x[4], 0.07)) < min(3, len(_r44x)):
+        _collapsed44.append(len(_r44x))
+check(not _collapsed44,
+      f"no stroke may collapse below drawable size at the zoom floor "
+      f"({len(_collapsed44)} did)")
+
+# A short straight run at the edge of the data is a coincidence, not a cut.
+_short44 = [(68.0, 10.0), (68.0, 10.5), (68.4, 10.5), (68.4, 10.0), (68.0, 10.0)]
+_far44 = [(68.0, 0.0), (146.0, 0.0), (146.0, 46.0), (100.0, 23.0), (68.0, 0.0)]
+_cl44, _ct44 = _detect43([_far44, _short44])
+check(68.0 not in _cl44,
+      f"a half-degree straight run at the data edge must not be believed as a "
+      f"cut (detected meridians: {sorted(_cl44)})")
 
 print("\n" + "="*50)
 if errors:

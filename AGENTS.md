@@ -22,10 +22,10 @@ touching one, say so in the commit message and state why no alternative existed.
 | File / pattern | Why it is protected |
 |---|---|
 | `map_manager.py` | Natural Earth tactical map engine — 1:10m vector polygons, coastline caching, airbase coordinates, mountain peaks, display modes. The renderer, polygon caching, display modes and `latlon_to_km()` are the parts that matter. Registering a new region in `country_files` is a recognised exception; see §2. |
-| `tha.json` | 1,545-point polygon for the Kingdom of Thailand sovereign border. |
-| `coastlines.json` | 8,338-point Gulf of Thailand, Andaman Sea and Indian Ocean coastlines. |
-| `borders.json` | International land boundaries of Southeast Asia. |
-| `mmr.json`, `lao.json`, `khm.json`, `vnm.json`, `mys.json`, `sgp.json`, `idn.json`, `chn.json`, `phl.json`, `twn.json`, `ind.json`, `bgd.json`, `lka.json`, `npl.json`, `btn.json`, `brn.json`, `tls.json`, `kor.json`, `prk.json` | Sovereign boundary vectors for the 20 registered regions. |
+| `tha.json` | 1,859-point polygon for the Kingdom of Thailand sovereign border. |
+| `coastlines.json` | 39,410-point coastlines spanning the theatre, from the Arabian Sea to the Sea of Okhotsk. |
+| `borders.json` | International land boundaries across the theatre, 9,305 points. |
+| `mmr.json`, `lao.json`, `khm.json`, `vnm.json`, `mys.json`, `sgp.json`, `idn.json`, `chn.json`, `phl.json`, `twn.json`, `ind.json`, `bgd.json`, `lka.json`, `npl.json`, `btn.json`, `brn.json`, `tls.json`, `kor.json`, `prk.json`, `jpn.json` | Sovereign boundary vectors for the 21 registered regions. |
 | `missions.py` | Base campaign scenarios (`OP-DEFENSE`, `OP-GUARDIAN`, `OP-IRONSWARM`, `OP-GHOST`). |
 | `AEGIS_Radar.spec`, `AEGIS_Radar_debug.spec` | PyInstaller deployment packaging. Changes here alter what ships to users — icon, version resource, bundled licence files, compression. Edit only for a deliberate packaging change, and record it. |
 
@@ -74,7 +74,7 @@ three-pillar doctrine:
 
 ## 5. Verification standard
 
-- Run `python test_logic.py` after any change. All **42 groups** must pass with zero errors.
+- Run `python test_logic.py` after any change. All **44 groups** must pass with zero errors.
 - Version strings in `main.py` (`__version__`) and `config.py` (`GameConfig.VERSION`) must
   always agree. Test group 42 enforces this; it is not left to convention.
 - A green test suite is necessary, not sufficient. Several defects have shipped past green

@@ -36,8 +36,15 @@ def latlon_to_km(lon, lat):
 # as a perfectly axis-aligned run of vertices sitting at the extreme edge of the
 # data, and real coastline is never both perfectly straight and extremal. Those
 # runs are dropped and what remains of the ring is drawn open.
-CLIP_TOL = 0.05      # degrees a cut may sit inside the data extent
-CLIP_MIN_RUN = 0.05  # degrees; shorter axis-aligned runs are real geography
+CLIP_TOL = 0.05       # degrees a cut may sit inside the data extent
+CLIP_MIN_RUN = 0.05   # degrees; shorter axis-aligned runs are real geography
+CLIP_MIN_TOTAL = 2.0  # degrees of accumulated run before a line is believed
+CUT_EPS = 1e-6        # tolerance matching a segment to a detected cut
+#
+# Residual hazard, deliberately accepted: a window edge placed exactly on a real
+# straight border cannot be told apart from a cut. The Indonesia-Papua New
+# Guinea border runs dead straight along the 141st meridian, so a future re-cut
+# at lon 141.0 would delete it. Do not choose a window edge that lies on one.
 
 
 def detect_clip_lines(rings):
@@ -48,24 +55,32 @@ def detect_clip_lines(rings):
         return frozenset(), frozenset()
     lo_lon, hi_lon = min(lons), max(lons)
     lo_lat, hi_lat = min(lats), max(lats)
-    cut_lons, cut_lats = set(), set()
+    lon_runs, lat_runs = {}, {}
     for ring in rings:
         for a, b in zip(ring, ring[1:]):
             if a[0] == b[0] and abs(a[1] - b[1]) > CLIP_MIN_RUN:
                 if abs(a[0] - lo_lon) <= CLIP_TOL or abs(a[0] - hi_lon) <= CLIP_TOL:
-                    cut_lons.add(a[0])
+                    lon_runs[a[0]] = lon_runs.get(a[0], 0.0) + abs(a[1] - b[1])
             if a[1] == b[1] and abs(a[0] - b[0]) > CLIP_MIN_RUN:
                 if abs(a[1] - lo_lat) <= CLIP_TOL or abs(a[1] - hi_lat) <= CLIP_TOL:
-                    cut_lats.add(a[1])
-    return frozenset(cut_lons), frozenset(cut_lats)
+                    lat_runs[a[1]] = lat_runs.get(a[1], 0.0) + abs(a[0] - b[0])
+    # One coincidental straight stretch at the edge of the data is not a cut; a
+    # real one runs for hundreds of kilometres.
+    return (frozenset(v for v, run in lon_runs.items() if run >= CLIP_MIN_TOTAL),
+            frozenset(v for v, run in lat_runs.items() if run >= CLIP_MIN_TOTAL))
 
 
 def _is_cut(a, b, clip):
-    """True when segment a->b lies along a detected cut rather than on land."""
+    """True when segment a->b lies along a detected cut rather than on land.
+
+    Matched within CUT_EPS rather than by exact equality: the cut values and the
+    vertices come from the same export today, but an export that re-rounded
+    46.0 to 45.99998 would otherwise disable the trimming silently.
+    """
     cut_lons, cut_lats = clip
-    if a[0] == b[0] and a[0] in cut_lons:
+    if a[0] == b[0] and any(abs(a[0] - c) <= CUT_EPS for c in cut_lons):
         return True
-    if a[1] == b[1] and a[1] in cut_lats:
+    if a[1] == b[1] and any(abs(a[1] - c) <= CUT_EPS for c in cut_lats):
         return True
     return False
 
@@ -103,8 +118,9 @@ def split_ring_on_frame(ring, clip):
             if not cur:
                 cur.append(pts[i])
             cur.append(pts[(i + 1) % n])
-    if len(cur) >= 2:
-        runs.append((cur, False))
+    # No trailing flush: the walk starts just past a cut segment and runs a full
+    # lap, so its final iteration lands back on that same cut and has already
+    # flushed whatever was open.
     return runs
 
 
@@ -136,7 +152,10 @@ def split_line_on_frame(line, clip):
 # pan. Two cheap filters keep the cost proportional to what is actually visible:
 # a bounding-box reject, and thinning strokes whose vertices land closer than
 # LOD_MIN_PX apart - detail finer than that cannot be resolved anyway.
-# Tuned so the default 0.8 zoom and everything tighter keep every vertex.
+#
+# At the default 0.8 zoom every mainland outline keeps all its vertices; the
+# strokes that do thin there are sub-pixel islets, a few hundred pixels of
+# coastline in total across the whole theatre. Thinning stops entirely at 2.0.
 LOD_MIN_PX = 4.0
 
 
@@ -153,6 +172,30 @@ def stroke_meta(pts):
     else:
         seg = 0.0
     return (min(xs), min(ys), max(xs), max(ys), seg)
+
+
+def thin_stroke(pts, seg_km, zoom_level):
+    """Drop vertices a stroke is too small on screen to resolve.
+
+    Module level rather than a closure in render() so the output guard below is
+    reachable from the test suite.
+    """
+    step_px = seg_km * zoom_level
+    if len(pts) <= 8 or step_px <= 0.0 or step_px >= LOD_MIN_PX:
+        return pts
+    stride = int(LOD_MIN_PX / step_px)
+    if stride <= 1:
+        return pts
+    thinned = pts[::stride]
+    if thinned[-1] != pts[-1]:
+        thinned.append(pts[-1])
+    # Guard the OUTPUT, not just the input length. A closed island loop repeats
+    # its first vertex last, so the append above never fires for one, and a hard
+    # stride can collapse it to a single point which the draw calls then discard
+    # outright. Below four points a stroke is no longer a shape worth thinning.
+    if len(thinned) < 4:
+        return pts
+    return thinned
 
 
 def draw_dashed_polygon(surface, color, points, dash_len=8, space_len=6, width=1):
@@ -186,10 +229,15 @@ class MapManager:
     # collision; below min zoom the tier is not worth drawing at all. Without
     # this every tier renders at every scale and the theatre turns into an
     # unreadable smear as soon as the operator zooms out.
+    #
+    # Operational labels outrank decorative ones. This is an air defence
+    # display: an RTAF wing must never be suppressed by a country name. Ordered
+    # the obvious way round - SOVEREIGN above BASE - the word THAILAND is wide
+    # enough to kill WING 4 (TAKHLI) at the default zoom, 40 px away from it.
     LBL_HQ = (0, 0.00)
-    LBL_SOVEREIGN = (1, 0.00)
-    LBL_COUNTRY = (2, 0.06)
-    LBL_BASE = (3, 0.17)
+    LBL_BASE = (1, 0.17)
+    LBL_SOVEREIGN = (2, 0.00)
+    LBL_COUNTRY = (3, 0.06)
     LBL_MARITIME = (4, 0.15)
     LBL_ADIZ = (5, 0.20)
     LBL_SUBTITLE = (6, 0.22)
@@ -307,7 +355,12 @@ class MapManager:
 
         # The clip window is whatever rectangle bounds every loaded file, so this
         # keeps working untouched if the geodata is ever re-cut to a wider theatre.
-        all_rings = [r for rings in raw_polys.values() for r in rings]
+        # Country rings are polygons, so detection must see the implicit closing
+        # segment that split_ring_on_frame will evaluate - roughly half of them
+        # are stored without a repeated final vertex. Coastlines and borders are
+        # open lines; wrapping those would invent a segment that is not there.
+        all_rings = [r if (len(r) > 1 and r[0] == r[-1]) else list(r) + [r[0]]
+                     for rings in raw_polys.values() for r in rings if r]
         all_rings.extend(raw_coast)
         all_rings.extend(raw_borders)
         self.data_frame = detect_clip_lines(all_rings)
@@ -538,27 +591,29 @@ class MapManager:
                         or meta[3] < view_y0 or meta[1] > view_y1)
 
         def lod(pts, meta):
-            step_px = meta[4] * zoom_level
-            if len(pts) <= 8 or step_px <= 0.0 or step_px >= LOD_MIN_PX:
-                return pts
-            stride = int(LOD_MIN_PX / step_px)
-            if stride <= 1:
-                return pts
-            thinned = pts[::stride]
-            if thinned[-1] != pts[-1]:
-                thinned.append(pts[-1])
-            return thinned
+            return thin_stroke(pts, meta[4], zoom_level)
 
         # Text is queued rather than blitted so it lands on top of all linework,
         # thins out by zoom, and yields to whatever matters more where two
         # labels want the same pixels.
         labels = []
 
-        def queue(spec, text_surf, x, y):
+        def queue(spec, text_surf, x, y, parent=None):
+            """Queue one label. Returns a handle, or -1 if it will not be drawn.
+
+            Pass a parent handle to tie a label to another one: a subtitle whose
+            country name lost its collision must not be left stranded on the map
+            on its own, which is what "SOVEREIGN AIRSPACE" did with no THAILAND
+            above it once airbases started outranking country names.
+            """
+            if parent == -1:
+                return -1
             tier, min_zoom = spec
             if zoom_level < min_zoom:
-                return
-            labels.append((tier, len(labels), text_surf, int(x), int(y)))
+                return -1
+            handle = len(labels)
+            labels.append((tier, handle, text_surf, int(x), int(y), parent))
+            return handle
 
         # ----------------------------------------------------
         # 1. Maritime Water Labels (MODE 0 & 1)
@@ -675,10 +730,11 @@ class MapManager:
                 if -100 <= sx <= width + 100 and -50 <= sy <= height + 50:
                     c_txt = font_md.render(cname, True, col)
                     tier = self.LBL_SOVEREIGN if cname == "THAILAND" else self.LBL_COUNTRY
-                    queue(tier, c_txt, sx - c_txt.get_width() // 2, sy - 10)
+                    parent = queue(tier, c_txt, sx - c_txt.get_width() // 2, sy - 10)
                     if csub:
                         s_txt = font_xs.render(csub, True, (col[0] // 2 + 30, col[1] // 2 + 30, col[2] // 2 + 30))
-                        queue(self.LBL_SUBTITLE, s_txt, sx - s_txt.get_width() // 2, sy + 8)
+                        queue(self.LBL_SUBTITLE, s_txt, sx - s_txt.get_width() // 2, sy + 8,
+                              parent=parent)
 
         # ----------------------------------------------------
         # 8. Strategic Airbases & Regional Hubs
@@ -708,7 +764,11 @@ class MapManager:
         # 9. Label pass - priority order, first claim on the pixels wins
         # ----------------------------------------------------
         occupied = []
-        for _tier, _seq, text_surf, tx, ty in sorted(labels, key=lambda l: (l[0], l[1])):
+        drawn = set()
+        # Sorted by tier, so a parent is always resolved before its dependants.
+        for _tier, handle, text_surf, tx, ty, parent in sorted(labels, key=lambda l: (l[0], l[1])):
+            if parent is not None and parent not in drawn:
+                continue
             rect = pygame.Rect(tx, ty, text_surf.get_width(), text_surf.get_height())
             if rect.right < 0 or rect.left > width or rect.bottom < 0 or rect.top > height:
                 continue
@@ -716,6 +776,7 @@ class MapManager:
             if any(probe.colliderect(taken) for taken in occupied):
                 continue
             occupied.append(rect)
+            drawn.add(handle)
             surf.blit(text_surf, (tx, ty))
 
         # Save cache and blit to screen
