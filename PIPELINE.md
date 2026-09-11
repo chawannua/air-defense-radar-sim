@@ -128,15 +128,15 @@ if the change turns out larger than data registration.
   tree has moved — other tooling also writes to this repository.
 - **Never weaken or delete an existing test.** Append new groups only.
 - **Verify, do not assume.** Run the suite and inspect diffs; a passing report from a
-  delegated task is a claim, not proof. Several defects in v1.4.0 were found only by an
-  adversarial review pass after the tests were already green.
+  passing report is a claim, not proof. Several defects in v1.4.0 were found only by a
+  line-by-line review pass after the tests were already green.
 - `work/` is a 176 MB local build environment. It is gitignored and must stay untracked.
 
 ---
 
 ## Known open items (not blocking v1.4.1)
 
-From the v1.4.0 adversarial review — none can lose a game, all still open:
+From the v1.4.0 review pass — none can lose a game, all still open:
 
 | Severity | Location | Issue |
 |---|---|---|

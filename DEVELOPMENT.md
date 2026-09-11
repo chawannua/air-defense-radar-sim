@@ -1,4 +1,4 @@
-# Contributing to AEGIS Radar Simulator
+# AEGIS Radar — Development Notes
 
 > **Notice — this project is no longer open to outside contributions.**
 >
@@ -25,7 +25,7 @@
 6. [How to Synthesize Procedural Audio in NumPy](#6-how-to-synthesize-procedural-audio-in-numpy)
 7. [Running the Automated Test Suite](#7-running-the-automated-test-suite)
 8. [Code Style & Best Practices](#8-code-style--best-practices)
-9. [Submitting a Pull Request](#9-submitting-a-pull-request)
+9. [Release Workflow](#9-release-workflow)
 
 ---
 
@@ -226,7 +226,7 @@ If you add a new feature, please include corresponding unit tests in `test_logic
 
 ---
 
-## 9. Submitting a Pull Request
+## 9. Release Workflow
 
 1. **Create a topic branch**:
    ```bash

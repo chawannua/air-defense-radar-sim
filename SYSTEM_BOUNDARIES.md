@@ -1,6 +1,6 @@
 # Tactical Air Defense Simulator - System Boundaries & Modification Governance
 
-> **Reference Document for Developers & AI Agents**  
+> **Reference Document for Developers**  
 > **Status**: ACTIVE & ENFORCED  
 > **Last Updated**: 2026-09-09
 
@@ -10,7 +10,7 @@ This document explicitly defines which files are **strictly protected** (immutab
 
 ## 1. Strictly Protected Components (IMMUTABLE)
 
-Under no circumstances should autonomous agents or refactoring tools alter, delete, or rewrite any part of the following files:
+Under no circumstances should refactoring or code-generation tooling alter, delete, or rewrite any part of the following files:
 
 ```
 [STRICTLY PROTECTED - DO NOT TOUCH]

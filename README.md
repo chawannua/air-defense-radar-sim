@@ -102,7 +102,7 @@ Expands the tactical theatre from 11 to 20 registered regions — adding India, 
 
 ## System Boundaries & Modification Governance
 
-> For AI agents and developers, this repository enforces strict boundaries documented in [`SYSTEM_BOUNDARIES.md`](SYSTEM_BOUNDARIES.md) and [`AGENTS.md`](AGENTS.md):
+> This repository enforces strict modification boundaries, documented in [`SYSTEM_BOUNDARIES.md`](SYSTEM_BOUNDARIES.md) and [`AGENTS.md`](AGENTS.md):
 > - **Strictly Protected (Immutable)**: `map_manager.py` (v1.1.0 Natural Earth map geometry), all GeoJSON maps (`tha.json`, `coastlines.json`, etc.), and `missions.py`.
 > - **Permitted**: `command_center.py`, `targets.py`, `radar_ui.py`, `sound_engine.py`, `test_logic.py`, `README.md`, `CHANGELOG.md`.
 
@@ -557,10 +557,10 @@ air-defense-radar-sim/
 ├── visual_effects.py         # Visual juice engine: T² camera trauma model, shockwaves, shrapnel, lead vectors
 ├── config.py                 # Simulation balance constants, RTAF airbase coordinates, weapon envelopes (single truth)
 ├── test_logic.py             # Headless automated verification suite: 42 test modules passing 100%
-├── CONTRIBUTING.md           # Developer onboarding, domain modeling guides, and contribution rules
+├── DEVELOPMENT.md            # Developer onboarding, domain modeling guides, and architecture notes
 ├── CHANGELOG.md              # Historical version changelog adhering to Keep a Changelog & SemVer
-├── SYSTEM_BOUNDARIES.md      # Immutable boundaries and modification governance for developers and AI agents
-├── AGENTS.md                 # Agent orchestration directives and dynamic model tiering rules
+├── SYSTEM_BOUNDARIES.md      # Immutable boundaries and modification governance
+├── AGENTS.md                 # Protected files, permitted scope of work, and verification standard
 ├── requirements.txt          # Minimal runtime dependencies (pygame >= 2.0.0, numpy >= 1.24.0)
 ├── .gitignore                # Strict repository hygiene (ignores work/, *.exe, *.log, byte-cache)
 └── *.json                    # 1:10m Natural Earth geodata:
