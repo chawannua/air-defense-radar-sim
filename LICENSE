@@ -1,21 +1,77 @@
-MIT License
+AEGIS Radar — Proprietary Source-Available License
+Version 1.0, effective 2026-09-12
 
-Copyright (c) 2026 Chawanuea
+Copyright (c) 2026 Chawannua. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software and its source code (the "Software") are made publicly visible
+for evaluation, study and personal use only. They are NOT open source. All
+rights not expressly granted below are reserved by the copyright holder.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. GRANT OF LIMITED RIGHTS
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+   Subject to the restrictions in Section 2, you are permitted to:
+
+   (a) View and read the source code;
+   (b) Download and retain a personal copy;
+   (c) Run the Software for personal, non-commercial evaluation and private
+       use, including compiling it for that purpose.
+
+2. RESTRICTIONS
+
+   Except where Section 3 applies, you may NOT:
+
+   (a) Modify, adapt, translate, or create derivative works of the Software;
+   (b) Redistribute, publish, sublicense, lease, rent, sell, or otherwise
+       transfer the Software or any portion of it, in source or binary form;
+   (c) Use the Software or any portion of it in any commercial product,
+       commercial service, or revenue-generating activity;
+   (d) Incorporate any portion of the Software into another work;
+   (e) Remove, obscure, or alter this notice or any copyright, trademark, or
+       attribution notice contained in the Software;
+   (f) Reverse engineer the Software except to the limited extent that such
+       activity cannot lawfully be restricted under applicable law.
+
+3. RIGHTS RESERVED BY LAW AND BY PRIOR LICENSE
+
+   (a) Nothing in this License limits rights you hold under mandatory
+       applicable law, including any applicable right of private study,
+       quotation, or interoperability.
+
+   (b) Versions of the Software released on or before 2026-09-11, up to and
+       including version 1.4.1, were published under the MIT License. Those
+       releases remain available under the MIT License, and this License does
+       not purport to revoke, restrict, or modify any right already granted
+       under it. This License governs only versions released after that date.
+
+4. THIRD-PARTY COMPONENTS
+
+   The Software depends on and may be distributed alongside third-party
+   components that are licensed separately by their respective copyright
+   holders, including but not limited to pygame (LGPL-2.1), NumPy
+   (BSD-3-Clause), SDL2 and related libraries (zlib), FreeType (FTL), and
+   others. Those components remain governed by their own licenses, which are
+   not affected by this License. Geographic outline data is derived from
+   Natural Earth, which is in the public domain.
+
+5. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+6. LIMITATION OF LIABILITY
+
+   IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR
+   OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+   ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+7. TERMINATION
+
+   Any breach of Section 2 terminates the rights granted to you under Section 1
+   automatically and immediately.
+
+8. OTHER USES
+
+   For commercial licensing, modification rights, or any use not permitted
+   above, contact the copyright holder to request written permission.

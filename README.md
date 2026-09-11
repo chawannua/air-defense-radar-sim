@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Pygame 2.0+](https://img.shields.io/badge/Pygame-2.0%2B-FF6F00?style=for-the-badge&logo=python&logoColor=white)](https://pygame.org)
 [![NumPy](https://img.shields.io/badge/NumPy-1.24%2B-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg?style=for-the-badge)](LICENSE)
 [![RTAF C2](https://img.shields.io/badge/Military_C2-RTAF_SOC-00529B?style=for-the-badge&logo=shield)](https://github.com/chawannua/air-defense-radar-sim)
 [![Windows Executable](https://img.shields.io/badge/Windows_Binary-AEGIS__Radar.exe-success?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/chawannua/air-defense-radar-sim/releases/latest)
 
@@ -845,6 +845,8 @@ python -m PyInstaller --onefile --noconsole --name "AEGIS_Radar" `
 
 ## License & Acknowledgments
 
-- **License**: Released under the **[MIT License](LICENSE)**.
+- **License**: Released under a **[Proprietary Source-Available License](LICENSE)**. The source is public for evaluation, study and personal non-commercial use. Modification, redistribution and commercial use are **not** permitted without written permission.
+  - Releases up to and including **v1.4.1** were published under the MIT License and remain available under those terms. The proprietary license governs versions released after 2026-09-11.
+  - For commercial licensing or modification rights, contact the copyright holder.
 - **Academic Context**: Developed as a final project for an Object-Oriented Programming (OOP) curriculum, modeling advanced software design patterns, geospatial data projection, procedural acoustics, and interactive real-time systems.
 - **Data Source**: Real-world coastline and sovereign territorial vectors derived from Natural Earth 1:10m Cultural and Physical geospatial databases.

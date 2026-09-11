@@ -1,8 +1,18 @@
 # Contributing to AEGIS Radar Simulator
 
-Thank you for your interest in contributing to **AEGIS Radar** (`air-defense-radar-sim`)! We welcome contributions from military aviation enthusiasts, Python developers, radar engineers, and game designers alike.
-
-Whether you want to model a new hypersonic threat, implement advanced radar signal processing, refine the CRT phosphor rendering, or add new airbase geodata, this guide provides everything you need to get started.
+> **Notice — this project is no longer open to outside contributions.**
+>
+> As of 2026-09-12 AEGIS Radar is released under a [Proprietary Source-Available License](LICENSE).
+> Modification, derivative works and redistribution are not permitted, so pull requests
+> cannot be accepted and forks may not be published. Releases up to v1.4.1 remain under the
+> MIT License and are unaffected.
+>
+> This document is retained as **internal architecture and development documentation**. The
+> setup, architecture, physics, geodata and audio sections below describe how the codebase is
+> built and are useful for reading the source. The pull-request workflow in section 9 applies
+> only to the copyright holder.
+>
+> To request commercial licensing or permission to modify, contact the copyright holder.
 
 ---
 
