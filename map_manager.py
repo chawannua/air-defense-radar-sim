@@ -114,7 +114,16 @@ class MapManager:
             "IDN": "idn.json",
             "CHN": "chn.json",
             "PHL": "phl.json",
-            "TWN": "twn.json"
+            "TWN": "twn.json",
+            "IND": "ind.json",
+            "BGD": "bgd.json",
+            "LKA": "lka.json",
+            "NPL": "npl.json",
+            "BTN": "btn.json",
+            "BRN": "brn.json",
+            "TLS": "tls.json",
+            "KOR": "kor.json",
+            "PRK": "prk.json"
         }
 
         for iso, fname in country_files.items():

@@ -13,11 +13,11 @@
 ## 📡 AEGIS Air Defense Radar Simulator
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
-### ⚡ Current Release: `v1.4.0` (Main Menu, Spectator/Player Modes & Context-Aware AI)
-Introduces the cinematic Main Menu and Scene Architecture (`scenes.py`, `camera_director.py`), decoupled Spectator and Player simulation profiles (`profiles.py`), context-aware AI combat doctrine (closing-leaker Auto-CIWS, physical chaff, RF-gated EW ghost floods), expanded Philippines & Taiwan geodata theater, and comprehensive test suite expansion to 41/41.
+### ⚡ Current Release: `v1.4.1` (Geodata Theatre Expansion — 20 Regions)
+Expands the tactical theatre from 11 to 20 registered regions — adding India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, South Korea and North Korea as Natural Earth 1:10m sovereign outlines — growing operational span from 3,716 × 2,930 km to 6,788 × 5,806 km (+83% east-west, +98% north-south). Geodata registration only; the protected map engine gained nine loader entries and no rendering logic was altered. Test suite expansion to 42/42.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.4.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (41/41)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.4.1)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (42/42)](test_logic.py)
 
 </div>
 
@@ -36,8 +36,8 @@ Introduces the cinematic Main Menu and Scene Architecture (`scenes.py`, `camera_
 9. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 10. [Complete Tactical Keybindings (Menu & Combat)](#complete-tactical-keybindings-menu--combat)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
-12. [Automated Testing (41/41 Test Suite)](#automated-testing-4141-test-suite)
-13. [Release History & Version Evolution (v1.0.0 → v1.4.0)](#release-history--version-evolution-v100--v140)
+12. [Automated Testing (42/42 Test Suite)](#automated-testing-4242-test-suite)
+13. [Release History & Version Evolution (v1.0.0 → v1.4.1)](#release-history--version-evolution-v100--v141)
 14. [Version Control, Release Architecture & Repository Governance](#version-control-release-architecture--repository-governance)
 15. [Installation & Build Guide](#installation--build-guide)
 16. [Dependencies](#dependencies)
@@ -556,7 +556,7 @@ air-defense-radar-sim/
 ├── sound_engine.py           # 100% procedural audio: NumPy mathematical DSP synthesis (zero audio files)
 ├── visual_effects.py         # Visual juice engine: T² camera trauma model, shockwaves, shrapnel, lead vectors
 ├── config.py                 # Simulation balance constants, RTAF airbase coordinates, weapon envelopes (single truth)
-├── test_logic.py             # Headless automated verification suite: 41 test modules passing 100%
+├── test_logic.py             # Headless automated verification suite: 42 test modules passing 100%
 ├── CONTRIBUTING.md           # Developer onboarding, domain modeling guides, and contribution rules
 ├── CHANGELOG.md              # Historical version changelog adhering to Keep a Changelog & SemVer
 ├── SYSTEM_BOUNDARIES.md      # Immutable boundaries and modification governance for developers and AI agents
@@ -611,9 +611,9 @@ air-defense-radar-sim/
 
 ---
 
-## Automated Testing (41/41 Test Suite)
+## Automated Testing (42/42 Test Suite)
 
-AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 41 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
+AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 42 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
 ```bash
 $ python test_logic.py
@@ -670,13 +670,13 @@ ALL 41 TEST MODULES PASSED (100% SUCCESS RATE)
 
 ---
 
-## Release History & Version Evolution (v1.0.0 → v1.4.0)
+## Release History & Version Evolution (v1.0.0 → v1.4.1)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0` ➔ `v1.4.1`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
@@ -686,6 +686,14 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.3.0`** to **`v1.3.1`** implemented security hardening, audio thread-safety locks, memory caps, and trajectory alignment telemetry.
 - The version increment from **`v1.3.1`** to **`v1.3.2`** delivers the `VFXManager.add_shockwave()` crash hotfix triggered by Tactical EMP `[B]` discharge under heavy contact loads, and expands the test suite to 31/31.
 - The version increment from **`v1.3.2`** to **`v1.4.0`** introduces the cinematic Main Menu and scene system, strict Spectator/Player mode separation, context-aware skill triggers replacing RNG and blind-geometry firing, and expands map coverage to the Philippines and Taiwan (+57% east-west extent). Test suite expands to 41/41.
+- The version increment from **`v1.4.0`** to **`v1.4.1`** expands the tactical theatre from 11 to 20 registered regions across South, South-East and East Asia, growing operational span from 3,716 x 2,930 km to 6,788 x 5,806 km (+83% east-west, +98% north-south). Geodata registration only; no rendering logic altered. Test suite expands to 42/42.
+
+### 🌟 Version 1.4.1 Feature Highlights
+- **Geodata Theatre Expansion (11 ➔ 20 Regions):** Registered Natural Earth 1:10m sovereign outlines for India, Bangladesh, Sri Lanka, Nepal, Bhutan, Brunei, Timor-Leste, South Korea and North Korea, extending the theatre from 3,716 × 2,930 km to **6,788 × 5,806 km** (+83% east-west, +98% north-south).
+- **Calibrated Outline Fidelity:** Douglas-Peucker simplification tolerance derived by reproducing Thailand's shipped 1,545-point outline from its 3,317-point source (`eps = 0.005019°`), then applied uniformly — new regions match existing data density rather than shipping coarse low-vertex shapes.
+- **Deliberate Extent Discipline:** Japan, Papua New Guinea and Australia evaluated and excluded for sitting beyond the ~4,000 km origin guidance; at the 0.10 zoom floor the furthest registered point renders 455 px from centre against an 800 px half-window limit.
+- **Zero-Regression Registration:** The protected map engine gained nine `country_files` entries (10 insertions, 1 deletion). Renderer, polygon caching, display modes and `latlon_to_km()` untouched.
+- **Regression Lock (Test Group 42):** Registry/disk agreement, v1.4.0 region survival, minimum outline density, theatre growth, zoom-floor fit and `main.py` ↔ `config.py` version lockstep all asserted automatically. Suite 41/41 ➔ 42/42.
 
 ### 🌟 Version 1.4.0 Feature Highlights
 - **Main Menu & Scene Architecture (`scenes.py`, `camera_director.py`):** State-driven scene manager featuring dark-tactical C2 aesthetics, phosphor green/amber scanlines, full keyboard/mouse navigation, and smoothstep-eased cinematic camera panning over RTAF airbases with cosine zoom breathing.
@@ -760,7 +768,7 @@ No release tag may be minted or pushed without achieving a 100% clean bill of he
 ```bash
 python test_logic.py
 ```
-- **Zero Failures**: All **41/41 test modules** (325+ assertions) must evaluate to `[PASS]`.
+- **Zero Failures**: All **42/42 test modules** (325+ assertions) must evaluate to `[PASS]`.
 - **Adversarial Regression Locks**: Tests 38–41 explicitly lock in critical behavioral guards:
   - *Test 38*: `DEFAULT_PROFILE` command input retention (un-profiled callers retain human console controls).
   - *Test 39*: Spectator IFF re-designation guard against accidental civilian shootdown court-martial.

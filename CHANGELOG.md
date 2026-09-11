@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-09-11
+
+### Added
+- **Geodata Theatre Expansion**: Registered nine new sovereign outlines sourced from Natural Earth 1:10m admin-0 - India (`ind.json`), Bangladesh (`bgd.json`), Sri Lanka (`lka.json`), Nepal (`npl.json`), Bhutan (`btn.json`), Brunei (`brn.json`), Timor-Leste (`tls.json`), South Korea (`kor.json`) and North Korea (`prk.json`). Theatre extent grows from 3,716 x 2,930 km to **6,788 x 5,806 km** (+83% east-west, +98% north-south); registered regions 11 -> 20.
+  - Outline fidelity is calibrated against the existing `tha.json` rather than guessed: Douglas-Peucker simplification at `eps = 0.005019` deg reproduces Thailand's shipped 1,545 points from the 3,317-point source, and the same tolerance is applied to every new region. No blocky low-vertex outlines of the kind `twn.json` (9 points) shipped with. Rings that simplification collapses to zero enclosed area are discarded rather than left to draw sub-pixel hairlines.
+  - Japan, Papua New Guinea and Australia were evaluated and **deliberately excluded**: Japan's north-east extremity (145.341, 44.346) sits 5,912 km from the Bangkok origin, well past the ~4,000 km guidance, and would stretch the theatre far enough that it no longer reads at a usable zoom.
+  - Registration only - the `country_files` dict gained nine entries (10 insertions, 1 deletion). The renderer, polygon caching, display modes and `latlon_to_km()` are untouched.
+- **Test group 42 - Geodata Theatre Registration & Fidelity**: Locks in the expansion against regression. Asserts the registry and on-disk files agree, every registered region loads at least one >=3-point ring, all 11 v1.4.0 regions survive, all 9 new regions load, new outlines carry >=80 points, the theatre exceeds the v1.4.0 baseline, the furthest point still lands on screen at the 0.10 zoom floor (4,552 km -> 455 px against an 800 px limit), and `GameConfig.VERSION` stays in lockstep with `main.py.__version__`. Suite 41 -> 42 groups.
+
+### Changed
+- **Version**: `main.py.__version__` and `GameConfig.VERSION` bumped 1.4.0 -> 1.4.1 in lockstep, now enforced by test group 42 rather than convention. These two strings drifted apart once before (`main.py` at 1.3.1 while `config.py` said 1.3.2).
+
 ## [1.4.0] - 2026-09-11
 
 ### Added

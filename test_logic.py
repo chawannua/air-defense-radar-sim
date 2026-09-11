@@ -1732,6 +1732,103 @@ check(len(_cc_distant_ply.active_engagements) == 0,
       "Mode contrast: a 100km distant Drone must NOT be auto-engaged under PLAYER_PROFILE "
       "(correctly left for the human to fire on manually), proving backup fire stays restricted")
 
+
+print("\n=== 42. Geodata Theatre Registration & Fidelity (v1.4.1 map expansion) ===")
+import json as _json42
+import re as _re42
+import main as _main42
+from map_manager import MapManager as _MapManager42
+
+_here42 = os.path.dirname(__file__)
+
+# The loader is generic: it iterates country_files and projects each ring. Parse the
+# registry straight from the source so a file added to the dict but missing from disk
+# (or vice versa) fails here rather than silently rendering nothing.
+_src42 = open(os.path.join(_here42, "map_manager.py"), encoding="utf-8").read()
+_m42 = _re42.search(r"country_files = \{(.*?)\}", _src42, _re42.S)
+check(_m42 is not None,
+      "country_files dict must be parseable from map_manager.py (reformatted or renamed?)")
+_registry42 = dict(_re42.findall(r'"(\w+)":\s*"([\w.]+\.json)"', _m42.group(1))) if _m42 else {}
+
+_map42 = _MapManager42()
+
+check(len(_registry42) == 20,
+      f"Registry must list 20 regions after the v1.4.1 expansion (found {len(_registry42)})")
+
+_missing42 = [f for f in _registry42.values() if not os.path.exists(os.path.join(_here42, f))]
+check(not _missing42,
+      f"Every registered country file must exist on disk (missing: {_missing42})")
+
+_empty42 = [iso for iso in _registry42 if not _map42.country_polys.get(iso)]
+check(not _empty42,
+      f"Every registered region must load at least one >=3-point ring (empty: {_empty42})")
+
+# v1.4.0 baseline must never silently disappear - this is the regression guard.
+_BASELINE42 = ["CHN", "IDN", "KHM", "LAO", "MMR", "MYS", "PHL", "SGP", "THA", "TWN", "VNM"]
+_lost42 = [iso for iso in _BASELINE42 if iso not in _map42.country_polys]
+check(not _lost42,
+      f"All 11 v1.4.0 regions must survive the expansion (lost: {_lost42})")
+
+# Each new region must contain the country it claims to. Without a geographic assertion
+# every other check here passes even if one file holds a duplicate of another country:
+# the region count, the point counts and the theatre span all stay identical while the
+# real country silently vanishes from the map.
+_BOX42 = {  # iso: (lon_min, lon_max, lat_min, lat_max) from Natural Earth 1:10m
+    "IND": (68.1, 97.4, 6.7, 35.5), "BGD": (88.0, 92.6, 20.7, 26.6),
+    "LKA": (79.7, 81.9, 5.9, 9.8),  "NPL": (80.0, 88.2, 26.3, 30.4),
+    "BTN": (88.7, 92.1, 26.7, 28.4), "BRN": (114.0, 115.4, 4.0, 5.1),
+    "TLS": (124.0, 127.3, -9.5, -8.1), "KOR": (124.6, 131.9, 33.2, 38.6),
+    "PRK": (124.2, 130.7, 37.7, 43.0),
+}
+_TOL42 = 1.5  # degrees of slack for simplification nudging an extremity
+for _iso42, (_lo42, _hi42, _la42, _ha42) in sorted(_BOX42.items()):
+    _fn42 = _registry42.get(_iso42)
+    check(_fn42 is not None, f"{_iso42} must be registered in country_files")
+    if not _fn42 or not os.path.exists(os.path.join(_here42, _fn42)):
+        continue
+    _rings42 = _json42.load(open(os.path.join(_here42, _fn42), encoding="utf-8"))
+    _lons42 = [p[0] for r in _rings42 for p in r]
+    _lats42 = [p[1] for r in _rings42 for p in r]
+    _fits42 = (_lo42 - _TOL42 <= min(_lons42) and max(_lons42) <= _hi42 + _TOL42
+               and _la42 - _TOL42 <= min(_lats42) and max(_lats42) <= _ha42 + _TOL42)
+    check(_fits42,
+          f"{_iso42} ({_fn42}) must actually contain {_iso42} territory: expected lon "
+          f"{_lo42}..{_hi42} lat {_la42}..{_ha42} (+/-{_TOL42}), got lon "
+          f"{min(_lons42):.1f}..{max(_lons42):.1f} lat {min(_lats42):.1f}..{max(_lats42):.1f}")
+    check(sum(len(r) for r in _rings42) >= 80,
+          f"{_iso42} outline must carry >=80 points, not a degenerate blocky shape "
+          f"(got {sum(len(r) for r in _rings42)}; twn.json shipped at 9 in v1.4.0)")
+    _degen42 = [i for i, r in enumerate(_rings42)
+                if abs(sum(r[i2][0] * r[(i2 + 1) % len(r)][1] - r[(i2 + 1) % len(r)][0] * r[i2][1]
+                           for i2 in range(len(r)))) / 2.0 == 0.0]
+    check(not _degen42,
+          f"{_iso42} must contain no zero-area rings that draw sub-pixel hairlines "
+          f"(ring indices: {_degen42})")
+
+_xs42 = [p[0] for rings in _map42.country_polys.values() for r in rings for p in r]
+_ys42 = [p[1] for rings in _map42.country_polys.values() for r in rings for p in r]
+_xspan42, _yspan42 = max(_xs42) - min(_xs42), max(_ys42) - min(_ys42)
+
+check(_xspan42 > 3716 and _yspan42 > 2930,
+      f"Theatre must exceed the v1.4.0 baseline of 3716 x 2930 km "
+      f"(got {_xspan42:.0f} x {_yspan42:.0f} km)")
+
+# radar_ui.py clamps zoom to max(0.10, ...) and sizes the window at 90% of the monitor,
+# so the tightest real case is the narrowest supported display, not a fixed 1600px.
+_MIN_MONITOR_W42 = 1024
+_half42 = _MIN_MONITOR_W42 * 0.9 / 2.0
+_far42 = max((x * x + y * y) ** 0.5 for x, y in zip(_xs42, _ys42))
+check(_far42 * 0.10 < _half42,
+      f"At the 0.10 zoom floor the furthest point must stay on screen on the narrowest "
+      f"supported {_MIN_MONITOR_W42}px display ({_far42:.0f} km -> {_far42 * 0.10:.0f} px, "
+      f"limit {_half42:.0f})")
+
+# These two strings drifted apart once before (main.py at 1.3.1 while config.py said
+# 1.3.2), so assert against the real module attribute, not just GameConfig.
+check(_main42.__version__ == GameConfig.VERSION == "1.4.1",
+      f"main.py __version__ ({_main42.__version__}) and GameConfig.VERSION "
+      f"({GameConfig.VERSION}) must both read 1.4.1")
+
 print("\n" + "="*50)
 if errors:
     print(f"FAILED: {len(errors)} test(s)")
