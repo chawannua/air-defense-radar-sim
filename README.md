@@ -17,7 +17,7 @@
 Introduces the cinematic Main Menu and Scene Architecture (`scenes.py`, `camera_director.py`), decoupled Spectator and Player simulation profiles (`profiles.py`), context-aware AI combat doctrine (closing-leaker Auto-CIWS, physical chaff, RF-gated EW ghost floods), expanded Philippines & Taiwan geodata theater, and comprehensive test suite expansion to 41/41.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.4.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (41/41)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.4.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (41/41)](test_logic.py)
 
 </div>
 
@@ -676,12 +676,14 @@ This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://se
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.3.0` ➔ `v1.3.2` ➔ `v1.4.0`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.2.0` ➔ `v1.3.0` ➔ `v1.3.1` ➔ `v1.3.2` ➔ `v1.4.0`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
 - The version increment from **`v1.1.0`** to **`v1.1.1`** delivered critical bug fixes, UI coordinate harmonizations, audio click elimination, and asset recovery safeguards.
+- The version increment from **`v1.1.1`** to **`v1.2.0`** introduced the Tier 2 Black Ops Experimental Arsenal, the 3-pillar Anti-Jammer ECCM Triad, and automated AI interceptor standoff suppression.
 - The version increment from **`v1.2.0`** to **`v1.3.0`** introduces Interactive AWACS Command & Control, a complete Procedural Audio Engine Overhaul, and comprehensive Input Disambiguation.
+- The version increment from **`v1.3.0`** to **`v1.3.1`** implemented security hardening, audio thread-safety locks, memory caps, and trajectory alignment telemetry.
 - The version increment from **`v1.3.1`** to **`v1.3.2`** delivers the `VFXManager.add_shockwave()` crash hotfix triggered by Tactical EMP `[B]` discharge under heavy contact loads, and expands the test suite to 31/31.
 - The version increment from **`v1.3.2`** to **`v1.4.0`** introduces the cinematic Main Menu and scene system, strict Spectator/Player mode separation, context-aware skill triggers replacing RNG and blind-geometry firing, and expands map coverage to the Philippines and Taiwan (+57% east-west extent). Test suite expands to 41/41.
 
