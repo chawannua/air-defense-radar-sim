@@ -24,6 +24,61 @@ class GameConfig:
         "Wing 56 (Hat Yai)":     ["Gripen C/D Detachment", "F-16A ADF"]
     }
 
+    # --- Threat model -----------------------------------------------------
+    # One tick is one second, so 3600 ticks is one hour of scope time and a
+    # per-tick chance of 0.01 is roughly 36 events an hour.
+    #
+    # These used to be hardcoded in command_center.py and were far too hot: a
+    # wartime hostile chance of 0.25-0.50 per tick with 10% of those ballistic
+    # put ~90 ballistic launches an hour on the scope. Real air defence is
+    # mostly empty sky punctuated by rare events.
+    THREAT_PHASES = {
+        "PEACETIME": {"hostile_per_tick": 0.004, "civilian_per_tick": 0.35,
+                      "civilian_ratio": 0.90},
+        "TENSIONS":  {"hostile_per_tick": 0.010, "hostile_per_tick_end": 0.030,
+                      "civilian_per_tick": 0.30, "civilian_per_tick_end": 0.12,
+                      "civilian_ratio": 0.70, "civilian_ratio_end": 0.30},
+        "WARTIME":   {"hostile_per_tick": 0.045, "civilian_per_tick": 0.03,
+                      "civilian_ratio": 0.05},
+    }
+
+    # Relative rarity of each threat when a hostile does appear. Weights, not
+    # probabilities - they are normalised at use.
+    THREAT_WEIGHTS = {
+        "FIGHTER": 42,
+        "DRONE":   24,
+        "CRUISE":  12,
+        "ARM":      8,
+        "HELI":     8,
+        "TBM":      5,
+        "ICBM":     1,
+    }
+
+    # Hard ceiling per threat per rolling hour, applied on top of the weights
+    # and enforced for wave spawns too. This is what stops a ballistic rain
+    # wave from putting five TBM launches on the scope inside an hour.
+    THREAT_WINDOW_TICKS = 3600
+    THREAT_MAX_PER_HOUR = {
+        "ICBM":     1,
+        "TBM":      3,
+        "ARM":      8,
+        "CRUISE":  12,
+        "HELI":    12,
+        "DRONE":   40,
+        "FIGHTER": 60,
+    }
+
+    # Combat Air Patrol stations: (wing number, orbit x_km, orbit y_km, name).
+    # Wing numbers index AIRBASES, so a station can never sit at a field the
+    # wing does not actually operate from.
+    CAP_STATIONS = [
+        (4,  30.0,  400.0, "Northern CAP"),
+        (7, -130.0, -430.0, "Southern CAP"),
+        (21, 430.0,  260.0, "Eastern CAP"),
+        (41, -230.0, 620.0, "Northwestern CAP"),
+    ]
+    CAP_CONCURRENT = 2
+
     # Hit probabilities - tuned so enemies occasionally punch through
     HIT_CHANCE_THAAD = 0.35
     HIT_CHANCE_SAM_NUKE = 0.10
@@ -75,3 +130,27 @@ class GameConfig:
     WAVE_COOLDOWN_AFTER = 180
     WAVE_SIZE_MIN = 10
     WAVE_SIZE_MAX = 18
+
+    @classmethod
+    def wing_home(cls, wing):
+        """Home field of a wing, in km from Bangkok, read from AIRBASES.
+
+        CAPFighter used to carry its own hardcoded copy of these coordinates
+        with the latitude sign flipped, so wings 1, 4 and 21 launched hundreds
+        of km south of Bangkok when their real fields are north of it.
+        """
+        prefix = "Wing %d (" % wing
+        for x_km, y_km, name in cls.AIRBASES:
+            if name.startswith(prefix):
+                return (x_km, y_km)
+        return (0.0, 0.0)
+
+    @classmethod
+    def wing_fighter(cls, wing):
+        """Aircraft type flown by a wing, for CAP callouts."""
+        prefix = "Wing %d (" % wing
+        for _x, _y, name in cls.AIRBASES:
+            if name.startswith(prefix):
+                types = cls.WING_AIRCRAFT.get(name) or []
+                return types[0] if types else "Unknown Type"
+        return "Unknown Type"
