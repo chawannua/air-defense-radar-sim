@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-09-11
+
+### Added
+- **Main Menu & Scene System (`scenes.py`)**: New `SceneManager` / `Scene` / `MenuScene` layer runs ahead of the simulation. Dark-tactical C2 styling (phosphor green + amber on near-black, scanline overlay) continuous with the in-game HUD. Keyboard and mouse navigation both supported.
+- **Cinematic Camera (`camera_director.py`)**: Menu background pans the live tactical map along smoothstep-eased waypoints drawn from the RTAF airbase positions, with a cosine zoom-breathing effect.
+- **Mode Selection (`profiles.py`)**: `SimulationProfile` frozen dataclass with `SPECTATOR_PROFILE` and `PLAYER_PROFILE`. Profiles are injected and read from; `GameConfig` is never mutated, so mode switches cannot leak process-global state.
+  - **Spectator Mode**: autonomous AI showcase at ~2.0x spawn pressure, view-only. Enforced by a single command-input gate rather than scattered per-handler checks. Camera pan, zoom, selection, restart, mute and ESC remain available.
+  - **Player Mode**: reduced balanced waves, human holds the trigger. Auto-fire is demoted to a backup role (leakers inside 40 km, or unengaged ICBM/TacticalBM). Auto-CIWS stays autonomous in both modes as last-ditch point defence.
+- **Map Coverage**: Registered `phl.json` and `twn.json`, already present in the repo but never wired into the loader. East-west extent 2,360 km -> 3,716 km (+57%). Data registration only; no rendering logic altered. Zoom floor lowered 0.2 -> 0.10 so the wider theatre fits on screen.
+
+### Changed
+- **Auto-CIWS**: replaced blind geometry (any non-friendly in range) with leaker prioritisation - closing on base, IFF-aware, ghosts excluded, not already covered by an outer layer unless ETA <= 3 ticks. Ranked by `calculate_threat_score()`, capped at 2/tick and 1/tick below 25% magazine. CIWS kills fell 19.6 -> 11.4 with survival flat, i.e. the removed shots were overkill rather than saves.
+- **Chaff**: replaced `random.random() < 0.25` with `capability x range x salvo x eccm`, clamped at 0.75 and exactly 0.0 with no cartridges remaining. Aircraft now carry a finite chaff loadout; civilian traffic never chaffs.
+- **EW Ghost Flood**: replaced the flat 40%/tick roll with a rate derived from jammer strength and range. EMCON SILENT now returns exactly 0.0 - a radar that is not radiating cannot be flooded. Ghost count scales with jam power instead of a flat 3-8.
+- **Repository**: untracked `work/` (3,684 files, 176MB portable Python distribution, unreferenced by source or either PyInstaller spec) and removed `gbr.json`, `irl.json`, the superseded bare `README`, and a stray tracked `.spec`. Tracked files 3,725 -> 37. `.gitignore` rewritten; it had every rule duplicated. History intentionally not rewritten.
+
+### Fixed
+- **Friendly AWACS misclassified as a jammer**: the RTAF `Saab 340 AEW&C` `true_type` contains the substring `"EW"`, so a naive match scored our own airborne early-warning platform as a hostile jammer, driving a permanent ghost-track flood with no enemy EW present. `get_jammer_strength()` now returns 0.0 for friendlies.
+- **`DEFAULT_PROFILE` was silently view-only**: `player_input_enabled` defaulted to `False`, so running `radar_ui.py` directly - or any `start_radar(profile=None)` call - was unplayable (no firing, no upgrades, no restart).
+- **Spectator could lose a game it only watches**: the Flight Info Panel `H/S/F/U` IFF buttons sit under `MOUSEBUTTONDOWN`, outside the `KEYDOWN` command gate. Re-designating a civilian airliner HOSTILE let the autonomous SAM layer kill it, triggering court-martial and `base_hp = 0`. Now gated.
+- **Spectator stranded at game over**: restart sat inside the command gate while the AAR screen still prompts "Press [R] to Re-Scramble Sortie". Moved out alongside the fullscreen toggle.
+- **Player backup fire starved**: `process_personnel()` popped exactly one threat per tick and discarded the tick when it was backup-ineligible, so a distant high-scoring cruise missile could indefinitely starve a close leaking drone. The queue is now walked until an eligible threat is found; Spectator behaviour is unchanged.
+
+### Verification
+- Test suite expanded 31 -> **41 groups**. New groups cover profile-driven spawn and weapon autonomy, the three context-aware skill triggers with hold-fire discrimination, and regression locks on all four critical fixes above.
+- The starvation regression test was confirmed to fail against a real revert of the fix, not a mock.
+- Balance A/B over 10 identical seeds (Spectator, WARTIME, 2,500-tick cap): survival 700.3 -> 709.9 mean. No material difficulty shift.
+
 ## [1.3.2] - 2026-09-09
 
 ### Fixed

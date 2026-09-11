@@ -13,11 +13,11 @@
 ## 📡 AEGIS Air Defense Radar Simulator
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
-### ⚡ Current Release: `v1.3.2` (EMP Shockwave Crash Fix & Stability Hotfix)
+### ⚡ Current Release: `v1.4.0` (Main Menu, Spectator/Player Modes & Context-Aware AI)
 The official hotfix resolving the `VFXManager.add_shockwave()` crash triggered by the Tier 2 Tactical EMP Generator `[B]` discharge under heavy contact loads, plus complementary test suite expansion to 31/31.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.3.2)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (31/31)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.3.0 → v1.4.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings) • [Architecture](#system-architecture--oop-design) • [Verification (41/41)](test_logic.py)
 
 </div>
 
@@ -566,19 +566,20 @@ ALL 31 TEST MODULES PASSED (100% SUCCESS RATE)
 
 ---
 
-## Release History & Version Evolution (v1.0.0 → v1.3.2)
+## Release History & Version Evolution (v1.0.0 → v1.4.0)
 
 This project strictly adheres to [Semantic Versioning 2.0.0 (SemVer)](https://semver.org/) and follows the [Keep a Changelog](https://keepachangelog.com/) standard.
 
 Full changelog details and release history are maintained in **[CHANGELOG.md](CHANGELOG.md)**.
 
-### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.3.0` ➔ `v1.3.2`
+### Version Evolution: `v1.0.0` ➔ `v1.1.0` ➔ `v1.1.1` ➔ `v1.3.0` ➔ `v1.3.2` ➔ `v1.4.0`
 
 In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.0.0`** to **`v1.1.0`** introduced major Phase 3 features and the real Southeast Asia geodata map engine.
 - The version increment from **`v1.1.0`** to **`v1.1.1`** delivered critical bug fixes, UI coordinate harmonizations, audio click elimination, and asset recovery safeguards.
 - The version increment from **`v1.2.0`** to **`v1.3.0`** introduces Interactive AWACS Command & Control, a complete Procedural Audio Engine Overhaul, and comprehensive Input Disambiguation.
 - The version increment from **`v1.3.1`** to **`v1.3.2`** delivers the `VFXManager.add_shockwave()` crash hotfix triggered by Tactical EMP `[B]` discharge under heavy contact loads, and expands the test suite to 31/31.
+- The version increment from **`v1.3.2`** to **`v1.4.0`** introduces the cinematic Main Menu and scene system, strict Spectator/Player mode separation, context-aware skill triggers replacing RNG and blind-geometry firing, and expands map coverage to the Philippines and Taiwan (+57% east-west extent). Test suite expands to 41/41.
 
 ### 🌟 Version 1.3.0 Feature Highlights
 - **Controllable AWACS Operations:** Fully interactive AWACS integration granting a 400 km look-down sensor horizon, dynamic right-click patrol station retasking, adjustable orbit radii (20–150 km), and instant Return-To-Base (RTB) commands.
