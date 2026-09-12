@@ -2172,7 +2172,10 @@ random.seed(1234)
 _cmd45 = _CC45(profile=_PROF45)
 _counts45 = _coll45.Counter()
 _KINDS45 = [(_ICBM45, "ICBM"), (_TBM45, "TBM"), (_ARM45, "ARM"),
-            (_CRZ45, "CRUISE"), (_DRN45, "DRONE"), (_HEL45, "HELI")]
+            (_CRZ45, "CRUISE"), (_DRN45, "DRONE"), (_HEL45, "HELI"),
+            # Aircraft last, and it must be here: leaving it out made the
+            # FIGHTER ceiling assertion read 0 <= 60 and pass on nothing.
+            (_AC45, "FIGHTER")]
 for _t45 in range(1, GameConfig.THREAT_WINDOW_TICKS + 1):
     _cmd45.tick_count = _t45
     _n45 = len(_cmd45.unseen_contacts)
@@ -2184,10 +2187,11 @@ for _t45 in range(1, GameConfig.THREAT_WINDOW_TICKS + 1):
                 break
     _cmd45.unseen_contacts = []
 
-for _kind45, _cap45 in sorted(GameConfig.THREAT_MAX_PER_HOUR.items()):
+for _kind45, _cap45 in sorted(_cmd45._threat_ceilings.items()):
     _got45 = _counts45.get(_kind45, 0)
-    check(_got45 <= _cap45,
-          f"{_kind45} must respect its {_cap45}/hour ceiling (spawned {_got45})")
+    check(0 < _got45 <= _cap45,
+          f"{_kind45} must respect its {_cap45}/hour ceiling and still appear "
+          f"at all (spawned {_got45})")
 
 _ball45 = _counts45.get("ICBM", 0) + _counts45.get("TBM", 0)
 check(_ball45 <= 5,
@@ -2226,17 +2230,106 @@ for _t45 in range(0, 1200, 5):
 check(len(_flown45) >= 3,
       f"CAP must rotate across wings, not just two hardcoded ones (flew: {sorted(_flown45)})")
 
-# --- zoom must move the camera, not just the scale ---
-# Read it out of the source the same way the zoom-floor check does: the wheel
-# handler has to compensate the camera, or zoom magnifies about the map origin.
+# --- zoom must keep the world point under the cursor, not just rescale ---
+# Asserted numerically, not by grepping the handler for the right-looking
+# source text: a sign-flipped camera would read correct and be wrong, which is
+# exactly the defect being fixed on the CAP side of this same release.
+import radar_ui as _rui45
+_W45, _H45 = 1600, 900
+_bad_zoom45 = []
+for _cx45, _cy45 in ((0, 0), (900, -400), (-650, 730)):        # centred and panned away
+    for _mx45, _my45 in ((_W45 // 2, _H45 // 2), (140, 90), (1480, 820)):
+        for _z045, _z145 in ((0.80, 1.25), (1.25, 0.80), (0.07, 0.22), (2.0, 1.85)):
+            _ncx45, _ncy45 = _rui45.zoom_anchor(
+                _mx45, _my45, _cx45, _cy45, _z045, _z145, _W45, _H45)
+            # world point under the cursor, before and after, in km
+            _bx45, _by45 = (_W45 // 2) + _cx45, (_H45 // 2) + _cy45
+            _ax45, _ay45 = (_W45 // 2) + _ncx45, (_H45 // 2) + _ncy45
+            _wx045, _wy045 = (_mx45 - _bx45) / _z045, (_by45 - _my45) / _z045
+            _wx145, _wy145 = (_mx45 - _ax45) / _z145, (_ay45 - _my45) / _z145
+            _drift45 = ((_wx145 - _wx045) ** 2 + (_wy145 - _wy045) ** 2) ** 0.5
+            if _drift45 > 1e-6:
+                _bad_zoom45.append((_cx45, _cy45, _mx45, _my45, _z045, _z145,
+                                    round(_drift45, 3)))
+check(not _bad_zoom45,
+      f"zoom must leave the world point under the cursor exactly where it is, "
+      f"at every camera offset and zoom step ({len(_bad_zoom45)} of 36 cases "
+      f"drifted, worst {_bad_zoom45[:1]})")
+
+# and the wheel handler must actually be the caller, or the helper is dead code
 _ui45 = open(os.path.join(_here42, "radar_ui.py"), encoding="utf-8").read()
 _wheel45 = _ui45[_ui45.index("pygame.MOUSEWHEEL"):]
 _wheel45 = _wheel45[:_wheel45.index("if event.type", 40)]
-check("camera_x =" in _wheel45 and "camera_y =" in _wheel45,
-      "the mouse-wheel handler must reposition the camera, otherwise zoom "
-      "scales about the map origin and drags the view back to Bangkok")
-check("get_pos()" in _wheel45,
-      "zoom must anchor on the cursor position")
+check("zoom_anchor(" in _wheel45 and "get_pos()" in _wheel45,
+      "the mouse-wheel handler must call zoom_anchor() with the cursor "
+      "position, otherwise zoom magnifies about Bangkok however correct the "
+      "helper is")
+
+# 46. Waves must never be announced empty, and Player mode must be quieter
+#
+# The hourly ceilings introduced above interact with the wave system: once a
+# themed pool is capped out, pick_threat() returns None and the wave spawned
+# nothing - while the red BATTLE STATIONS / DEFCON 1 banner had already been
+# logged and the cooldown already burnt. Measured before the fix: 73% of waves
+# over three simulated hours announced an attack that never arrived.
+print("\n=== 46. Empty-Wave Suppression & Player Threat Budget ===")
+from command_center import CommandCenter as _CC46
+from profiles import PLAYER_PROFILE as _PLAYER46, SPECTATOR_PROFILE as _SPEC46
+
+_BANNERS46 = ("BATTLE STATIONS", "BALLISTIC MISSILE LAUNCH DETECTED",
+              "UNMANNED AERIAL SWARM", "HEAVY FIGHTER FORMATION",
+              "SEAD STRIKE INBOUND", "ARMs unable to lock",
+              "CRUISE MISSILE VOLLEY")
+
+_empty46 = 0
+_waves46 = 0
+for _seed46 in (1234, 7, 99):
+    random.seed(_seed46)
+    _cmd46 = _CC46(profile=_PROF45)
+    for _t46 in range(1, 3 * GameConfig.THREAT_WINDOW_TICKS + 1):
+        _cmd46.tick_count = _t46
+        _before46 = len(_cmd46.unseen_contacts)
+        # add_log() caps tactical_log at 24 and pops from the front, so index
+        # arithmetic is unreliable; clear it and read whatever this tick logged.
+        _cmd46.tactical_log = []
+        _cmd46.detect_airspace()
+        _announced46 = any(any(_b46 in str(_l46) for _b46 in _BANNERS46)
+                           for _l46 in _cmd46.tactical_log)
+        if _announced46:
+            _waves46 += 1
+            if len(_cmd46.unseen_contacts) == _before46:
+                _empty46 += 1
+        _cmd46.unseen_contacts = []
+
+check(_waves46 > 0, f"the harness must actually trigger waves (saw {_waves46})")
+check(_empty46 == 0,
+      f"a wave must never announce itself and then spawn nothing: {_empty46} of "
+      f"{_waves46} announced waves were empty (73% before the fix)")
+
+# --- Player mode carries a smaller hourly budget than Spectator ---
+_pl46 = _CC46(profile=_PLAYER46)
+_sp46 = _CC46(profile=_SPEC46)
+check(hasattr(_pl46, "_threat_ceilings"),
+      "ceilings must be resolved per CommandCenter, not read from GameConfig "
+      "at spawn time, or two profiles in one process share a budget")
+_lower46 = [_k46 for _k46 in _pl46._threat_ceilings
+            if _pl46._threat_ceilings[_k46] < _sp46._threat_ceilings[_k46]]
+check(len(_lower46) >= 5,
+      f"Player mode must see a quieter sky than Spectator across most threat "
+      f"types (lower for {sorted(_lower46)})")
+check(_pl46._threat_ceilings["ARM"] <= 2,
+      f"anti-radiation missiles must be rare in Player mode: "
+      f"{_pl46._threat_ceilings['ARM']}/hour")
+check(all(_v46 >= 1 for _v46 in _pl46._threat_ceilings.values()),
+      "no threat type may be scaled out of existence entirely")
+
+# --- a stamp ahead of the clock must not block a type forever ---
+_guard46 = _CC46(profile=_PROF45)
+_guard46.tick_count = 10
+_guard46._threat_log["ICBM"] = [10 ** 9]          # clock rewound under us
+check(_guard46.threat_allowed("ICBM"),
+      "a tick stamp ahead of the clock must be discarded, not survive every "
+      "window filter and block its type permanently")
 
 print("\n" + "="*50)
 if errors:

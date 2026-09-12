@@ -54,6 +54,22 @@ def load_real_map():
 MAP_SHAPES_KM, MAP_PEAKS_KM, MAP_AIRBASES_KM = load_real_map()
 MAP_CONTOURS_KM = global_map_manager.contours_km
 
+def zoom_anchor(mouse_x, mouse_y, camera_x, camera_y, old_zoom, new_zoom, width, height):
+    """Camera offsets that keep the world point under the cursor where it is.
+
+    Screen position is ``CX + x_km * zoom`` with ``CX`` the map origin, so
+    changing zoom alone magnifies about Bangkok: pan out to Japan, zoom, and
+    the view slides back home. Solving for the camera that leaves
+    ``(mouse_x, mouse_y)`` over the same world point gives the offsets below.
+    """
+    base_cx = (width // 2) + camera_x
+    base_cy = (height // 2) + camera_y
+    world_x = (mouse_x - base_cx) / old_zoom
+    world_y = (base_cy - mouse_y) / old_zoom
+    return (mouse_x - world_x * new_zoom - (width // 2),
+            mouse_y + world_y * new_zoom - (height // 2))
+
+
 def start_radar(profile=None):
     if profile is None:
         from profiles import DEFAULT_PROFILE
@@ -368,18 +384,9 @@ def start_radar(profile=None):
                 old_zoom = zoom_level
                 zoom_level = max(0.07, min(10.0, zoom_level + event.y * 0.15))
                 if zoom_level != old_zoom:
-                    # Pin the world point under the cursor. Screen position is
-                    # CX + x_km * zoom, and CX is the map origin, so scaling
-                    # zoom alone magnifies about Bangkok: pan to Japan, zoom,
-                    # and the view slides back to Bangkok. Move the camera so
-                    # whatever is under the cursor stays under the cursor.
                     mx, my = pygame.mouse.get_pos()
-                    base_cx = (WIDTH // 2) + camera_x
-                    base_cy = (HEIGHT // 2) + camera_y
-                    world_x = (mx - base_cx) / old_zoom
-                    world_y = (base_cy - my) / old_zoom
-                    camera_x = mx - world_x * zoom_level - (WIDTH // 2)
-                    camera_y = my + world_y * zoom_level - (HEIGHT // 2)
+                    camera_x, camera_y = zoom_anchor(
+                        mx, my, camera_x, camera_y, old_zoom, zoom_level, WIDTH, HEIGHT)
 
             # AWACS retask (right-click) is a command -- Spectator is view-only.
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and profile.player_input_enabled:

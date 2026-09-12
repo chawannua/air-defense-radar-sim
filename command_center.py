@@ -41,6 +41,14 @@ class CommandCenter:
         self._wave_size_scale = profile_cfg["WAVE_SIZE_MAX"] / GameConfig.WAVE_SIZE_MAX
         self._wave_size_min = profile_cfg["WAVE_SIZE_MIN"]
         self._wave_cooldown_after_scale = profile_cfg["WAVE_COOLDOWN_AFTER"] / GameConfig.WAVE_COOLDOWN_AFTER
+        # Hourly threat ceilings, scaled by the profile. Resolved once here
+        # rather than read through GameConfig on every spawn, so the Player
+        # and Spectator sitting in one process cannot share a budget.
+        ceiling_scale = profile_cfg["THREAT_CEILING_SCALE"]
+        self._threat_ceilings = {
+            kind: max(1, int(round(cap * ceiling_scale)))
+            for kind, cap in GameConfig.THREAT_MAX_PER_HOUR.items()
+        }
 
         self.contacts = []
         self.unseen_contacts = []
@@ -583,31 +591,13 @@ class CommandCenter:
         # Player sees smaller, less frequent ones) without touching GameConfig.
         base_wave_trigger_chance = 0.08 if phase == "TENSIONS" else 0.12 * min(3.0, 1.0 + (tick - 360) / 1500.0)
         if wave_enabled and self.wave_cooldown <= 0 and random.random() < base_wave_trigger_chance * self._wave_chance_scale:
-            base_cooldown = max(80, 200 if phase == "TENSIONS" else int(200 / min(3.0, 1.0 + (tick - 360) / 1500.0)))
-            self.wave_cooldown = max(1, int(base_cooldown * self._wave_cooldown_after_scale))
             base_wave_size = random.randint(5, 10) if phase == "TENSIONS" else int(random.randint(8, 15) * min(3.0, 1.0 + (tick - 360) / 1500.0))
             wave_size = max(self._wave_size_min, int(base_wave_size * self._wave_size_scale))
-            
+
             wave_theme = random.choices(
-                ["MIXED", "BALLISTIC_RAIN", "DRONE_SWARM", "FIGHTER_STRIKE", "SEAD_STRIKE", "CRUISE_VOLLEY"], 
+                ["MIXED", "BALLISTIC_RAIN", "DRONE_SWARM", "FIGHTER_STRIKE", "SEAD_STRIKE", "CRUISE_VOLLEY"],
                 weights=[30, 15, 15, 15, 15, 10], k=1)[0]
-                
-            if wave_theme == "MIXED":
-                self.add_log("\033[41;97m[TACTICAL WARNING] MULTIPLE HOSTILE CONTACTS INBOUND. BATTLE STATIONS.\033[0m")
-            elif wave_theme == "BALLISTIC_RAIN":
-                self.add_log("\033[41;97m[DEFCON 1] BALLISTIC MISSILE LAUNCH DETECTED. THAAD BATTERIES TO STANDBY.\033[0m")
-            elif wave_theme == "DRONE_SWARM":
-                self.add_log("\033[41;97m[WARNING] UNMANNED AERIAL SWARM DETECTED. ACTIVATE CIWS PROTOCOL.\033[0m")
-            elif wave_theme == "FIGHTER_STRIKE":
-                self.add_log("\033[41;97m[TACTICAL WARNING] HEAVY FIGHTER FORMATION INBOUND. SCRAMBLE ALL INTERCEPTORS.\033[0m")
-            elif wave_theme == "SEAD_STRIKE":
-                if self.emcon_mode == "SILENT":
-                    self.add_log("\033[93m[INTEL] Enemy SEAD strike detected but radar is dark (EMCON SILENT). ARMs unable to lock!\033[0m")
-                else:
-                    self.add_log("\033[41;97m[TACTICAL WARNING] SEAD STRIKE INBOUND! ANTI-RADIATION MISSILES HOMING ON BASE RADAR!\033[0m")
-            elif wave_theme == "CRUISE_VOLLEY":
-                self.add_log("\033[41;97m[TACTICAL WARNING] TERRAIN-MASKED CRUISE MISSILE VOLLEY DETECTED!\033[0m")
-            
+
             THEME_POOLS = {
                 "BALLISTIC_RAIN": {"ICBM": 10, "TBM": 90},
                 "DRONE_SWARM":    {"DRONE": 100},
@@ -616,14 +606,41 @@ class CommandCenter:
                 "CRUISE_VOLLEY":  {"CRUISE": 100},
             }
             pool = THEME_POOLS.get(wave_theme, dict(GameConfig.THREAT_WEIGHTS))
+
+            # Draw the wave before announcing it. Every unit passes the same
+            # hourly ceiling as a lone spawn, so a ballistic rain thins itself
+            # out instead of dumping a dozen launches on the scope -- but a
+            # themed pool can also be entirely capped out, and a BATTLE
+            # STATIONS banner over an empty scope is worse than a quiet hour.
+            drawn = []
             for _ in range(wave_size):
-                # Every wave unit passes the same hourly ceiling as a lone
-                # spawn, so a ballistic rain thins itself out instead of
-                # dumping a dozen launches on the scope.
                 threat_type = self.pick_threat(pool)
                 if threat_type is None:
                     break
-                self.unseen_contacts.append(self.spawn_threat(threat_type))
+                drawn.append(threat_type)
+
+            if drawn:
+                base_cooldown = max(80, 200 if phase == "TENSIONS" else int(200 / min(3.0, 1.0 + (tick - 360) / 1500.0)))
+                self.wave_cooldown = max(1, int(base_cooldown * self._wave_cooldown_after_scale))
+
+                if wave_theme == "MIXED":
+                    self.add_log("\033[41;97m[TACTICAL WARNING] MULTIPLE HOSTILE CONTACTS INBOUND. BATTLE STATIONS.\033[0m")
+                elif wave_theme == "BALLISTIC_RAIN":
+                    self.add_log("\033[41;97m[DEFCON 1] BALLISTIC MISSILE LAUNCH DETECTED. THAAD BATTERIES TO STANDBY.\033[0m")
+                elif wave_theme == "DRONE_SWARM":
+                    self.add_log("\033[41;97m[WARNING] UNMANNED AERIAL SWARM DETECTED. ACTIVATE CIWS PROTOCOL.\033[0m")
+                elif wave_theme == "FIGHTER_STRIKE":
+                    self.add_log("\033[41;97m[TACTICAL WARNING] HEAVY FIGHTER FORMATION INBOUND. SCRAMBLE ALL INTERCEPTORS.\033[0m")
+                elif wave_theme == "SEAD_STRIKE":
+                    if self.emcon_mode == "SILENT":
+                        self.add_log("\033[93m[INTEL] Enemy SEAD strike detected but radar is dark (EMCON SILENT). ARMs unable to lock!\033[0m")
+                    else:
+                        self.add_log("\033[41;97m[TACTICAL WARNING] SEAD STRIKE INBOUND! ANTI-RADIATION MISSILES HOMING ON BASE RADAR!\033[0m")
+                elif wave_theme == "CRUISE_VOLLEY":
+                    self.add_log("\033[41;97m[TACTICAL WARNING] TERRAIN-MASKED CRUISE MISSILE VOLLEY DETECTED!\033[0m")
+
+                for threat_type in drawn:
+                    self.unseen_contacts.append(self.spawn_threat(threat_type))
         
         # civilian traffic (airliners passing through)
         if random.random() < civilian_chance:
@@ -1038,15 +1055,19 @@ class CommandCenter:
         """Rolling one-hour ceiling per threat type.
 
         Returns True and records the spawn, or False when the type has already
-        used its GameConfig.THREAT_MAX_PER_HOUR budget for the last hour of
+        used its per-hour budget (GameConfig.THREAT_MAX_PER_HOUR scaled by
+        the profile) for the last hour of
         scope time. Wave spawns go through here too, which is what stops a
         ballistic rain putting five TBM launches on the scope inside an hour.
         """
-        cap = GameConfig.THREAT_MAX_PER_HOUR.get(kind)
+        cap = self._threat_ceilings.get(kind)
         if cap is None:
             return True
         cutoff = self.tick_count - GameConfig.THREAT_WINDOW_TICKS
-        stamps = [t for t in self._threat_log.get(kind, []) if t > cutoff]
+        # Upper bound as well as lower: a stamp ahead of the clock would
+        # otherwise survive every filter and block the type permanently.
+        stamps = [t for t in self._threat_log.get(kind, [])
+                  if cutoff < t <= self.tick_count]
         if len(stamps) >= cap:
             self._threat_log[kind] = stamps
             return False
