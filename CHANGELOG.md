@@ -8,13 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.8.0] - 2026-09-12
 
 ### Fixed
-- **Ballistic launches were roughly ninety an hour.** The spawn rates lived inside `detect_airspace()` as literals, and one tick is one second. Wartime ran a `0.25-0.50` per-tick hostile chance with 10% of those ballistic, so the scope saw about **90 ballistic launches every hour**, and a `BALLISTIC_RAIN` wave added 5-15 more in a single burst. The threat model now lives in `GameConfig`: `THREAT_PHASES` holds the per-phase rates, `THREAT_WEIGHTS` the relative rarity of each type, and `THREAT_MAX_PER_HOUR` a rolling one-hour ceiling that wave spawns obey too. Measured by driving `detect_airspace()` through a full simulated hour:
+- **Ballistic launches were roughly ninety an hour.** The spawn rates lived inside `detect_airspace()` as literals, and one tick is one second. Wartime ran a `0.25-0.50` per-tick hostile chance with 10% of those ballistic, so the scope saw **307 ballistic launches an hour** (95 ICBM and 212 TBM, measured on v1.7.0 over three seeds - the first estimate of ~90 understated it), and a `BALLISTIC_RAIN` wave added 5-15 more in a single burst. The threat model now lives in `GameConfig`: `THREAT_PHASES` holds the per-phase rates, `THREAT_WEIGHTS` the relative rarity of each type, and `THREAT_MAX_PER_HOUR` a rolling one-hour ceiling that wave spawns obey too. Measured by driving `detect_airspace()` through a full simulated hour:
 
 | Threat | Player | Default | Spectator |
 |---|---|---|---|
 | ICBM | **1** | 1 | 2 |
 | TBM | **2** | 3 | 4 |
-| ARM | **2** | 3 | 4 |
+| ARM | **1** | 2 | 3 |
 | CRUISE | **6** | 12 | 18 |
 | HELI | **6** | 12 | 18 |
 | DRONE | **20** | 40 | 60 |
@@ -22,13 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Measured over a full simulated hour, every profile spawns exactly its ceiling, so the ceilings - not the underlying rates - are what the player feels. Ballistic total per hour: **3 in Player mode, 4 default, against ~90 before**.
 
-- **Anti-radiation missiles were a constant, not an event.** ARM carried weight 8 of 100 and an 8/hour ceiling, so it saturated every hour of play: the SEAD warning never stopped. A SEAD package is an event, so the weight drops to 5 and the ceiling to 3 - **2 an hour in Player mode**.
+- **Anti-radiation missiles were a constant, not an event.** ARM carried weight 8 of 100 and an 8/hour ceiling, so it saturated every hour of play and the SEAD warning never stopped. Weight drops to 8 -> 3 and the ceiling to 8 -> 2: **1 an hour in Player mode**, 2 default.
 
-- **Waves announced attacks that never arrived.** The `BATTLE STATIONS` / `DEFCON 1` banner was logged, and the wave cooldown consumed, before the wave drew its contacts. Once the hourly ceilings bound, a themed pool could be entirely capped out and the wave spawned nothing - measured at **73% of waves over three simulated hours, from about 14 minutes in**. The wave is now drawn first and abandoned silently if nothing can be drawn, leaving the cooldown untouched so the next tick may try again. Measured after the fix: **0 of 97 announced waves empty**.
+- **The SEAD warning fired without a single anti-radiation missile.** The `SEAD_STRIKE` wave pool carried a stray `CRUISE: 1` alongside the ARMs, so once ARM hit its ceiling the wave drew cruise missiles only and still logged `ANTI-RADIATION MISSILES HOMING ON BASE RADAR` - measured at **5 of 10 SEAD alerts**. The pool is now ARMs alone, the banner is logged only when an ARM is actually in the draw, and the theme is drawn 6 times in 100 instead of 15, because a SEAD package is an event. Measured after: **0 false SEAD alerts over 12 simulated hours**.
+
+- **Mass-attack banners fired over a single contact.** A ceiling can thin a wave to one track, and `MULTIPLE HOSTILE CONTACTS INBOUND` over one contact teaches the player to ignore the alert - **49 of 163 waves**. Banners now require at least two drawn contacts; a lone contact arrives as a track, with no wave announcement. Measured after: **0 thin alerts**.
+
+- **Waves announced attacks that never arrived.** The `BATTLE STATIONS` / `DEFCON 1` banner was logged, and the wave cooldown consumed, before the wave drew its contacts. Once the hourly ceilings bound, a themed pool could be entirely capped out and the wave spawned nothing - measured at **73% of waves over three simulated hours, from about 14 minutes in**. The wave is now drawn first and abandoned silently if nothing can be drawn, taking a short 20-tick back-off so the gate is not simply re-rolled on the next tick - leaving the cooldown alone raised the real wave rate 6.3 to 10.9 an hour. Measured after the fix: **0 of 59 announced waves empty**, at 6.6 waves an hour (4.8 in Player mode).
 
 - **CAP fighters launched from the wrong airfields.** `CAPFighter` carried its own copy of the airbase coordinates with the latitude sign flipped, so Korat, Takhli and Ubon - all north of Bangkok - put their fighters several hundred km *south* of their real fields, over the Gulf. Home position now reads `GameConfig.wing_home()`, which reads `AIRBASES`, the same table the map draws from, so the two cannot drift apart. Verified over **600 live CAP launches** across wings 4, 7, 21 and 41: zero at a wrong field.
 
-- **Zooming dragged the view back to Bangkok.** Screen position is `CX + x_km * zoom` where `CX` is Bangkok, so changing zoom alone magnifies about Bangkok. Panning out to Japan and scrolling slid the view home. The mouse-wheel handler now compensates the camera so the world point under the cursor stays under the cursor. The compensation is exact; the only residual is the integer truncation of the camera offsets, which is sub-pixel - **0.2 to 0.6 km depending on zoom**. Asserted algebraically over 36 camera/cursor/zoom combinations rather than measured once.
+- **Zooming dragged the view back to Bangkok.** Screen position is `CX + x_km * zoom` where `CX` is Bangkok, so changing zoom alone magnifies about Bangkok. Panning out to Japan and scrolling slid the view home. The mouse-wheel handler now compensates the camera so the world point under the cursor stays under the cursor. The compensation is exact; the only residual is the integer truncation of the camera offsets, which is **under one pixel on screen at any zoom** - 1.35 km at the default 0.80, more in kilometres the further out you zoom, because a pixel covers more ground there. Asserted algebraically over 36 camera/cursor/zoom combinations rather than measured once.
 
 ### Changed
 - **CAP rotates across four wings instead of two.** Only wings 4 and 7 ever flew. Stations are now listed in `GameConfig.CAP_STATIONS` - Northern (Wing 4, Takhli), Southern (Wing 7, Surat Thani), Eastern (Wing 21, Ubon) and Northwestern (Wing 41, Chiang Mai) - and each wing flies the aircraft `WING_AIRCRAFT` lists for it rather than a shared default.

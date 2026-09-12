@@ -2301,6 +2301,52 @@ for _seed46 in (1234, 7, 99):
                 _empty46 += 1
         _cmd46.unseen_contacts = []
 
+# A banner must describe the contacts that actually launched. A ceiling can
+# thin a wave to one track, and a SEAD pool can be capped out entirely, so the
+# announcement is gated on the draw rather than on the theme alone.
+_liar46 = []
+_thin46 = []
+for _seed46 in (1234, 7, 99, 31):
+    random.seed(_seed46)
+    _cmd46c = _CC46(profile=_PROF45)
+    for _t46 in range(1, 3 * GameConfig.THREAT_WINDOW_TICKS + 1):
+        _cmd46c.tick_count = _t46
+        _cmd46c.tactical_log = []
+        _cmd46c.unseen_contacts = []
+        _cmd46c.detect_airspace()
+        _text46 = " ".join(str(_l46) for _l46 in _cmd46c.tactical_log)
+        _spawned46 = list(_cmd46c.unseen_contacts)
+        if "SEAD STRIKE INBOUND" in _text46 or "ARMs unable to lock" in _text46:
+            if not any(isinstance(_c46, _ARM45) for _c46 in _spawned46):
+                _liar46.append(_t46)
+        if any(_b46 in _text46 for _b46 in ("MULTIPLE HOSTILE CONTACTS", "BALLISTIC MISSILE LAUNCH",
+                                           "UNMANNED AERIAL SWARM", "HEAVY FIGHTER FORMATION",
+                                           "CRUISE MISSILE VOLLEY")):
+            if len(_spawned46) < 2:
+                _thin46.append((_t46, len(_spawned46)))
+
+check(not _liar46,
+      f"a SEAD warning must never be logged without an anti-radiation missile "
+      f"in the wave ({len(_liar46)} false alerts; 5 of 10 before the fix)")
+check(not _thin46,
+      f"a mass-attack banner must never be logged over fewer than two contacts "
+      f"({len(_thin46)} thin alerts; 49 of 163 before the fix)")
+
+# --- an ARM launch must be an event, not weather ---
+_arm46 = 0
+random.seed(1234)
+_cmd46d = _CC46(profile=_PLAYER46)
+for _t46 in range(1, GameConfig.THREAT_WINDOW_TICKS + 1):
+    _cmd46d.tick_count = _t46
+    _n46 = len(_cmd46d.unseen_contacts)
+    _cmd46d.detect_airspace()
+    _arm46 += sum(1 for _c46 in _cmd46d.unseen_contacts[_n46:]
+                  if isinstance(_c46, _ARM45))
+    _cmd46d.unseen_contacts = []
+check(_arm46 <= 1,
+      f"anti-radiation missiles must be an event in Player mode: {_arm46} in an "
+      f"hour (8 before the fix, reported twice by the player as too many)")
+
 check(_waves46 > 0, f"the harness must actually trigger waves (saw {_waves46})")
 check(_empty46 == 0,
       f"a wave must never announce itself and then spawn nothing: {_empty46} of "

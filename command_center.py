@@ -596,13 +596,13 @@ class CommandCenter:
 
             wave_theme = random.choices(
                 ["MIXED", "BALLISTIC_RAIN", "DRONE_SWARM", "FIGHTER_STRIKE", "SEAD_STRIKE", "CRUISE_VOLLEY"],
-                weights=[30, 15, 15, 15, 15, 10], k=1)[0]
+                weights=[34, 15, 16, 17, 6, 12], k=1)[0]
 
             THEME_POOLS = {
                 "BALLISTIC_RAIN": {"ICBM": 10, "TBM": 90},
                 "DRONE_SWARM":    {"DRONE": 100},
                 "FIGHTER_STRIKE": {"FIGHTER": 100},
-                "SEAD_STRIKE":    {"ARM": 100, "CRUISE": 1},
+                "SEAD_STRIKE":    {"ARM": 100},
                 "CRUISE_VOLLEY":  {"CRUISE": 100},
             }
             pool = THEME_POOLS.get(wave_theme, dict(GameConfig.THREAT_WEIGHTS))
@@ -619,11 +619,30 @@ class CommandCenter:
                     break
                 drawn.append(threat_type)
 
-            if drawn:
+            if not drawn:
+                # Nothing could be drawn: every candidate is capped out.
+                # Back off briefly rather than re-rolling the gate on the
+                # next tick, which would raise the real wave rate.
+                self.wave_cooldown = 20
+            else:
                 base_cooldown = max(80, 200 if phase == "TENSIONS" else int(200 / min(3.0, 1.0 + (tick - 360) / 1500.0)))
                 self.wave_cooldown = max(1, int(base_cooldown * self._wave_cooldown_after_scale))
 
-                if wave_theme == "MIXED":
+                # The banner must describe what actually launched. A ceiling
+                # can thin a wave to a single contact, and "MULTIPLE HOSTILE
+                # CONTACTS INBOUND" over one track trains the player to ignore
+                # the alert; a SEAD warning with no ARM in the draw is simply
+                # false. Both are announced only when the draw supports them.
+                if wave_theme == "SEAD_STRIKE":
+                    if "ARM" not in drawn:
+                        pass  # no anti-radiation missile launched: no SEAD alert
+                    elif self.emcon_mode == "SILENT":
+                        self.add_log("\033[93m[INTEL] Enemy SEAD strike detected but radar is dark (EMCON SILENT). ARMs unable to lock!\033[0m")
+                    else:
+                        self.add_log("\033[41;97m[TACTICAL WARNING] SEAD STRIKE INBOUND! ANTI-RADIATION MISSILES HOMING ON BASE RADAR!\033[0m")
+                elif len(drawn) < 2:
+                    pass  # a lone contact is not a wave; the track speaks for itself
+                elif wave_theme == "MIXED":
                     self.add_log("\033[41;97m[TACTICAL WARNING] MULTIPLE HOSTILE CONTACTS INBOUND. BATTLE STATIONS.\033[0m")
                 elif wave_theme == "BALLISTIC_RAIN":
                     self.add_log("\033[41;97m[DEFCON 1] BALLISTIC MISSILE LAUNCH DETECTED. THAAD BATTERIES TO STANDBY.\033[0m")
@@ -631,11 +650,6 @@ class CommandCenter:
                     self.add_log("\033[41;97m[WARNING] UNMANNED AERIAL SWARM DETECTED. ACTIVATE CIWS PROTOCOL.\033[0m")
                 elif wave_theme == "FIGHTER_STRIKE":
                     self.add_log("\033[41;97m[TACTICAL WARNING] HEAVY FIGHTER FORMATION INBOUND. SCRAMBLE ALL INTERCEPTORS.\033[0m")
-                elif wave_theme == "SEAD_STRIKE":
-                    if self.emcon_mode == "SILENT":
-                        self.add_log("\033[93m[INTEL] Enemy SEAD strike detected but radar is dark (EMCON SILENT). ARMs unable to lock!\033[0m")
-                    else:
-                        self.add_log("\033[41;97m[TACTICAL WARNING] SEAD STRIKE INBOUND! ANTI-RADIATION MISSILES HOMING ON BASE RADAR!\033[0m")
                 elif wave_theme == "CRUISE_VOLLEY":
                     self.add_log("\033[41;97m[TACTICAL WARNING] TERRAIN-MASKED CRUISE MISSILE VOLLEY DETECTED!\033[0m")
 
