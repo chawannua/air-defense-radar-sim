@@ -21,6 +21,7 @@ class SimulationProfile:
     wave_size_max: Optional[int] = None
     wave_cooldown_initial: Optional[int] = None
     wave_cooldown_after: Optional[int] = None
+    threat_ceiling_scale: Optional[float] = None
 
     # Behavior flags
     autonomous_weapons: bool = True
@@ -45,6 +46,7 @@ class SimulationProfile:
             "WAVE_SIZE_MAX": self.resolve("wave_size_max", "WAVE_SIZE_MAX"),
             "WAVE_COOLDOWN_INITIAL": self.resolve("wave_cooldown_initial", "WAVE_COOLDOWN_INITIAL"),
             "WAVE_COOLDOWN_AFTER": self.resolve("wave_cooldown_after", "WAVE_COOLDOWN_AFTER"),
+            "THREAT_CEILING_SCALE": self.resolve("threat_ceiling_scale", "THREAT_CEILING_SCALE"),
         }
 
 
@@ -56,6 +58,7 @@ SPECTATOR_PROFILE = SimulationProfile(
     wave_size_max=int(GameConfig.WAVE_SIZE_MAX * 1.5),
     wave_cooldown_initial=max(1, int(GameConfig.WAVE_COOLDOWN_INITIAL * 0.5)),
     wave_cooldown_after=max(1, int(GameConfig.WAVE_COOLDOWN_AFTER * 0.5)),
+    threat_ceiling_scale=1.5,
     autonomous_weapons=True,
     player_input_enabled=False,
 )
@@ -68,6 +71,9 @@ PLAYER_PROFILE = SimulationProfile(
     wave_size_max=max(1, GameConfig.WAVE_SIZE_MAX // 2),
     wave_cooldown_initial=int(GameConfig.WAVE_COOLDOWN_INITIAL * 1.5),
     wave_cooldown_after=int(GameConfig.WAVE_COOLDOWN_AFTER * 1.5),
+    # Half the hourly threat budget. A player holding the trigger has one
+    # pair of hands; the AI in Spectator mode does not.
+    threat_ceiling_scale=0.5,
     autonomous_weapons=False,
     player_input_enabled=True,
 )

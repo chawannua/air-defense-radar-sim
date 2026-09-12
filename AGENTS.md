@@ -74,7 +74,7 @@ three-pillar doctrine:
 
 ## 5. Verification standard
 
-- Run `python test_logic.py` after any change. All **45 groups** must pass with zero errors.
+- Run `python test_logic.py` after any change. All **46 groups** must pass with zero errors.
 - Version strings in `main.py` (`__version__`) and `config.py` (`GameConfig.VERSION`) must
   always agree. Test group 42 enforces this; it is not left to convention.
 - A green test suite is necessary, not sufficient. Several defects have shipped past green

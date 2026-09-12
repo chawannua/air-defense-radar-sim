@@ -48,7 +48,7 @@ class GameConfig:
         "FIGHTER": 42,
         "DRONE":   24,
         "CRUISE":  12,
-        "ARM":      8,
+        "ARM":      5,
         "HELI":     8,
         "TBM":      5,
         "ICBM":     1,
@@ -61,7 +61,7 @@ class GameConfig:
     THREAT_MAX_PER_HOUR = {
         "ICBM":     1,
         "TBM":      3,
-        "ARM":      8,
+        "ARM":      3,
         "CRUISE":  12,
         "HELI":    12,
         "DRONE":   40,
@@ -71,6 +71,10 @@ class GameConfig:
     # Combat Air Patrol stations: (wing number, orbit x_km, orbit y_km, name).
     # Wing numbers index AIRBASES, so a station can never sit at a field the
     # wing does not actually operate from.
+    # Multiplier applied to every ceiling above. Profiles override it so a
+    # Player sees a quieter sky than a Spectator without a second table.
+    THREAT_CEILING_SCALE = 1.0
+
     CAP_STATIONS = [
         (4,  30.0,  400.0, "Northern CAP"),
         (7, -130.0, -430.0, "Southern CAP"),

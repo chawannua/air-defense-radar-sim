@@ -10,27 +10,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Ballistic launches were roughly ninety an hour.** The spawn rates lived inside `detect_airspace()` as literals, and one tick is one second. Wartime ran a `0.25-0.50` per-tick hostile chance with 10% of those ballistic, so the scope saw about **90 ballistic launches every hour**, and a `BALLISTIC_RAIN` wave added 5-15 more in a single burst. The threat model now lives in `GameConfig`: `THREAT_PHASES` holds the per-phase rates, `THREAT_WEIGHTS` the relative rarity of each type, and `THREAT_MAX_PER_HOUR` a rolling one-hour ceiling that wave spawns obey too. Measured by driving `detect_airspace()` through a full simulated hour:
 
-| Threat | Ceiling / hour | Spawned in 1 h |
-|---|---|---|
-| ICBM | 1 | **1** |
-| TBM | 3 | **3** |
-| ARM | 8 | **8** |
-| CRUISE | 12 | **12** |
-| HELI | 12 | **12** |
-| DRONE | 40 | **40** |
-| FIGHTER | 60 | **60** |
+| Threat | Player | Default | Spectator |
+|---|---|---|---|
+| ICBM | **1** | 1 | 2 |
+| TBM | **2** | 3 | 4 |
+| ARM | **2** | 3 | 4 |
+| CRUISE | **6** | 12 | 18 |
+| HELI | **6** | 12 | 18 |
+| DRONE | **20** | 40 | 60 |
+| FIGHTER | **30** | 60 | 90 |
 
-  Ballistic total: **4 an hour against ~90 before**. Every type reaches its ceiling, so the ceilings - not the underlying rates - are what the player feels; they are one dict in `config.py` and can be lowered without touching spawn code.
+  Measured over a full simulated hour, every profile spawns exactly its ceiling, so the ceilings - not the underlying rates - are what the player feels. Ballistic total per hour: **3 in Player mode, 4 default, against ~90 before**.
+
+- **Anti-radiation missiles were a constant, not an event.** ARM carried weight 8 of 100 and an 8/hour ceiling, so it saturated every hour of play: the SEAD warning never stopped. A SEAD package is an event, so the weight drops to 5 and the ceiling to 3 - **2 an hour in Player mode**.
+
+- **Waves announced attacks that never arrived.** The `BATTLE STATIONS` / `DEFCON 1` banner was logged, and the wave cooldown consumed, before the wave drew its contacts. Once the hourly ceilings bound, a themed pool could be entirely capped out and the wave spawned nothing - measured at **73% of waves over three simulated hours, from about 14 minutes in**. The wave is now drawn first and abandoned silently if nothing can be drawn, leaving the cooldown untouched so the next tick may try again. Measured after the fix: **0 of 97 announced waves empty**.
 
 - **CAP fighters launched from the wrong airfields.** `CAPFighter` carried its own copy of the airbase coordinates with the latitude sign flipped, so Korat, Takhli and Ubon - all north of Bangkok - put their fighters several hundred km *south* of their real fields, over the Gulf. Home position now reads `GameConfig.wing_home()`, which reads `AIRBASES`, the same table the map draws from, so the two cannot drift apart. Verified over **600 live CAP launches** across wings 4, 7, 21 and 41: zero at a wrong field.
 
-- **Zooming dragged the view back to Bangkok.** Screen position is `CX + x_km * zoom` where `CX` is Bangkok, so changing zoom alone magnifies about Bangkok. Panning out to Japan and scrolling slid the view home. The mouse-wheel handler now compensates the camera so the world point under the cursor stays under the cursor. Measured across a real `0.80 -> 1.25` wheel event with the view panned away: drift **0.21 km**.
+- **Zooming dragged the view back to Bangkok.** Screen position is `CX + x_km * zoom` where `CX` is Bangkok, so changing zoom alone magnifies about Bangkok. Panning out to Japan and scrolling slid the view home. The mouse-wheel handler now compensates the camera so the world point under the cursor stays under the cursor. The compensation is exact; the only residual is the integer truncation of the camera offsets, which is sub-pixel - **0.2 to 0.6 km depending on zoom**. Asserted algebraically over 36 camera/cursor/zoom combinations rather than measured once.
 
 ### Changed
 - **CAP rotates across four wings instead of two.** Only wings 4 and 7 ever flew. Stations are now listed in `GameConfig.CAP_STATIONS` - Northern (Wing 4, Takhli), Southern (Wing 7, Surat Thani), Eastern (Wing 21, Ubon) and Northwestern (Wing 41, Chiang Mai) - and each wing flies the aircraft `WING_AIRCRAFT` lists for it rather than a shared default.
 
 ### Added
-- Test group 45 covers all three defects: the hourly ceilings over a full simulated hour, every CAP station spawning at its own `AIRBASES` field with northern wings north of Bangkok, CAP rotation across more than two wings, and the wheel handler repositioning the camera. Suite **44 -> 45 groups**.
+- **Per-profile threat budgets.** `SimulationProfile.threat_ceiling_scale` scales every ceiling (Player 0.5, Spectator 1.5) and is resolved once per `CommandCenter`, so a Player and a Spectator in one process cannot share a budget. No type can be scaled out of existence - the floor is 1 per hour.
+- Test group 45 covers the three original defects: the hourly ceilings over a full simulated hour, every CAP station spawning at its own `AIRBASES` field with northern wings north of Bangkok, CAP rotation across more than two wings, and the wheel handler calling `zoom_anchor()`. Group 46 covers what the release review found: no announced wave may spawn nothing, Player ceilings must sit below Spectator across every type, no type may be scaled to zero, and a tick stamp ahead of the clock must not block its type forever. Suite **44 -> 46 groups**.
+
+### Review
+An adversarial review pass ran before this version was cut and blocked the first
+attempt. It found the empty-wave defect above - which the ceilings introduced and
+no test covered - and two holes in the new tests: the FIGHTER ceiling assertion
+counted nothing and so read `0 <= 60`, and the zoom check grepped the event loop
+for plausible-looking source text, which a sign-flipped camera would have passed.
+The camera math is now a named function asserted numerically, and `threat_allowed()`
+bounds its window at both ends so a rewound clock cannot permanently block a
+threat type. Three findings were accepted as correct-but-imprecise documentation
+and the wording fixed rather than the code.
 
 ## [1.7.0] - 2026-09-12
 

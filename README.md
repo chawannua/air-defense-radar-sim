@@ -14,10 +14,10 @@
 > A highly optimized, multi-threaded 2D radar simulation built with Python and Pygame, featuring realistic procedural audio, deterministic thread-safe mechanics, decoupled OOP architecture, and 100% logic test coverage.
 
 ### ⚡ Current Release: `v1.8.0` (Realistic Threat Tempo)
-Threats now arrive at a rate a real air-defence watch would recognise. Ballistic launches fall from roughly **90 an hour to 4** - the rates moved out of the spawn function into `GameConfig`, gained relative rarity weights, and sit under a rolling per-hour ceiling that wave spawns obey too. CAP fighters launch from their own airfields again: `CAPFighter` had its own copy of the coordinates with the latitude sign flipped, putting the three northern wings hundreds of km south over the Gulf, and CAP now rotates across **four wings** rather than two. Zooming no longer drags the view back to Bangkok - the wheel anchors on the cursor, drift **0.21 km**. Test suite expansion to 45/45.
+Threats now arrive at a rate a real air-defence watch would recognise. Ballistic launches fall from roughly **90 an hour to 4** - the rates moved out of the spawn function into `GameConfig`, gained relative rarity weights, and sit under a rolling per-hour ceiling that wave spawns obey too. CAP fighters launch from their own airfields again: `CAPFighter` had its own copy of the coordinates with the latitude sign flipped, putting the three northern wings hundreds of km south over the Gulf, and CAP now rotates across **four wings** rather than two. Zooming no longer drags the view back to Bangkok - the wheel anchors on the cursor, exactly. Player mode carries **half the hourly threat budget** of Spectator, and a wave that cannot draw any contact is abandoned silently instead of announcing an attack that never arrives. Test suite expansion to 46/46.
 
 **Quick Links:**
-[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.8.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (45/45)](test_logic.py)
+[Download AEGIS_Radar.exe (Windows)](https://github.com/chawannua/air-defense-radar-sim/releases/latest) • [Changelog (v1.0.0 → v1.8.0)](CHANGELOG.md) • [Features](#key-features) • [Tactical Controls](#complete-tactical-keybindings-menu--combat) • [Architecture](#system-architecture--oop-design) • [Verification (46/46)](test_logic.py)
 
 </div>
 
@@ -36,7 +36,7 @@ Threats now arrive at a rate a real air-defence watch would recognise. Ballistic
 9. [Visual FX & "Juice" Engine (`visual_effects.py`)](#visual-fx--juice-engine-visual_effectspy)
 10. [Complete Tactical Keybindings (Menu & Combat)](#complete-tactical-keybindings-menu--combat)
 11. [System Architecture & OOP Design](#system-architecture--oop-design)
-12. [Automated Testing (45/45 Test Suite)](#automated-testing-4545-test-suite)
+12. [Automated Testing (46/46 Test Suite)](#automated-testing-4646-test-suite)
 13. [Release History & Version Evolution (v1.0.0 → v1.8.0)](#release-history--version-evolution-v100--v180)
 14. [Version Control, Release Architecture & Repository Governance](#version-control-release-architecture--repository-governance)
 15. [Installation & Build Guide](#installation--build-guide)
@@ -561,7 +561,7 @@ air-defense-radar-sim/
 ├── sound_engine.py           # 100% procedural audio: NumPy mathematical DSP synthesis (zero audio files)
 ├── visual_effects.py         # Visual juice engine: T² camera trauma model, shockwaves, shrapnel, lead vectors
 ├── config.py                 # Simulation balance constants, RTAF airbase coordinates, weapon envelopes (single truth)
-├── test_logic.py             # Headless automated verification suite: 42 test modules passing 100%
+├── test_logic.py             # Headless automated verification suite: 46 test modules passing 100%
 ├── DEVELOPMENT.md            # Developer onboarding, domain modeling guides, and architecture notes
 ├── CHANGELOG.md              # Historical version changelog adhering to Keep a Changelog & SemVer
 ├── AGENTS.md                 # Protected files, permitted scope of work, and verification standard
@@ -615,9 +615,9 @@ air-defense-radar-sim/
 
 ---
 
-## Automated Testing (45/45 Test Suite)
+## Automated Testing (46/46 Test Suite)
 
-AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 42 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
+AEGIS Radar includes a comprehensive, headless automated test suite in [`test_logic.py`](test_logic.py). All 46 test modules validate core simulation physics, kinematics, and operational doctrines without requiring a GUI:
 
 ```bash
 $ python test_logic.py
@@ -669,7 +669,7 @@ $ python test_logic.py
 [PASS] 41. Player-Mode Backup Fire Must Not Starve on a Distant Priority Threat
 
 ==================================================
-ALL 41 TEST MODULES PASSED (100% SUCCESS RATE)
+ALL 46 TEST MODULES PASSED (100% SUCCESS RATE)
 ```
 
 ---
@@ -696,13 +696,15 @@ In accordance with SemVer (`MAJOR.MINOR.PATCH`):
 - The version increment from **`v1.5.1`** to **`v1.6.0`** brings the entire theatre up to the map detail of Thailand itself. Coastlines grow 8,338 to 27,639 points, borders 2,873 to 7,785, the Philippines 110 to 3,608 and Taiwan 9 to 256, and five country polygons clipped to the original Southeast Asia box are re-cut on the shared theatre frame, removing the rectangle that cut across the map. Eleven regions gain names; zoom floor 0.10 to 0.09.
 - The version increment from **`v1.6.0`** to **`v1.7.0`** finishes what v1.6.0 started. Terminating every layer on one shared frame did not make the straight edge read as a map border — the clipper returns straddling polygons closed along the cut, so the frame was being drawn as coastline. Cuts are now detected from the geometry and trimmed, Japan is reinstated as the 21st region on a window wide enough to contain it whole, labels gain zoom tiers and collision culling, and the render is brought back inside its frame budget on 39% more geometry. Test suite expands to 44/44.
 
-- The version increment from **`v1.7.0`** to **`v1.8.0`** makes the threat tempo realistic and fixes two long-standing positional defects. Spawn rates leave `detect_airspace()` for `GameConfig`, gaining per-type rarity weights and a rolling per-hour ceiling that wave spawns obey - ballistic launches drop from ~90 an hour to 4. `CAPFighter` stops carrying its own flipped copy of the airbase coordinates and reads `AIRBASES` instead, and CAP rotates across four wings instead of two. The mouse wheel anchors zoom on the cursor rather than on Bangkok. Test suite expands to 45/45.
+- The version increment from **`v1.7.0`** to **`v1.8.0`** makes the threat tempo realistic and fixes two long-standing positional defects. Spawn rates leave `detect_airspace()` for `GameConfig`, gaining per-type rarity weights and a rolling per-hour ceiling that wave spawns obey - ballistic launches drop from ~90 an hour to 4. `CAPFighter` stops carrying its own flipped copy of the airbase coordinates and reads `AIRBASES` instead, and CAP rotates across four wings instead of two. The mouse wheel anchors zoom on the cursor rather than on Bangkok. Threat ceilings are scaled per profile, so Player mode sees half the hourly budget Spectator does, and waves are drawn before they are announced. Test suite expands to 46/46.
 ### 🌟 Version 1.8.0 Feature Highlights
 - **Threat Tempo, Not Threat Spam:** Wartime ran a `0.25-0.50` per-tick hostile chance with 10% ballistic, and one tick is one second - about **90 ballistic launches an hour**, plus 5-15 more per `BALLISTIC_RAIN` wave. Measured over a full simulated hour after the fix: **1 ICBM, 3 TBM**.
 - **Rarity Is Configuration:** `THREAT_PHASES`, `THREAT_WEIGHTS` and `THREAT_MAX_PER_HOUR` live in `config.py`. The ceiling is rolling over `THREAT_WINDOW_TICKS` (3,600 ticks = 1 hour) and applies to wave spawns too, so a ballistic rain thins itself out instead of emptying a magazine on the scope.
 - **CAP Flies From Its Own Field:** `CAPFighter` held a private copy of the airbase table with the latitude sign flipped - Korat, Takhli and Ubon launched hundreds of km *south* of their real fields. Home now reads `GameConfig.wing_home()`, the same `AIRBASES` table the map draws. **600 live launches, zero at a wrong field.**
 - **Four Wings On Patrol:** Northern (Wing 4, Takhli), Southern (Wing 7, Surat Thani), Eastern (Wing 21, Ubon) and Northwestern (Wing 41, Chiang Mai), each flying the aircraft `WING_AIRCRAFT` lists for it.
-- **Cursor-Anchored Zoom:** Screen position is `CX + x_km * zoom` with `CX` at Bangkok, so zoom alone magnified about Bangkok. The wheel handler now moves the camera; the world point under the cursor drifts **0.21 km** across a 0.80 ➔ 1.25 zoom with the view panned to Japan.
+- **Cursor-Anchored Zoom:** Screen position is `CX + x_km * zoom` with `CX` at Bangkok, so zoom alone magnified about Bangkok. `zoom_anchor()` now moves the camera so the world point under the cursor stays under it — asserted algebraically over 36 camera, cursor and zoom-step combinations, residual sub-pixel.
+- **Quieter In Player Mode:** `threat_ceiling_scale` halves every hourly ceiling for a player and raises it 50% for a spectator, resolved once per `CommandCenter`. In Player mode: **2 ARM, 2 TBM, 1 ICBM** an hour, against 8 ARM and ~90 ballistic before.
+- **No Empty Battle Stations:** A wave used to log its red banner and burn its cooldown before drawing contacts, so once the ceilings bound, **73% of waves announced an attack that never arrived**. Waves are drawn first and abandoned in silence if the pool is capped out. **0 of 97 empty.**
 
 ### 🌟 Version 1.7.0 Feature Highlights
 - **The Straight Edge Was Never A Border:** v1.6.0 reasoned that terminating every layer on one clip frame would make the edge "read as the map border rather than a stray box". It did not. A polygon straddling the frame comes back *closed along the cut*, so the frame was drawn as coastline — `chn.json` alone carrying **36.25° (~3,000 km)** of perfectly straight fake border across northern China. Longest surviving axis-aligned run: **~3,000 km ➔ 19 km**.
@@ -814,7 +816,7 @@ No release tag may be minted or pushed without achieving a 100% clean bill of he
 ```bash
 python test_logic.py
 ```
-- **Zero Failures**: All **45/45 test modules** (370+ assertions) must evaluate to `[PASS]`.
+- **Zero Failures**: All **46/46 test modules** (370+ assertions) must evaluate to `[PASS]`.
 - **Adversarial Regression Locks**: Tests 38–41 explicitly lock in critical behavioral guards:
   - *Test 38*: `DEFAULT_PROFILE` command input retention (un-profiled callers retain human console controls).
   - *Test 39*: Spectator IFF re-designation guard against accidental civilian shootdown court-martial.

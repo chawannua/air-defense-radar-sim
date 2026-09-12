@@ -17,7 +17,7 @@
 |---|---|
 | Version | `1.8.0` — `main.py:2` (`__version__`) and `config.py:3` (`GameConfig.VERSION`) must always agree; **test group 42 now enforces this**, it is no longer convention |
 | Branch | `main`, trunk-based, linear history |
-| Test suite | `python test_logic.py` → **45 groups**, must print `ALL TESTS PASSED` |
+| Test suite | `python test_logic.py` → **46 groups**, must print `ALL TESTS PASSED` |
 | Entry point | `python main.py` → menu → mode select → `start_radar(profile=...)` |
 | Map coverage | 21 countries on the window `lon 68-146, lat -11-46`; x span `8,399 km`, y span `6,294 km`, furthest `5,968 km`; 97k drawable points. Only `lat 46.0` cuts the theatre and the loader trims it, so no clip edge is ever drawn |
 
@@ -162,7 +162,7 @@ Test coverage gap: the suite is UI-free. No test exercises the Spectator input g
 
 | Version | Summary |
 |---|---|
-| v1.8.0 | Spawn rates left `detect_airspace()` for `GameConfig`: `THREAT_PHASES` (per-phase rates), `THREAT_WEIGHTS` (relative rarity) and a rolling `THREAT_MAX_PER_HOUR` ceiling that wave spawns obey. Ballistic launches ~90/hour -> 4/hour measured over a full simulated hour. `CAPFighter` no longer carries a private, latitude-flipped copy of the airbase table - home reads `GameConfig.wing_home()` off `AIRBASES`; CAP rotates across the four `CAP_STATIONS` wings instead of two. Mouse wheel anchors zoom on the cursor (drift 0.21 km) instead of magnifying about Bangkok. Suite 44 -> 45 groups |
+| v1.8.0 | Spawn rates left `detect_airspace()` for `GameConfig`: `THREAT_PHASES` (per-phase rates), `THREAT_WEIGHTS` (relative rarity) and a rolling `THREAT_MAX_PER_HOUR` ceiling that wave spawns obey. Ballistic launches ~90/hour -> 4/hour measured over a full simulated hour. `CAPFighter` no longer carries a private, latitude-flipped copy of the airbase table - home reads `GameConfig.wing_home()` off `AIRBASES`; CAP rotates across the four `CAP_STATIONS` wings instead of two. Mouse wheel anchors zoom on the cursor (exactly; residual is sub-pixel integer truncation) instead of magnifying about Bangkok. Ceilings scale per profile via `SimulationProfile.threat_ceiling_scale` (Player 0.5, Spectator 1.5), resolved once per CommandCenter. Waves are drawn before they are announced - the review found 73% of waves logging BATTLE STATIONS and spawning nothing once the ceilings bound. ARM weight 8 -> 5, ceiling 8 -> 3. Suite 44 -> 46 groups |
 | v1.7.0 | Clip edges were being drawn as coastline (chn.json alone ~3,000 km of fake straight border, plus a hard frame round the theatre); cuts are now detected from the geometry and trimmed. Labels tiered, zoom-gated and collision-culled. Theatre re-cut to `lon 68-146, lat -11-46` adding JPN whole, reversing the v1.4.1 ~4,000 km exclusion; zoom floor 0.09 -> 0.07. Render 23.4 -> 17.9 ms worst case on 39% more geometry via bbox culling, LOD and an inlined projection. Suite 42 -> 44 groups |
 | v1.4.0 | Main menu + cinematic camera, Spectator/Player mode separation, context-aware skill triggers (CIWS / chaff / EW flood), map extended to PHL + TWN (+57% east-west), repo cleanup 3,725 → 37 tracked files, suite 31 → 41 groups |
 | v1.6.0 | Uniform theatre detail: coastlines 8,338 -> 27,639 pts, borders 2,873 -> 7,785, PHL 110 -> 3,608, TWN 9 -> 256; chn/idn/mys/mmr/kor re-cut from the old SEA box onto the shared frame, removing the mid-map rectangle; 11 region labels; zoom floor 0.10 -> 0.09. Uncached render ~26 ms vs 16.7 ms budget |
